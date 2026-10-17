@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  One page type's layout, as its draft: the current template set's regions, each an ordered list of
+  sections. Every control is a form POST that redirects back here (↑/↓, move to a region, remove,
+  each section's settings); drag and drop is mgmt.js's enhancement over the same lists, posting
+  the new order to …/arrange and reloading.
+
+  A section the set cannot render -- an unknown type, a type the set does not implement, settings
+  that fail, a region the set lacks -- stays on screen, marked; it is never dropped, and renders
+  again on a set that can.
+
+  Settings fields are named f_<field>: MgmtDesignController collects them, DesignLayouts checks them
+  against the section type (SectionSettings). Nothing else in a section's form has a name.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(${mgmtText.label(editor.pageType)} + ' · ' + #{design.layouts})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('design')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(${mgmtText.label(editor.pageType)})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <a class="btn btn-ghost" th:href="@{/mgmt/design}">
+                    <svg class="i"><use href="#i-arrow-up"></use></svg> <span th:text="#{design.title}">Design</span>
+                </a>
+                <span class="badge" th:classappend="${editor.custom} ? 'published'"
+                      th:text="${editor.custom} ? #{design.layout.custom} : #{design.layout.default}">default</span>
+                <span class="badge" th:if="${editor.unpublished}" th:text="#{design.layout.draft}">draft</span>
+                <span class="spacer" style="margin-left:auto"></span>
+                <a class="btn" th:href="@{/mgmt/design/preview(page=${pageTypeSlug})}">
+                    <svg class="i"><use href="#i-eye"></use></svg> <span th:text="#{design.preview}">Preview</span>
+                </a>
+                <form method="post" class="inline-form" th:if="${can != null and can.site('design.publish')}"
+                      th:action="@{/mgmt/design/layouts/{t}/publish(t=${pageTypeSlug})}">
+                    <button class="btn btn-primary" type="submit">
+                        <svg class="i"><use href="#i-check"></use></svg> <span th:text="#{design.publish}">Publish</span>
+                    </button>
+                </form>
+                <form method="post" class="inline-form" th:if="${editor.unpublished}"
+                      th:action="@{/mgmt/design/layouts/{t}/discard(t=${pageTypeSlug})}" th:data-confirm="#{design.discard.confirm}">
+                    <button class="btn" type="submit" th:text="#{design.discard}">Discard the draft</button>
+                </form>
+                <form method="post" class="inline-form"
+                      th:action="@{/mgmt/design/layouts/{t}/reset(t=${pageTypeSlug})}" th:data-confirm="#{design.reset.confirm}">
+                    <button class="btn btn-ghost" type="submit" th:text="#{design.reset}">Template default</button>
+                </form>
+            </div>
+
+            <p class="muted" th:text="#{design.layout.intro}">Changes are a draft until published.</p>
+
+            <!--/* Design assist: a layout draft from a few words (DesignAssist). Only the draft changes. */-->
+            <div class="card" th:if="${aiAvailable and can != null and can.site('design.write')}">
+                <h2><svg class="i"><use href="#i-layout"></use></svg> <span th:text="#{design.assist.title}">Describe it</span></h2>
+                <form method="post" th:action="@{/mgmt/design/layouts/{t}/assist(t=${pageTypeSlug})}">
+                    <div class="card-body">
+                        <span class="hint" th:text="#{design.assist.layout.intro}">Describe the page; AI drafts the sections.</span>
+                        <textarea name="brief" rows="3" maxlength="1000" th:placeholder="#{design.assist.layout.example}"></textarea>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn" type="submit"><svg class="i"><use href="#i-play"></use></svg> <span th:text="#{design.assist.submit}">Draft it</span></button>
+                    </div>
+                </form>
+            </div>
+
+
+            <div class="card" th:unless="${editor.issues.isEmpty()}">
+                <h2><svg class="i"><use href="#i-alert"></use></svg> <span th:text="#{design.issues}">Not rendered by this template</span></h2>
+                <div class="card-body">
+                    <ul style="margin:0">
+                        <li th:each="i : ${editor.issues}">
+                            <strong th:text="${labels.section(i.type)}">Search box</strong>
+                            <span class="muted" th:text="'(' + ${labels.region(i.region)} + ')'">(aside)</span>:
+                            <span th:text="${labels.issue(i)}">this template does not render it</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card region-card" th:each="r : ${editor.regions}">
+                <h2>
+                    <svg class="i"><use href="#i-layout"></use></svg>
+                    <span th:text="${labels.region(r.name)}">Main column</span>
+                    <span class="badge off" th:unless="${r.known}" th:text="#{design.region.unknown}">not on this template</span>
+                </h2>
+                <ol class="region-list" th:data-region="${r.name}" th:data-arrange="@{/mgmt/design/layouts/{t}/arrange(t=${pageTypeSlug})}">
+                    <li class="section-card" th:each="v, it : ${r.sections}" th:data-id="${v.section.id}"
+                        th:classappend="${v.rendered} ? '' : 'section-card--flagged'">
+                        <div class="section-card__head">
+                            <span class="section-card__grip" aria-hidden="true">⋮⋮</span>
+                            <strong th:text="${v.primary} ? #{design.section.primary.title} : ${labels.section(v.section.type)}">Article list</strong>
+                            <span class="muted section-card__summary" th:unless="${v.primary}">
+                                <th:block th:if="${v.section.settings['heading'] != null}" th:text="${v.section.settings['heading']}">Heading</th:block>
+                                <th:block th:if="${v.section.settings['style'] != null}"
+                                          th:text="' · ' + ${labels.choice('style', v.section.settings['style'])}"> · Cards</th:block>
+                                <th:block th:if="${v.section.settings['source'] != null}"
+                                          th:text="' · ' + ${labels.choice('source', v.section.settings['source'])}"> · Latest</th:block>
+                            </span>
+                            <span class="badge off" th:unless="${v.rendered}" th:text="#{design.notRendered}">not rendered</span>
+                            <span class="spacer" style="margin-left:auto"></span>
+                            <form method="post" class="inline-form" th:unless="${it.first}"
+                                  th:action="@{/mgmt/design/layouts/{t}/sections/{s}/move(t=${pageTypeSlug}, s=${v.section.id})}">
+                                <input type="hidden" name="dir" value="up">
+                                <button class="btn btn-sm btn-ghost" type="submit" th:title="#{design.up}" th:aria-label="#{design.up}">↑</button>
+                            </form>
+                            <form method="post" class="inline-form" th:unless="${it.last}"
+                                  th:action="@{/mgmt/design/layouts/{t}/sections/{s}/move(t=${pageTypeSlug}, s=${v.section.id})}">
+                                <input type="hidden" name="dir" value="down">
+                                <button class="btn btn-sm btn-ghost" type="submit" th:title="#{design.down}" th:aria-label="#{design.down}">↓</button>
+                            </form>
+                            <form method="post" class="inline-form" th:if="${editor.set.spec(editor.pageType).regions().size() > 1}"
+                                  th:action="@{/mgmt/design/layouts/{t}/sections/{s}/region(t=${pageTypeSlug}, s=${v.section.id})}">
+                                <label class="sr-only" th:for="'to-' + ${v.section.id}" th:text="#{design.moveTo}">Move to</label>
+                                <select name="region" th:id="'to-' + ${v.section.id}" class="select-sm">
+                                    <option th:each="n : ${editor.set.spec(editor.pageType).regions()}" th:value="${n}"
+                                            th:text="${labels.region(n)}" th:selected="${n == r.name}">main</option>
+                                </select>
+                                <button class="btn btn-sm" type="submit" th:text="#{design.move}">Move</button>
+                            </form>
+                            <form method="post" class="inline-form" th:unless="${v.primary}"
+                                  th:action="@{/mgmt/design/layouts/{t}/sections/{s}/remove(t=${pageTypeSlug}, s=${v.section.id})}"
+                                  th:data-confirm="#{design.remove.confirm}">
+                                <button class="btn btn-sm btn-danger" type="submit" th:text="#{design.remove}">Remove</button>
+                            </form>
+                        </div>
+                        <p class="muted section-card__note" th:if="${v.primary}" th:text="#{design.section.primary.note}">This page's own content.</p>
+                        <p class="section-card__note" th:each="i : ${v.issues}" th:text="${labels.issue(i)}">Not rendered.</p>
+
+                        <details th:if="${v.type.isPresent() and !v.primary and !v.type.get().fields().isEmpty()}"
+                                 th:open="${openSection == v.section.id}">
+                            <summary th:text="#{design.settings}">Settings</summary>
+                            <form method="post" class="section-form"
+                                  th:action="@{/mgmt/design/layouts/{t}/sections/{s}(t=${pageTypeSlug}, s=${v.section.id})}">
+                                <div class="field" th:each="f : ${v.type.get().fields()}"
+                                     th:with="value=${v.section.settings[f.name()]}, fid=${v.section.id + '-' + f.name()}">
+                                    <label th:for="${fid}" th:text="${labels.field(f.name())}">Heading</label>
+                                    <th:block th:switch="${f.kind().name()}">
+                                        <select th:case="'CHOICE'" th:id="${fid}" th:name="'f_' + ${f.name()}">
+                                            <option th:each="c : ${f.choices()}" th:value="${c}"
+                                                    th:text="${labels.choice(f.name(), c)}" th:selected="${c == value}">c</option>
+                                        </select>
+                                        <select th:case="'CATEGORY'" th:id="${fid}" th:name="'f_' + ${f.name()}">
+                                            <option value="" th:text="'—'">—</option>
+                                            <option th:each="c : ${categories}" th:value="${c.id}" th:text="${c.name}"
+                                                    th:selected="${value != null and c.id == value}">Category</option>
+                                        </select>
+                                        <input th:case="'NUMBER'" type="number" th:id="${fid}" th:name="'f_' + ${f.name()}"
+                                               th:min="${f.min()}" th:max="${f.max()}" th:value="${value}">
+                                        <textarea th:case="'LONG_TEXT'" th:id="${fid}" th:name="'f_' + ${f.name()}" rows="3"
+                                                  th:maxlength="${f.max()}" th:text="${value}"></textarea>
+                                        <textarea th:case="'HTML'" th:id="${fid}" th:name="'f_' + ${f.name()}" rows="8" class="code"
+                                                  th:maxlength="${f.max()}" th:text="${value}"></textarea>
+                                        <input th:case="*" type="text" th:id="${fid}" th:name="'f_' + ${f.name()}"
+                                               th:maxlength="${f.max() > 0 ? f.max() : null}" th:value="${value}">
+                                    </th:block>
+                                    <span class="hint" th:if="${f.kind().name() == 'URL'}" th:text="#{design.hint.url}">An https address, or one on the website.</span>
+                                    <span class="hint" th:if="${f.kind().name() == 'HTML'}" th:text="#{design.hint.html}">HTML, as in an article body.</span>
+                                </div>
+                                <div class="actions">
+                                    <button class="btn btn-primary" type="submit">
+                                        <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{design.saveSection}">Save the section</span>
+                                    </button>
+                                </div>
+                            </form>
+                        </details>
+                    </li>
+                </ol>
+                <div class="empty" th:if="${r.sections.isEmpty()}">
+                    <span th:text="#{design.region.empty}">Nothing here yet.</span>
+                </div>
+                <div class="card-foot" th:if="${r.known and !editor.addable.isEmpty()}">
+                    <form method="post" class="actions" th:action="@{/mgmt/design/layouts/{t}/sections(t=${pageTypeSlug})}">
+                        <input type="hidden" name="region" th:value="${r.name}">
+                        <label class="sr-only" th:for="'add-' + ${r.name}" th:text="#{design.add}">Add a section</label>
+                        <select name="type" th:id="'add-' + ${r.name}" class="select-sm">
+                            <option th:each="t : ${editor.addable}" th:value="${t.id()}" th:text="${labels.section(t)}">Rich text</option>
+                        </select>
+                        <button class="btn" type="submit">
+                            <svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{design.add}">Add a section</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

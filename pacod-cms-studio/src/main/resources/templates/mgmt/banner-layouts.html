@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<!--/*
+  «Макети» -- the folders behind the site's HTML5 bookings.
+
+  The «папка» column is the reason this screen is worth having on its own. A booking can name a
+  folder that is absent from the content volume, and the only other symptom is an empty iframe on
+  the public site. A layout whose folder is missing says so here.
+*/-->
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{banners.layouts.title})}"></head>
+
+<body>
+
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('layouts')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{banners.layouts.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <form class="toolbar" method="get" th:action="@{/mgmt/banners/layouts}"
+                      style="flex:1 1 420px; margin:0">
+                    <div class="search">
+                        <svg class="i"><use href="#i-search"></use></svg>
+                        <input type="search" id="search-input" name="q" th:value="${q}"
+                               th:placeholder="#{banners.layouts.search.placeholder}"
+                               th:aria-label="#{banners.layouts.search.aria}">
+                        <kbd>/</kbd>
+                    </div>
+                    <button class="btn" type="submit" th:text="#{banners.layouts.search.submit}">Search</button>
+                    <a class="btn btn-ghost" th:href="@{/mgmt/banners/layouts}"
+                       th:if="${!#strings.isEmpty(q)}" th:text="#{banners.layouts.search.clear}">Clear</a>
+                </form>
+                <a class="btn btn-ghost" th:href="@{/mgmt/banners/layouts/skeletons}">
+                    <svg class="i"><use href="#i-code"></use></svg> <th:block th:text="#{banners.layouts.skeletons}">Templates</th:block>
+                </a>
+                <a class="btn btn-primary" th:href="@{/mgmt/banners/layouts/new}">
+                    <svg class="i"><use href="#i-plus"></use></svg> <th:block th:text="#{banners.layouts.new}">New layout</th:block>
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{banners.layouts.col.folder}">Folder</th>
+                            <th th:text="#{banners.layouts.col.title}">Title</th>
+                            <th class="shrink" th:text="#{banners.layouts.col.origin}">Origin</th>
+                            <th class="shrink" th:text="#{banners.layouts.col.slides}">Frames</th>
+                            <th class="shrink" th:text="#{banners.layouts.col.size}">Size</th>
+                            <th class="shrink" th:text="#{banners.layouts.col.bookings}">Bookings</th>
+                            <th class="shrink" th:text="#{banners.layouts.col.files}">Files</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="row : ${layouts}"
+                            th:attr="data-href=@{/mgmt/banners/layouts/{id}(id=${row.layout.id})}">
+                            <td>
+                                <code th:text="${row.layout.id}">acme-2026</code>
+                            </td>
+                            <td class="title-cell">
+                                <a th:href="@{/mgmt/banners/layouts/{id}(id=${row.layout.id})}"
+                                   th:text="${row.layout.title}">Acme</a>
+                                <div class="cell-sub muted" th:text="${row.layout.publicPath()}">
+                                    /resources/banners/acme-2026/index.html
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge plain" th:text="${mgmtText.label(row.layout.origin)}">Built</span>
+                            </td>
+                            <td>
+                                <span th:if="${row.layout.origin.name() == 'BUILT'}"
+                                      th:text="${row.layout.slideCount()}">2</span>
+                                <span th:unless="${row.layout.origin.name() == 'BUILT'}" class="muted">—</span>
+                            </td>
+                            <td>
+                                <span th:if="${row.layout.width != null and row.layout.height != null}"
+                                      th:text="${row.layout.width} + '×' + ${row.layout.height}">300×250</span>
+                                <span th:unless="${row.layout.width != null and row.layout.height != null}"
+                                      class="muted" th:text="#{banners.layouts.size.byFrame}">by the frame</span>
+                            </td>
+                            <td th:text="${row.bookings}">1</td>
+                            <td>
+                                <!--/*
+                                  Not a count of files -- the detail screen has that. This says only
+                                  whether the folder is on the volume at all, which is the failure
+                                  that is otherwise invisible from every other screen in the console.
+                                */-->
+                                <span class="badge published" th:if="${row.folderPresent}"
+                                      th:text="#{banners.layouts.folder.present}">on disk</span>
+                                <span class="badge draft" th:unless="${row.folderPresent}"
+                                      th:text="#{banners.layouts.folder.missing}">missing</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="empty" th:if="${layouts.isEmpty()}">
+                    <svg class="i"><use href="#i-layout"></use></svg>
+                    <span th:text="${#strings.isEmpty(q)}
+                            ? #{banners.layouts.empty}
+                            : #{banners.layouts.empty.search}"></span>
+                    <a class="btn btn-sm" th:href="@{/mgmt/banners/layouts/new}"
+                       th:if="${#strings.isEmpty(q)}" th:text="#{banners.layouts.empty.createFirst}">Create the first</a>
+                </div>
+            </div>
+
+            <!--/*
+              ============================================================ непознати папки
+
+              Папки, които стоят на диска, но никой документ не ги описва. Без този списък екраните
+              описват само това, което конзолата сама е създала — а на живия диск това не е нито
+              една от рекламите, които сайтът в момента върти.
+
+              Приемането не е автоматично: то презаписва папка, която конзолата не е писала, затова
+              се случва само когато операторът го поиска. Копие се пази настрани преди първата
+              промяна.
+            */-->
+            <div class="card" th:if="${!orphans.isEmpty()}">
+                <h2>
+                    <svg class="i"><use href="#i-inbox"></use></svg>
+                    <span th:text="#{banners.layouts.orphans.heading}">Folders on disk without a layout</span>
+                    <span class="hint" th:text="#{banners.layouts.orphans.count(${orphans.size()})}">3</span>
+                </h2>
+                <div class="card-body">
+                    <p class="muted" style="margin-top:0" th:text="#{banners.layouts.orphans.intro}">
+                        These folders exist in the banner directory, but the console does not know about them.
+                    </p>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{banners.layouts.col.folder}">Folder</th>
+                            <th class="shrink" th:text="#{banners.layouts.col.files}">Files</th>
+                            <th th:text="#{banners.layouts.orphans.col.entry}">Opened from</th>
+                            <th class="shrink" th:text="#{banners.layouts.orphans.col.adopt}">Adoption</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="o : ${orphans}">
+                            <td><code th:text="${o.id}">acme2</code></td>
+                            <td th:text="${o.files}">5</td>
+                            <td>
+                                <code th:if="${o.entryFile != null}" th:text="${o.entryFile}">index.html</code>
+                                <span th:unless="${o.entryFile != null}" class="muted"
+                                      th:text="#{banners.layouts.orphans.noEntry}">
+                                    no unambiguous HTML file
+                                </span>
+                            </td>
+                            <td class="path-row">
+                                <form method="post" class="inline-form"
+                                      th:action="@{/mgmt/banners/layouts/adopt}">
+                                    <input type="hidden" name="folder" th:value="${o.id}">
+                                    <button class="btn btn-sm" type="submit"
+                                            th:disabled="${o.entryFile == null}"
+                                            th:text="#{banners.layouts.orphans.adopt}">Adopt</button>
+                                </form>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!--/*
+              Import lives on the list rather than behind a screen of its own: it is the other half
+              of «Нов макет», and UploadSizeAdvice redirects an oversize upload to this URL's parent,
+              which is this page.
+            */-->
+            <div class="card">
+                <h2>
+                    <svg class="i"><use href="#i-upload"></use></svg>
+                    <span th:text="#{banners.layouts.import.heading}">Upload a ready-made layout</span>
+                    <span class="hint" th:text="#{banners.layouts.import.limit}">.zip up to 4 MB</span>
+                </h2>
+                <div class="card-body">
+                    <p class="muted" style="margin-top:0" th:text="#{banners.layouts.import.intro}">
+                        An archive of a ready-made folder.
+                    </p>
+                    <form method="post" enctype="multipart/form-data"
+                          th:action="@{/mgmt/banners/layouts/import}">
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="import-id" th:text="#{banners.layouts.import.id}">Folder name</label>
+                                <input type="text" id="import-id" name="id" required
+                                       placeholder="globex-2026" maxlength="64">
+                                <span class="hint" th:text="#{banners.layouts.import.id.hint}">Lowercase Latin letters, digits and hyphens. Cannot be changed later.</span>
+                            </div>
+                            <div class="field">
+                                <label for="import-title" th:text="#{banners.layouts.import.title}">Title</label>
+                                <input type="text" id="import-title" name="title"
+                                       th:placeholder="#{banners.layouts.import.title.placeholder}" maxlength="128">
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="import-file" th:text="#{banners.layouts.import.file}">Archive</label>
+                            <input type="file" id="import-file" name="file" accept=".zip,application/zip" required>
+                        </div>
+                        <div class="actions">
+                            <button class="btn" type="submit">
+                                <svg class="i"><use href="#i-upload"></use></svg> <th:block th:text="#{banners.layouts.import.submit}">Upload the archive</th:block>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

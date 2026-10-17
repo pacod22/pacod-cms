@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  The studio's error page: BasicErrorController renders the view `error` for every status. It reads
+  nothing but ${status} and the request attributes every handler gets (mgmtText, studioRoot) -- no
+  controller ran, and a template that threw inside the error dispatch would re-enter it. The copy
+  branches on the status; `message` is never shown.
+*/-->
+<head th:replace="~{mgmt/fragments :: head(#{|error.heading.${status == 403 or status == 404 or status == 503 ? status : 'other'}|})}"></head>
+
+<body class="login-page">
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<main class="login-card" th:with="kind=${status == 403 or status == 404 or status == 503 ? status : 'other'}">
+    <span class="brand-mark"><svg class="i"><use href="#i-leaf"></use></svg></span>
+
+    <h1 th:text="#{|error.heading.${kind}|}">Something went wrong</h1>
+    <p class="sub" th:text="${status}">500</p>
+    <p class="muted" th:text="#{|error.text.${kind}|}">Please try again.</p>
+
+    <a class="btn btn-primary" th:href="${studioRoot != null ? studioRoot : ''} + '/mgmt/sites'"
+       th:text="#{error.back}">Back to the websites</a>
+</main>
+
+</body>
+</html>

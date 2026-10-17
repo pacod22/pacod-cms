@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  /mgmt/crawlers -- the crawlers that reached the public site: the stale-crawler warning, four
+  tiles, a chart, the per-bot table, the categories, the top paths and the filtered visit log with
+  its pager.
+
+  Two halves, and the screen says which is which, because they answer to different controls:
+  - the tiles, the chart, the per-bot table, the categories and the top paths follow the PERIOD only;
+  - the log follows the period AND its own filters (bot, category, verification, errors, path).
+  Summaries that silently ignored the log's filters would mislead; the hints say so.
+
+  The log-backed cards (last seen, top paths, the log) read crawlerVisit, which keeps 31 days, so on
+  the twelve-month range they say they stop there -- window.clamped.
+
+  Every filter is a GET parameter and every link carries all of them, for the reason the monitoring
+  screen's range form carries `banner`: a GET form replaces the whole query string. The pager links
+  are the one place `page` travels; every other link drops it, because a differently filtered log
+  has different rows on page 4.
+*/-->
+<head th:replace="~{mgmt/fragments :: head(#{ops.crawl.title})}"></head>
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('crawlers')}"></th:block>
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{ops.crawl.title})}"></header>
+        <main class="content"
+              th:with="cat=${filter.category != null ? filter.category.name() : null},
+                       ver=${filter.verification != null ? filter.verification.name() : null},
+                       err=${filter.errorsOnly ? '1' : null}">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <form class="toolbar" method="get" th:action="@{/mgmt/crawlers}" style="flex:1 1 320px; margin:0">
+                    <label class="pick">
+                        <select name="range" data-autosubmit th:aria-label="#{ops.mon.range.aria}">
+                            <option th:each="r : ${ranges}" th:value="${r.key}" th:text="${mgmtText.label(r)}"
+                                    th:selected="${r.key == range.key}">24 hours</option>
+                        </select>
+                    </label>
+                    <input type="hidden" name="bot" th:if="${filter.bot != null}" th:value="${filter.bot}"/>
+                    <input type="hidden" name="category" th:if="${cat != null}" th:value="${cat}"/>
+                    <input type="hidden" name="verification" th:if="${ver != null}" th:value="${ver}"/>
+                    <input type="hidden" name="errors" th:if="${filter.errorsOnly}" value="1"/>
+                    <input type="hidden" name="q" th:if="${filter.q != null}" th:value="${filter.q}"/>
+                    <button class="btn" type="submit" th:text="#{ops.common.show}">Show</button>
+                </form>
+                <a class="btn btn-ghost push" th:href="@{/mgmt/monitoring(range=${range.key})}">
+                    <svg class="i"><use href="#i-activity"></use></svg> <th:block th:text="#{ops.crawl.toMonitoring}">Back to statistics</th:block>
+                </a>
+            </div>
+
+            <!--/*
+              Googlebot and Bingbot gone quiet is the one finding on this screen worth interrupting
+              for. It waits for 48 hours of history before it will say so -- an empty collection on
+              a fresh installation is not evidence of anything -- and a forged visit does not count
+              as the bot having been here. See MgmtCrawlerService.watch.
+            */-->
+            <div class="flash warn" th:if="${!watch.stale.isEmpty()}" role="status">
+                <svg class="i"><use href="#i-alert"></use></svg>
+                <span class="flash-text">
+                    <th:block th:each="s, it : ${watch.stale}">
+                        <b th:text="${s.bot}">googlebot</b>
+                        <span th:if="${s.lastSeen != null}"
+                              th:text="#{ops.crawl.stale.since(${times.day(s.lastSeen)})}">has not come</span>
+                        <span th:if="${s.lastSeen == null}"
+                              th:text="#{ops.crawl.stale.never(${retentionDays})}">has not come</span>
+                        <br th:unless="${it.last}"/>
+                    </th:block>
+                </span>
+            </div>
+            <p class="result-line" th:if="${watch.collecting}">
+                <svg class="i"><use href="#i-activity"></use></svg>
+                <span th:if="${watch.since != null}"
+                      th:text="#{ops.crawl.collecting.since(${times.day(watch.since)})}">The log has been kept since …</span>
+                <span th:if="${watch.since == null}" th:text="#{ops.crawl.collecting.empty}">No crawler visits recorded yet.</span>
+            </p>
+
+            <div class="stat-grid">
+                <div class="stat">
+                    <span class="stat-label" th:text="#{ops.crawl.hits}">Crawler visits</span>
+                    <span class="stat-value" th:text="${report.totals.hits}">0</span>
+                    <span class="stat-note" th:text="${mgmtText.label(range)}">period</span>
+                </div>
+                <div class="stat" th:classappend="${report.totals.errors > 0} ? 'stat-danger'">
+                    <span class="stat-label" th:text="#{ops.crawl.errors}">Errors</span>
+                    <span class="stat-value" th:text="${report.totals.errors}">0</span>
+                    <span class="stat-note" th:text="#{ops.crawl.errors.note}">response 400 or higher</span>
+                </div>
+                <div class="stat" th:classappend="${report.totals.spoofed > 0} ? 'stat-warn'">
+                    <span class="stat-label" th:text="#{ops.crawl.spoofed}">Fake</span>
+                    <span class="stat-value" th:text="${report.totals.spoofed}">0</span>
+                    <span class="stat-note" th:title="#{ops.crawl.spoofed.title}" th:text="#{ops.crawl.spoofed.note}">
+                        under a borrowed name, by DNS</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label" th:text="#{ops.crawl.bots}">Distinct crawlers</span>
+                    <span class="stat-value" th:text="${report.totals.bots}">0</span>
+                    <span class="stat-note" th:text="#{ops.crawl.bots.note}">in the period</span>
+                </div>
+            </div>
+
+            <div th:replace="~{mgmt/chart :: chart(${report.chart}, #{ops.crawl.chart}, ${mgmtText.label(range)})}"></div>
+
+            <!--/* Per bot, from the buckets: the period only. «Последно» is the one column from the
+                   log, over everything it keeps, so it is not limited to the period. */-->
+            <div class="card">
+                <h2>
+                    <svg class="i"><use href="#i-bot"></use></svg> <th:block th:text="#{ops.crawl.byBot}">By crawler</th:block>
+                    <span class="hint" th:text="#{ops.crawl.byBot.hint(${mgmtText.label(range)})}">period</span>
+                </h2>
+                <div class="table-wrap" th:unless="${report.bots.isEmpty()}">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{ops.crawl.col.bot}">Crawler</th>
+                            <th class="shrink" th:text="#{ops.crawl.col.category}">Category</th>
+                            <th class="num shrink" th:text="#{ops.crawl.col.hits}">Visits</th>
+                            <th class="num shrink" th:text="#{ops.crawl.errors}">Errors</th>
+                            <th class="shrink" th:title="#{ops.crawl.col.verify.title}" th:text="#{ops.crawl.col.verify}">Check</th>
+                            <th class="shrink" th:title="#{ops.crawl.col.last.title(${retentionDays})}" th:text="#{ops.crawl.col.last}">Last</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="b : ${report.bots}"
+                            th:classappend="${filter.bot == b.bot} ? 'row-selected'"
+                            th:attr="data-href=@{/mgmt/crawlers(range=${range.key}, bot=${b.bot})} + '#log'">
+                            <td><a th:href="@{/mgmt/crawlers(range=${range.key}, bot=${b.bot})} + '#log'"
+                                   th:text="${b.bot}">googlebot</a></td>
+                            <td class="muted nowrap" th:text="${mgmtText.label(b.category)}">Search engines</td>
+                            <td class="num" th:text="${b.hits}">0</td>
+                            <td class="num" th:text="${b.errors}"
+                                th:classappend="${b.errors > 0} ? 'crawl-err' : 'muted'">0</td>
+                            <td class="crawl-verify">
+                                <span class="badge published" th:if="${b.verified > 0}"
+                                      th:text="#{ops.crawl.verified.count(${b.verified})}">verified</span>
+                                <span class="badge off" th:if="${b.spoofed > 0}"
+                                      th:text="#{ops.crawl.spoofed.count(${b.spoofed})}">fake</span>
+                                <span class="muted" th:if="${b.verified == 0 and b.spoofed == 0}">—</span>
+                            </td>
+                            <td class="muted nowrap" th:text="${times.ago(b.lastSeen)}"
+                                th:title="${times.stamp(b.lastSeen)}">—</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${report.bots.isEmpty()}">
+                    <svg class="i"><use href="#i-bot"></use></svg>
+                    <span th:text="#{ops.crawl.none}">No crawler visits in the period.</span>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-tag"></use></svg> <th:block th:text="#{ops.crawl.byCategory}">By category</th:block>
+                        <span class="hint" th:text="${mgmtText.label(range)}">period</span>
+                    </h2>
+                    <div class="table-wrap" th:unless="${report.categories.isEmpty()}">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th th:text="#{ops.crawl.col.category}">Category</th>
+                                <th class="num shrink" th:text="#{ops.crawl.col.hits}">Visits</th>
+                                <th class="num shrink" th:text="#{ops.mon.col.share}">Share</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="c : ${report.categories}"
+                                th:attr="data-href=@{/mgmt/crawlers(range=${range.key}, category=${c.category.name()})} + '#log'">
+                                <td>
+                                    <span class="chart-key" th:classappend="${c.category.chartKey}"><span class="chart-swatch"></span></span>
+                                    <a th:href="@{/mgmt/crawlers(range=${range.key}, category=${c.category.name()})} + '#log'"
+                                       th:text="${mgmtText.label(c.category)}">Search engines</a>
+                                </td>
+                                <td class="num" th:text="${c.hits}">0</td>
+                                <td class="num muted nowrap"
+                                    th:text="${c.share != null} ? |${#numbers.formatDecimal(c.share, 1, 1)} %| : '—'">—</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="empty" th:if="${report.categories.isEmpty()}">
+                        <svg class="i"><use href="#i-tag"></use></svg>
+                        <span th:text="#{ops.crawl.none}">No crawler visits in the period.</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-link"></use></svg> <th:block th:text="#{ops.crawl.paths}">Most crawled addresses</th:block>
+                        <span class="hint" th:text="${window.clamped} ? #{ops.crawl.paths.hint.clamped(${retentionDays})} : #{ops.crawl.paths.hint(${mgmtText.label(range)})}">period</span>
+                    </h2>
+                    <div class="table-wrap" th:unless="${paths.isEmpty()}">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th th:text="#{ops.crawl.col.path}">Address</th>
+                                <th class="num shrink" th:text="#{ops.crawl.col.hits}">Visits</th>
+                                <th class="num shrink" th:text="#{ops.crawl.errors}">Errors</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="p : ${paths}">
+                                <td class="crawl-path">
+                                    <a th:href="@{/mgmt/crawlers(range=${range.key}, q=${p.path})} + '#log'"
+                                       th:text="${p.path}" th:title="${p.path}">/article/1</a>
+                                </td>
+                                <td class="num" th:text="${p.hits}">0</td>
+                                <td class="num" th:text="${p.errors}"
+                                    th:classappend="${p.errors > 0} ? 'crawl-err' : 'muted'">0</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="empty" th:if="${paths.isEmpty()}">
+                        <svg class="i"><use href="#i-link"></use></svg>
+                        <span th:text="#{ops.crawl.paths.none}">No addresses recorded in the period.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!--/*
+              The log: one row per request, newest first, 50 a page. Its own filter form, so it is a
+              GET form like every other list here; the range rides along as a hidden field, and the
+              path box reuses id="search-input" so mgmt.js debounces it and "/" focuses it.
+            */-->
+            <div class="card" id="log">
+                <h2>
+                    <svg class="i"><use href="#i-file-text"></use></svg> <th:block th:text="#{ops.crawl.log}">Log</th:block>
+                    <span class="hint" th:text="${window.clamped} ? #{ops.crawl.lastDays(${retentionDays})} : ${mgmtText.label(range)}">period</span>
+                </h2>
+                <div class="card-body">
+                    <form class="toolbar crawl-filters" method="get" th:action="@{/mgmt/crawlers} + '#log'" style="margin:0">
+                        <input type="hidden" name="range" th:value="${range.key}"/>
+                        <div class="search">
+                            <svg class="i"><use href="#i-search"></use></svg>
+                            <input type="search" id="search-input" name="q" th:value="${filter.q}"
+                                   th:placeholder="#{ops.crawl.search.placeholder}" th:aria-label="#{ops.crawl.search.aria}">
+                            <kbd>/</kbd>
+                        </div>
+                        <select class="pick" name="bot" data-autosubmit th:aria-label="#{ops.crawl.col.bot}">
+                            <option value="" th:text="#{ops.crawl.allBots}">All crawlers</option>
+                            <option th:each="b : ${botOptions}" th:value="${b}" th:text="${b}"
+                                    th:selected="${b == filter.bot}">googlebot</option>
+                        </select>
+                        <select class="pick" name="category" data-autosubmit th:aria-label="#{ops.crawl.col.category}">
+                            <option value="" th:text="#{ops.crawl.allCategories}">All categories</option>
+                            <option th:each="c : ${categories}" th:value="${c.name()}" th:text="${mgmtText.label(c)}"
+                                    th:selected="${c == filter.category}">Search engines</option>
+                        </select>
+                        <select class="pick" name="verification" data-autosubmit th:aria-label="#{ops.crawl.col.verify}">
+                            <option value="" th:text="#{ops.crawl.anyVerification}">Any check</option>
+                            <option th:each="v : ${verifications}" th:value="${v.name()}" th:text="${mgmtText.label(v)}"
+                                    th:selected="${v == filter.verification}">verified</option>
+                        </select>
+                        <label class="crawl-check">
+                            <input type="checkbox" name="errors" value="1" data-autosubmit th:checked="${filter.errorsOnly}"/>
+                            <th:block th:text="#{ops.crawl.errorsOnly}">Errors only</th:block>
+                        </label>
+                        <button class="btn" type="submit" th:text="#{ops.common.search}">Search</button>
+                        <a class="btn btn-ghost" th:if="${filter.active}"
+                           th:href="@{/mgmt/crawlers(range=${range.key})} + '#log'" th:text="#{ops.common.clear}">Clear</a>
+                    </form>
+                </div>
+
+                <div class="table-wrap" th:unless="${log.rows.isEmpty()}">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th class="shrink" th:text="#{ops.crawl.col.time}">Time</th>
+                            <th class="shrink" th:text="#{ops.crawl.col.bot}">Crawler</th>
+                            <th th:text="#{ops.crawl.col.path}">Address</th>
+                            <th class="num shrink" th:text="#{ops.crawl.col.code}">Code</th>
+                            <th class="shrink">IP</th>
+                            <th class="shrink" th:text="#{ops.crawl.col.verify}">Check</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="v : ${log.rows}">
+                            <td class="muted crawl-time" th:text="${times.stamp(v.occurredAt)}">11.10.2026 08:15:30</td>
+                            <td th:title="${v.userAgent}">
+                                <span th:text="${v.bot}">googlebot</span>
+                                <span class="muted crawl-method" th:if="${v.method != null and v.method != 'GET'}"
+                                      th:text="${v.method}">HEAD</span>
+                            </td>
+                            <td class="crawl-path"><span th:text="${v.path}" th:title="${v.path}">/article/1</span></td>
+                            <td class="num" th:text="${v.status}"
+                                th:classappend="${v.status >= 500 ? 'crawl-err' : (v.status >= 400 ? 'crawl-warn' : 'muted')}">200</td>
+                            <td class="crawl-ip" th:text="${v.ip != null} ? ${v.ip} : '—'">66.249.66.1</td>
+                            <td>
+                                <span class="badge published" th:if="${v.verification != null and v.verification.name() == 'VERIFIED'}"
+                                      th:title="#{ops.crawl.verified.title}" th:text="#{enum.CrawlerVerification.VERIFIED}">verified</span>
+                                <span class="badge off" th:if="${v.verification != null and v.verification.name() == 'UNVERIFIED'}"
+                                      th:title="#{ops.crawl.unverified.title}" th:text="#{enum.CrawlerVerification.UNVERIFIED}">fake</span>
+                                <span class="muted" th:if="${v.verification == null or v.verification.name() == 'UNKNOWN'}"
+                                      th:title="#{ops.crawl.unknown.title}" th:text="#{enum.CrawlerVerification.UNKNOWN}">unverified</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${log.rows.isEmpty()}">
+                    <svg class="i"><use href="#i-file-text"></use></svg>
+                    <span th:if="${filter.active}" th:text="#{ops.crawl.log.noMatch}">No visits match the filter.</span>
+                    <span th:unless="${filter.active}" th:text="#{ops.crawl.log.none}">No crawler visits recorded in the period.</span>
+                    <a class="btn btn-sm" th:if="${filter.active}"
+                       th:href="@{/mgmt/crawlers(range=${range.key})} + '#log'" th:text="#{ops.crawl.clearFilters}">Clear the filters</a>
+                </div>
+
+                <div class="pager" th:if="${log.hasPrevious() or log.hasNext}">
+                    <a th:if="${log.hasPrevious()}" th:title="#{ops.crawl.newer}"
+                       th:href="@{/mgmt/crawlers(range=${range.key}, bot=${filter.bot}, category=${cat}, verification=${ver}, errors=${err}, q=${filter.q}, page=${log.page - 1})} + '#log'">&larr; <th:block th:text="#{ops.crawl.newer}">Newer</th:block></a>
+                    <a th:if="${log.hasNext}" th:title="#{ops.crawl.older}"
+                       th:href="@{/mgmt/crawlers(range=${range.key}, bot=${filter.bot}, category=${cat}, verification=${ver}, errors=${err}, q=${filter.q}, page=${log.page + 1})} + '#log'"><th:block th:text="#{ops.crawl.older}">Older</th:block> &rarr;</a>
+                    <span class="count" th:if="${!log.rows.isEmpty()}" th:text="#{ops.crawl.shown(${log.from()}, ${log.to()})}">Showing 1–50</span>
+                </div>
+            </div>
+
+            <p class="muted" style="font-size:12.5px" th:utext="#{ops.crawl.footnote}">
+                Crawlers are not counted in «Statistics».
+            </p>
+        </main>
+    </div>
+</div>
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

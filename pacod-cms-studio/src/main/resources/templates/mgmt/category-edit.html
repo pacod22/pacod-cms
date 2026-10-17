@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{articles.category.pageTitle})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('categories')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(${isNew} ? #{articles.categories.new} : #{articles.category.edit})}"></header>
+
+        <main class="content form-page">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <form method="post" th:object="${form}"
+                  th:action="${isNew} ? @{/mgmt/categories} : @{/mgmt/categories/{id}(id=${form.id})}">
+
+                <div th:replace="~{mgmt/fragments :: errors}"></div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-folder"></use></svg> <th:block th:text="#{articles.category.data}">Category details</th:block></h2>
+
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="name" th:text="#{articles.categories.col.name}">Name</label>
+                            <input type="text" id="name" th:field="*{name}">
+                            <span class="field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></span>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="id">
+                                    <th:block th:text="#{articles.category.number}">Number</th:block>
+                                    <span class="help" th:text="#{articles.category.number.help}">— the menu refers to categories by number</span>
+                                </label>
+                                <!--/*
+                                  Editable only on create: changing an id would mean a new document
+                                  and would leave every article pointing at the old one.
+                                */-->
+                                <input type="number" id="id" th:field="*{id}" min="1" th:readonly="${!isNew}">
+                                <span class="field-error" th:if="${#fields.hasErrors('id')}" th:errors="*{id}"></span>
+                            </div>
+
+                            <div class="field">
+                                <label for="lang" th:text="#{articles.c.lang}">Language</label>
+                                <input type="text" id="lang" th:field="*{lang}" placeholder="en">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-save"></use></svg> <th:block th:text="#{articles.c.save}">Save</th:block>
+                        </button>
+                        <a class="btn btn-ghost" th:href="@{/mgmt/categories}" th:text="#{articles.c.toList}">Back to the list</a>
+                    </div>
+                </div>
+            </form>
+
+            <div class="card danger" th:unless="${isNew}">
+                <h2>
+                    <svg class="i"><use href="#i-trash"></use></svg>
+                    <th:block th:text="#{articles.c.deletion}">Delete</th:block>
+                    <span class="hint" th:text="#{articles.c.usedBy(${articleCount})}"></span>
+                </h2>
+                <div class="card-body">
+                    <p class="muted" style="margin-top:0" th:text="#{articles.category.delete.note}">
+                        Articles in this category will be left with a broken reference.
+                    </p>
+                    <form method="post" th:action="@{/mgmt/categories/{id}/delete(id=${form.id})}"
+                          th:data-confirm="#{articles.category.delete.confirm}">
+                        <button class="btn btn-danger" type="submit">
+                            <svg class="i"><use href="#i-trash"></use></svg> <th:block th:text="#{articles.category.delete}">Delete the category</th:block>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

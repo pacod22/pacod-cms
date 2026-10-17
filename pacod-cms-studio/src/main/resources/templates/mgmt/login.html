@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{login.title})}"></head>
+
+<body class="login-page">
+<!--/*
+  This page loads no JavaScript at all -- which is why the theme is restored by the inline
+  snippet in the head fragment and the icons come from an inline sprite rather than a script.
+
+  Signing in happens on pacod-id's pages: both buttons are plain links to the studio's
+  authorization endpoint, which redirects there (MgmtSecurityConfig). "Create an account" adds
+  ?signup, which asks pacod-id for its sign-up page instead.
+*/-->
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<main class="login-card">
+    <span class="brand-mark"><svg class="i"><use href="#i-leaf"></use></svg></span>
+
+    <h1 th:text="#{login.heading}">Administration</h1>
+    <p class="sub" th:text="#{login.sub}">Content studio</p>
+
+    <div class="flash err" th:if="${param.error}">
+        <svg class="i"><use href="#i-alert"></use></svg>
+        <span class="flash-text" th:text="#{login.error}">Signing in did not complete.</span>
+    </div>
+    <div class="flash ok" th:if="${param.loggedOut}">
+        <svg class="i"><use href="#i-check"></use></svg>
+        <span class="flash-text" th:text="#{login.loggedOut}">Signed out.</span>
+    </div>
+    <div class="flash err" th:if="${param.ended}">
+        <svg class="i"><use href="#i-alert"></use></svg>
+        <span class="flash-text" th:text="#{login.ended}">Your session was ended.</span>
+    </div>
+
+    <p class="muted" th:text="#{login.via}">You sign in with your account.</p>
+
+    <a class="btn btn-primary" th:href="@{/mgmt/oauth2/authorization/pacod-id}" th:text="#{login.signIn}">Sign in</a>
+    <p class="login-foot">
+        <a th:href="@{/mgmt/oauth2/authorization/pacod-id(signup=1)}" th:text="#{login.signUp}">Create an account</a>
+    </p>
+
+    <span th:replace="~{mgmt/fragments :: uiLanguages}"></span>
+</main>
+
+</body>
+</html>

@@ -1,0 +1,42 @@
+[
+  {
+    "code": "en",
+    "adminName": "English",
+    "nativeName": "English",
+    "sortOrder": 0,
+    "fallbackNotice": "This page has not been translated yet and is shown in {0}.",
+    "legalNotice": "The {0} text of this page is the legally binding one. Any translation is provided for information only."
+  },
+  {
+    "code": "de",
+    "adminName": "German",
+    "nativeName": "Deutsch",
+    "sortOrder": 10,
+    "fallbackNotice": "Diese Seite wurde noch nicht übersetzt und wird auf {0} angezeigt.",
+    "legalNotice": "Rechtlich verbindlich ist der Text dieser Seite in der Sprache {0}. Übersetzungen dienen nur der Information."
+  },
+  {
+    "code": "fr",
+    "adminName": "French",
+    "nativeName": "Français",
+    "sortOrder": 20,
+    "fallbackNotice": "Cette page n’a pas encore été traduite et s’affiche en {0}.",
+    "legalNotice": "Seul le texte de cette page en {0} fait foi. Toute traduction est fournie à titre d’information."
+  },
+  {
+    "code": "es",
+    "adminName": "Spanish",
+    "nativeName": "Español",
+    "sortOrder": 30,
+    "fallbackNotice": "Esta página aún no se ha traducido y se muestra en {0}.",
+    "legalNotice": "El texto de esta página en {0} es el jurídicamente vinculante. Cualquier traducción se ofrece solo a título informativo."
+  },
+  {
+    "code": "it",
+    "adminName": "Italian",
+    "nativeName": "Italiano",
+    "sortOrder": 40,
+    "fallbackNotice": "Questa pagina non è ancora stata tradotta e viene mostrata in {0}.",
+    "legalNotice": "Il testo di questa pagina in {0} è quello giuridicamente vincolante. Le traduzioni sono fornite solo a titolo informativo."
+  }
+]

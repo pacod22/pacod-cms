@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  Editing ONE language of a standing page.
+
+  The two ids below are load-bearing and are reused from the article editor on purpose:
+
+    * the body textarea is id="text", which is what mgmt.js binds TinyMCE to. Rename it and the
+      editor silently does not appear -- you get a plain textarea and no error.
+    * the form is id="article-form", which is what the save bar's `form=` attribute, the Ctrl/Cmd+S
+      shortcut and the unsaved-changes guard all look for.
+
+  Neither is article-specific behaviour; both are guarded on the element existing. Reusing them is
+  what makes this screen inherit the editor's whole configuration -- the one that exists to stop
+  TinyMCE rewriting older markup, which a standing page can carry as easily as an article body.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{pages.edit.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('pages')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{pages.edit.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <a class="btn btn-ghost" th:href="@{/mgmt/pages}">
+                    <svg class="i"><use href="#i-arrow-up"></use></svg> <span th:text="#{pages.allPages}">All pages</span>
+                </a>
+                <a class="btn btn-ghost" th:href="@{'/p/' + ${page.slug}(lang=${language.code})}"
+                   target="_blank" rel="noopener">
+                    <svg class="i"><use href="#i-external"></use></svg> <span th:text="#{pages.viewPage}">View page</span>
+                </a>
+            </div>
+
+            <!--/*
+              The language tabs.
+
+              Each is a plain link that changes ?lang -- a GET, so an operator can open German in
+              one tab and Bulgarian in another, and the browser's back button works. A JavaScript
+              tab strip holding one editor per language would post every body on every save, and
+              any language whose editor failed to initialise would post empty and delete a
+              translation.
+
+              The dot marks a language that already has a body. It is read from the DOCUMENT, not
+              from the form, so it does not change as the operator types.
+            */-->
+            <div class="card">
+                <div class="card-body">
+                    <div class="chart-legend" style="margin:0">
+                        <th:block th:each="l : ${languages}">
+                            <a class="btn btn-sm"
+                               th:classappend="${l.code == language.code} ? 'btn-primary' : 'btn-ghost'"
+                               th:href="@{/mgmt/pages/{slug}(slug=${page.slug}, lang=${l.code})}">
+                                <span th:text="${l.displayName()}">Bulgarian</span>
+                                <span th:if="${page.hasBody(l.code)}" th:title="#{pages.hasText}">•</span>
+                            </a>
+                        </th:block>
+                        <a class="btn btn-sm btn-ghost push" th:href="@{/mgmt/pages/languages}"
+                           th:title="#{pages.edit.languagesLink.title}">
+                            <svg class="i"><use href="#i-tag"></use></svg> <span th:text="#{pages.field.languages}">Languages</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <form id="article-form" method="post"
+                  th:action="@{/mgmt/pages/{slug}(slug=${page.slug})}" th:object="${form}">
+
+                <div th:replace="~{mgmt/fragments :: errors}"></div>
+
+                <input type="hidden" th:field="*{slug}">
+                <input type="hidden" th:field="*{lang}">
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-file-text"></use></svg>
+                        <span th:text="#{pages.textFor(${language.displayName()})}">Text</span>
+                        <span class="hint" th:if="${language.code != originalCode and !page.hasBody(language.code)}"
+                              th:text="#{pages.edit.notTranslated}">not translated</span>
+                    </h2>
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="title" th:text="#{pages.field.title}">Title</label>
+                            <input type="text" id="title" th:field="*{title}" maxlength="200">
+                        </div>
+
+                        <div class="field">
+                            <label for="description" th:text="#{pages.edit.description}">Short description</label>
+                            <input type="text" id="description" th:field="*{description}" maxlength="300">
+                            <span class="hint" th:text="#{pages.edit.description.hint}">Used for meta description.</span>
+                        </div>
+
+                        <div class="field">
+                            <label for="text" th:text="#{pages.edit.body}">Content</label>
+                            <!--/* id="text" -- see the file header. This is what TinyMCE binds to. */-->
+                            <textarea id="text" th:field="*{body}" rows="20"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-shield"></use></svg> <span th:text="#{pages.settings}">Settings</span></h2>
+                    <div class="card-body">
+                        <span class="hint" th:text="#{pages.edit.settings.hint}">These settings apply to all languages.</span>
+
+                        <div class="field">
+                            <label class="check">
+                                <input type="checkbox" th:field="*{published}" th:disabled="${can != null and !can.site('content.publish')}"> <th:block th:text="#{pages.status.published}">Published</th:block>
+                            </label>
+                            <span class="hint" th:if="${can != null and !can.site('content.publish')}"
+                                  th:text="#{portal.publish.needed}">Publishing is up to an editor.</span>
+                        </div>
+
+                        <div class="field">
+                            <label class="check">
+                                <input type="checkbox" th:field="*{officialInDefaultLanguageOnly}">
+                                <th:block th:text="#{pages.edit.official}">Only the original text is legally binding</th:block>
+                            </label>
+                            <span class="hint" th:text="#{pages.edit.official.hint}">For the legal pages.</span>
+                        </div>
+
+                        <div class="field">
+                            <label for="sortOrder" th:text="#{pages.field.sortOrder}">Sort order</label>
+                            <input type="number" id="sortOrder" th:field="*{sortOrder}">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="savebar">
+                    <span class="spacer"></span>
+                    <span id="save-status" class="muted"></span>
+                    <button class="btn btn-primary" type="submit">
+                        <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{pages.action.save}">Save</span>
+                    </button>
+                </div>
+            </form>
+
+            <!--/*
+              Each of these is its own POST, so they cannot live inside the form above -- HTML
+              forbids nesting. Same arrangement as the article editor's image and delete cards.
+            */-->
+            <div class="card danger" th:if="${language.code != originalCode and page.hasBody(language.code)}">
+                <h2><svg class="i"><use href="#i-trash"></use></svg> <span th:text="#{pages.edit.removeTranslation.heading}">Delete the translation</span></h2>
+                <div class="card-body">
+                    <p class="muted">
+                        <th:block th:text="#{pages.edit.removeTranslation.before}">Deletes only the text in</th:block>
+                        <b th:text="${language.displayName()}">language</b><th:block
+                            th:text="#{pages.edit.removeTranslation.after}">.</th:block>
+                    </p>
+                </div>
+                <div class="card-foot">
+                    <form method="post" th:data-confirm="#{pages.edit.removeTranslation.confirm}"
+                          th:action="@{/mgmt/pages/{slug}/remove-translation(slug=${page.slug})}">
+                        <input type="hidden" name="lang" th:value="${language.code}">
+                        <button class="btn btn-danger" type="submit" th:text="#{pages.edit.removeTranslation.button}">Delete translation</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card danger">
+                <h2><svg class="i"><use href="#i-trash"></use></svg> <span th:text="#{pages.edit.delete.heading}">Delete the page</span></h2>
+                <div class="card-body">
+                    <p class="muted" th:text="#{pages.edit.delete.text}">Deletes the page in every language.</p>
+                </div>
+                <div class="card-foot">
+                    <form method="post" th:data-confirm="#{pages.edit.delete.confirm}"
+                          th:action="@{/mgmt/pages/{slug}/delete(slug=${page.slug})}">
+                        <button class="btn btn-danger" type="submit" th:text="#{pages.edit.delete.button}">Delete page</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/tinymce/tinymce.min.js}"></script>
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

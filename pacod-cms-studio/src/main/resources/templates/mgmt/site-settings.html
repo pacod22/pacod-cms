@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  A website's settings, inside the website: name, language, time zone, status; its addresses;
+  deleting it (org.manage -- an organisation admin's decision). Every form is its own POST; the
+  website is the one the address names, never a posted value.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{portal.site.settings.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('settings')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{portal.site.settings.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <form class="form-page" method="post" th:action="@{/mgmt/settings}" th:object="${form}">
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-settings"></use></svg> <span th:text="#{portal.site.settings.general}">General</span></h2>
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="name" th:text="#{portal.site.field.name}">Name</label>
+                            <input type="text" id="name" th:field="*{name}" required maxlength="100">
+                        </div>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="language" th:text="#{portal.site.field.language}">Language of the content</label>
+                                <input type="text" id="language" th:field="*{language}" required maxlength="3" pattern="[a-z]{2,3}">
+                                <span class="hint" th:text="#{portal.site.field.language.hint}">The language articles are written in, and the last fallback.</span>
+                            </div>
+                            <div class="field">
+                                <label for="timezone" th:text="#{portal.site.field.timezone}">Time zone</label>
+                                <input type="text" id="timezone" th:field="*{timezone}" maxlength="60">
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="status" th:text="#{portal.site.field.status}">Status</label>
+                            <select id="status" th:field="*{status}">
+                                <option th:each="s : ${statuses}" th:value="${s}" th:text="${mgmtText.label(s)}">active</option>
+                            </select>
+                            <span class="hint" th:text="#{portal.site.field.status.hint}">A suspended website answers nothing; its content stays.</span>
+                        </div>
+                        <div class="checkline">
+                            <input type="checkbox" id="ai" th:field="*{ai}">
+                            <label for="ai" th:text="#{portal.site.field.ai}">Use AI on this website</label>
+                        </div>
+                        <span class="hint" th:text="#{portal.site.field.ai.hint}">Also needs AI switched on for the organisation.</span>
+                        <dl class="kv">
+                            <dt th:text="#{portal.org.id}">Id</dt>
+                            <dd><code th:text="${website.id}">demo</code></dd>
+                            <dt th:text="#{portal.site.database}">Database</dt>
+                            <dd><code th:text="${website.dbName}">site_demo</code></dd>
+                        </dl>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{portal.action.save}">Save</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-globe"></use></svg> <span th:text="#{portal.site.domains}">Addresses</span></h2>
+                <div class="table-wrap" th:if="${!domains.isEmpty()}">
+                    <table>
+                        <tbody>
+                        <tr th:each="d : ${domains}">
+                            <td class="title-cell">
+                                <span th:text="${d.host}">demo.localhost</span>
+                                <span class="badge published" th:if="${d.primary}" th:text="#{portal.domain.primary}">primary</span>
+                            </td>
+                            <td>
+                                <div class="actions">
+                                    <form method="post" class="inline-form" th:unless="${d.primary}" th:action="@{/mgmt/settings/domains/primary}">
+                                        <input type="hidden" name="host" th:value="${d.host}">
+                                        <button class="btn btn-sm" type="submit" th:text="#{portal.domain.makePrimary}">Make primary</button>
+                                    </form>
+                                    <form method="post" class="inline-form" th:action="@{/mgmt/settings/domains/remove}"
+                                          th:data-confirm="#{portal.domain.remove.confirm}">
+                                        <input type="hidden" name="host" th:value="${d.host}">
+                                        <button class="btn btn-sm btn-danger" type="submit" th:text="#{portal.domain.remove}">Remove</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${domains.isEmpty()}">
+                    <svg class="i"><use href="#i-globe"></use></svg>
+                    <span th:text="#{portal.domain.none}">No address: the website answers nowhere.</span>
+                </div>
+                <div class="card-foot">
+                    <form method="post" class="actions" th:action="@{/mgmt/settings/domains}" style="width:100%">
+                        <label class="sr-only" for="new-host" th:text="#{portal.domain.add}">Add an address</label>
+                        <input type="text" id="new-host" name="host" required maxlength="253" spellcheck="false"
+                               autocapitalize="off" th:placeholder="#{portal.domain.placeholder}" style="max-width:320px">
+                        <button class="btn" type="submit">
+                            <svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{portal.domain.add}">Add an address</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card danger" th:if="${canDelete}">
+                <h2><svg class="i"><use href="#i-trash"></use></svg> <span th:text="#{portal.site.delete.heading}">Delete the website</span></h2>
+                <form method="post" th:action="@{/mgmt/settings/delete}" th:data-confirm="#{portal.site.delete.confirm}">
+                    <div class="card-body">
+                        <p class="muted" style="margin-top:0" th:text="#{portal.site.delete.hint}">Its articles, pages, images, bookings, statistics and roles are deleted for good.</p>
+                        <div class="field">
+                            <label for="confirmation" th:text="#{portal.site.delete.type(${website.id})}">Type the website's id to confirm</label>
+                            <input type="text" id="confirmation" name="confirmation" required autocomplete="off" spellcheck="false">
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-danger" type="submit" th:text="#{portal.site.delete.button}">Delete the website</button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

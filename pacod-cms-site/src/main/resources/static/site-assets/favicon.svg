@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The default mark for a website that has not set its own favicon: a page with lines of text.
+       Filled shapes only, so it stays legible at 16px against light and dark tab strips. -->
+  <rect x="5" y="2" width="22" height="28" rx="4" fill="#3B4A5A"/>
+  <rect x="9" y="8" width="14" height="3" rx="1.5" fill="#F4F6F8"/>
+  <rect x="9" y="14" width="14" height="2" rx="1" fill="#C9D2DB"/>
+  <rect x="9" y="19" width="14" height="2" rx="1" fill="#C9D2DB"/>
+  <rect x="9" y="24" width="9" height="2" rx="1" fill="#C9D2DB"/>
+</svg>

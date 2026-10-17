@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  The home page: GET /. It has no content of its own -- its layout's sections are all of it:
+  ${regions}, composed by PageComposer from the website's published HOME layout, or this set's
+  default (design/sets/editorial.yaml in core). Regions: main (the content column), aside (under
+  the advertising column) and wide (full width, below both).
+
+  The widgets are rendered here, on the server. No script may re-fetch them over /web/v1 and
+  overwrite this markup with its own: fragments/scripts loads none that does, and
+  LandingTemplateRenderTest checks.
+*/-->
+<head th:replace="~{fragments/head :: head(
+        lang=${lang},
+        pageTitle=${site.name(lang)},
+        pageDesc=${site.description(lang) ?: site.tagline(lang)},
+        ogUrl=${site.url('/')},
+        ogImagePath=null,
+        ogImageType=null)}"></head>
+
+<body>
+<th:block th:replace="~{fragments/scripts :: gtmNoscript}"></th:block>
+<th:block th:replace="~{fragments/scripts :: facebookSdk(${lang})}"></th:block>
+<th:block th:replace="~{fragments/navbar :: navbar(${lang})}"></th:block>
+
+<div class="shell">
+    <th:block th:replace="~{fragments/ad-sidebar :: topBanners(${topBanners})}"></th:block>
+</div>
+
+<div class="shell layout">
+    <main class="layout__main">
+        <th:block th:replace="~{sections :: region(${regions.get('main')}, ${lang})}"></th:block>
+    </main>
+    <aside class="layout__aside">
+        <th:block th:replace="~{fragments/ad-sidebar :: adSidebar(${sidebarBanners})}"></th:block>
+        <th:block th:replace="~{sections :: region(${regions.get('aside')}, ${lang})}"></th:block>
+    </aside>
+</div>
+
+<div class="shell region-wide" th:unless="${regions.isEmpty('wide')}">
+    <th:block th:replace="~{sections :: region(${regions.get('wide')}, ${lang})}"></th:block>
+</div>
+
+<th:block th:replace="~{fragments/footer :: footer(${lang})}"></th:block>
+<th:block th:replace="~{fragments/scripts :: siteScripts}"></th:block>
+</body>
+</html>

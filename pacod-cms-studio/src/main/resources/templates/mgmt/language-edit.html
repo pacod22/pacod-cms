@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  Editing one language.
+
+  The code is rendered as text, not as a field: it is the document id and the key every stored
+  TextItem is filed under, so binding it would orphan every translation written under the old code
+  -- the same reason /mgmt/images/{id} binds only the caption and not the filename.
+
+  A refused delete comes back HERE rather than to the list, because the refusal is only actionable
+  where the blocking pages are named. Same arrangement as a refused image delete.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{pages.language.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('pages')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{pages.language.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <a class="btn btn-ghost" th:href="@{/mgmt/pages/languages}">
+                    <svg class="i"><use href="#i-arrow-up"></use></svg> <span th:text="#{pages.language.all}">All languages</span>
+                </a>
+            </div>
+
+            <form class="form-page" method="post"
+                  th:action="@{/mgmt/pages/languages/{code}(code=${language.code})}"
+                  th:object="${form}">
+
+                <div th:replace="~{mgmt/fragments :: errors}"></div>
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-tag"></use></svg>
+                        <span th:text="${language.displayName()}">Language</span>
+                        <span class="badge" th:if="${language.code == originalCode}" th:text="#{pages.languages.badge.original}">fallback · original</span>
+                        <span class="badge" th:if="${language.code == fallbackCode}" th:text="#{pages.languages.badge.fallback}">fallback</span>
+                    </h2>
+                    <div class="card-body">
+                        <div class="field">
+                            <label th:text="#{pages.field.code}">Code</label>
+                            <p class="muted" style="margin:0">
+                                <code th:text="${language.code}">bg</code>
+                                <th:block th:text="#{pages.language.code.readonly}">— cannot be changed.</th:block>
+                            </p>
+                        </div>
+
+                        <div class="field">
+                            <label for="adminName" th:text="#{pages.language.adminName}">Name in the studio</label>
+                            <input type="text" id="adminName" th:field="*{adminName}" maxlength="60">
+                        </div>
+
+                        <div class="field">
+                            <label for="nativeName" th:text="#{pages.language.nativeName}">Own name</label>
+                            <input type="text" id="nativeName" th:field="*{nativeName}" maxlength="60">
+                            <span class="hint">
+                                <th:block th:text="#{pages.language.nativeName.slot.before}">Shown to readers in place of</th:block>
+                                <code>{0}</code> <th:block th:text="#{pages.language.nativeName.slot.after}">in the notice below.</th:block>
+                            </span>
+                        </div>
+
+                        <div class="field">
+                            <label for="sortOrder" th:text="#{pages.field.sortOrder}">Sort order</label>
+                            <input type="number" id="sortOrder" th:field="*{sortOrder}">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-alert"></use></svg> <span th:text="#{pages.language.notices}">Notices to readers</span></h2>
+                    <div class="card-body">
+                        <span class="hint" th:text="#{pages.language.notices.hint}">Written in this language.</span>
+
+                        <div class="field">
+                            <label for="fallbackNotice" th:text="#{pages.language.fallbackNotice}">No translation</label>
+                            <input type="text" id="fallbackNotice" th:field="*{fallbackNotice}" maxlength="300">
+                            <span class="hint">
+                                <code>{0}</code> <th:block th:text="#{pages.language.fallbackNotice.hint}">is replaced with the language name.</th:block>
+                            </span>
+                        </div>
+
+                        <div class="field">
+                            <label for="legalNotice" th:text="#{pages.language.legalNotice}">Legally binding text</label>
+                            <input type="text" id="legalNotice" th:field="*{legalNotice}" maxlength="300">
+                            <span class="hint">
+                                <th:block th:text="#{pages.language.legalNotice.hint.before}">Only for the legal pages, so</th:block>
+                                <code>{0}</code> <th:block th:text="#{pages.language.legalNotice.hint.after}">is not used here.</th:block>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="savebar">
+                    <span class="spacer"></span>
+                    <button class="btn btn-primary" type="submit">
+                        <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{pages.action.save}">Save</span>
+                    </button>
+                </div>
+            </form>
+
+            <!--/* Its own POST, so it cannot live inside the form above -- HTML forbids nesting. */-->
+            <div class="card danger">
+                <h2><svg class="i"><use href="#i-trash"></use></svg> <span th:text="#{pages.language.delete.heading}">Delete the language</span></h2>
+                <div class="card-body">
+                    <p class="muted" th:if="${language.code == originalCode or language.code == fallbackCode}"
+                       th:text="#{pages.language.delete.chain}">This language cannot be deleted.</p>
+
+                    <p class="muted" th:if="${language.code != originalCode and language.code != fallbackCode and usedBy.isEmpty()}"
+                       th:text="#{pages.language.delete.unused}">No page has text in this language.</p>
+
+                    <!--/*
+                      The blocking pages are NAMED, not counted. A number tells the operator that
+                      they are blocked; the names tell them what to do about it -- the same reason
+                      /mgmt/images/{id} lists the articles behind an image rather than a badge.
+                    */-->
+                    <div th:if="${language.code != originalCode and language.code != fallbackCode and !usedBy.isEmpty()}">
+                        <p class="muted" th:text="#{pages.language.delete.used}">Still used by the following pages:</p>
+                        <ul>
+                            <li th:each="p : ${usedBy}">
+                                <a th:href="@{/mgmt/pages/{slug}(slug=${p.slug}, lang=${language.code})}"
+                                   th:text="'/p/' + ${p.slug}">/p/about</a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-foot" th:if="${language.code != originalCode and language.code != fallbackCode}">
+                    <form method="post" th:data-confirm="#{pages.language.delete.confirm}"
+                          th:action="@{/mgmt/pages/languages/{code}/delete(code=${language.code})}">
+                        <button class="btn btn-danger" type="submit" th:text="#{pages.language.delete.button}">Delete language</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

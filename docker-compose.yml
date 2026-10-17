@@ -1,0 +1,467 @@
+# Local stack: MongoDB, the public site (`site`), the studio (`studio`) and Caddy in front.
+#
+# One stack hosts every website. Caddy sends the studio's host (STUDIO_HOST, studio.localhost by
+# default) to the studio, pacod-id's (ID_HOST) to pacod-id, and every other host to the public site,
+# which looks the host up in the control plane and answers 404 for one that belongs to no website.
+#
+# Data: MongoDB keeps the control plane in MONGO_DATABASE (pacod_cms) and each website's content
+# in a database of its own (site_<id>); files are under STORAGE_HOST, one folder per website
+# (sites/<id>/...).
+#
+# Always through make (make init, then make up): it passes the environment's preset
+# (env/<ENV>.env), this machine's .env and an optional .env-local as --env-file, in that order.
+# The defaults below are a developer machine's; docs/RUNNING.md describes dev, stage and prod.
+
+services:
+  mongo:
+    image: mongo:8
+    container_name: mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-pacod-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?run make init}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-pacod_cms}
+      # Consumed by the init script, not by the mongo image itself.
+      MONGO_APP_USER: ${MONGO_USER:-pacod-cms}
+      MONGO_APP_PASSWORD: ${MONGO_PASSWORD:?run make init}
+    ports:
+      # PUBLISH_IP: blank publishes on every interface (dev); stage and prod set 127.0.0.1.
+      - "${PUBLISH_IP:-}:${MONGO_PORT:-27017}:27017"
+    volumes:
+      - ${MONGO_DATA_DIR:-./.data/mongo}:/data/db
+      - ${MONGO_BACKUP_DIR:-./.data/backup/pacod-cms}:/data/backup
+      - ${MONGO_CONFIG:-./docker/mongo/config/mongod.conf}:/etc/mongod.conf:ro
+      - ./docker/mongo-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      pacod-cms-net:
+        aliases:
+          # Lets the applications reach it as "pacod-cms-mongo" without overriding their defaults.
+          - pacod-cms-mongo
+    healthcheck:
+      # The applications must not start against a MongoDB that is still initialising.
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  site:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: pacod-cms-site
+    container_name: site
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILE:-dev}
+      SERVER_PORT: 8443
+      # The studio's origin: the one page allowed to frame this site's banner folders and drafts.
+      STUDIO_ORIGIN: ${STUDIO_ORIGIN:-http://studio.localhost:${HTTP_PORT:-8000}}
+      # The draft-preview key, the studio's too (make init writes it into .env). Empty: no
+      # previews. No default: a published one would be a published key.
+      PACOD_PREVIEW_SECRET: ${PACOD_PREVIEW_SECRET:-}
+      # Behind Caddy: trust X-Forwarded-Proto/Host so redirects and absolute URLs are right.
+      SERVER_FORWARD_HEADERS_STRATEGY: FRAMEWORK
+      SSL_ENABLED: ${SSL_ENABLED:-false}
+      # SSL_KEYSTORE: file:/app/config/keystore.p12
+      # SSL_KEYSTORE_PASSWORD: ${SSL_KEYSTORE_PASSWORD:-}
+      MONGO_HOST: mongo
+      MONGO_USER: ${MONGO_USER:-pacod-cms}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:?run make init}
+      # No value on purpose: Compose then passes the variable through from the environment and
+      # leaves it UNSET when there is none. `${CORS_ALLOWED_ORIGINS:-}` would instead define it
+      # as the empty string, which is a value -- Spring's `${...:default}` would stop applying
+      # and the allowed-origin list would come out empty.
+      CORS_ALLOWED_ORIGINS:
+      # This service is the only WRITER of the traffic statistics; `studio` only reads them, which
+      # is why the salt is set here and nowhere else. Blank is a working configuration -- the
+      # application generates an ephemeral one and logs that it did.
+      METRICS_VISITOR_SALT: ${METRICS_VISITOR_SALT:-}
+      # The crawler statistics (/mgmt/crawlers), also written only by this service. TRACKING gates
+      # the recording; crawlers are kept out of the reader numbers either way. VERIFY is the
+      # reverse/forward DNS check that tells a real Googlebot from a forged one -- see .env.example.
+      CRAWLER_TRACKING: ${CRAWLER_TRACKING:-true}
+      CRAWLER_VERIFY: ${CRAWLER_VERIFY:-true}
+      LOG_DIR: /data/logs
+      # Every website's files, one folder each (sites/<id>/assets/..., sites/<id>/resources/...).
+      # The public site serves /assets/** and /resources/** out of the folder of the website the
+      # request's host belongs to (MediaController).
+      STORAGE_ROOT: /data/storage
+    ports:
+      - "${PUBLISH_IP:-}:${WEB_PORT:-8080}:8443"
+    volumes:
+      - ${LOG_DIR_HOST:-./.data/logs}:/data/logs
+      # Read-only: the public site writes no file. Uploads and deletions are the studio's.
+      - ${STORAGE_HOST:-./.data/storage}:/data/storage:ro
+      # - ./config:/app/config:ro   # uncomment to supply a TLS keystore
+    networks:
+      - pacod-cms-net
+    healthcheck:
+      # /web/v1/health is public, outside every website, so it answers before any website exists.
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8443/web/v1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+
+  # The studio. Its own container so a studio deploy cannot take the public sites down, and so the
+  # site's image carries neither the vendored editor nor any upload endpoint. Reached at
+  # STUDIO_HOST through Caddy; a website's screens are under /sites/<id>/mgmt/....
+  studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: pacod-cms-studio
+    container_name: studio
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILE:-dev}
+      SERVER_PORT: 7443
+      # Required, not optional. The studio's first answer to a browser is a redirect (/mgmt/ to
+      # /mgmt/sites, then to /mgmt/login), and without this the port is dropped from the Location
+      # header -- the exact failure `make smoke` prints the redirect URL to catch.
+      SERVER_FORWARD_HEADERS_STRATEGY: FRAMEWORK
+      SSL_ENABLED: ${SSL_ENABLED:-false}
+      # SSL_KEYSTORE: file:/app/config/keystore.p12
+      # SSL_KEYSTORE_PASSWORD: ${SSL_KEYSTORE_PASSWORD:-}
+      MONGO_HOST: mongo
+      MONGO_USER: ${MONGO_USER:-pacod-cms}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:?run make init}
+      # How long an idle studio session lasts. When it ends -- or the container restarts -- the next
+      # request goes through pacod-id again, whose own session signs the operator back in.
+      MGMT_SESSION_TIMEOUT: ${MGMT_SESSION_TIMEOUT:-8h}
+      # Background jobs, run by the studio itself (/mgmt/jobs). PDF export renders through
+      # Gotenberg below, which reads the site's print view at PACOD_PDF_SITE_URL on this network;
+      # blank PACOD_PDF_GOTENBERG_URL switches PDF export off.
+      PACOD_PDF_GOTENBERG_URL: ${PACOD_PDF_GOTENBERG_URL:-http://gotenberg:3000}
+      PACOD_PDF_SITE_URL: http://site:8443
+      PACOD_JOBS_WORKERS:
+      PACOD_JOBS_PER_ORGANISATION:
+      # The AI gateway (pacod-gw): its address and the studio's key. The development gateway is the
+      # gw service below; a deployment names its own. Without a key, AI is not set up.
+      PACOD_GW_URL: ${PACOD_GW_URL:-http://gw:8080}
+      PACOD_GW_API_KEY: ${PACOD_GW_API_KEY:-}
+      # See the site service for why this carries no value.
+      CORS_ALLOWED_ORIGINS:
+      LOG_DIR: /data/logs
+      # The same storage as the site service, read-write: the studio is the only writer.
+      STORAGE_ROOT: /data/storage
+      # How a website's own address is spelled from here: the banner previews are framed from the
+      # website's origin, never the studio's, and "view site" links there. The port is Caddy's
+      # published HTTP port; blank means the scheme's default.
+      # Both passed through without a value: unset stays unset, so the profile decides (dev: http
+      # and HTTP_PORT; prod: https and the scheme's default). Set both in production only if readers
+      # reach the websites some other way.
+      SITE_PUBLIC_SCHEME:
+      SITE_PUBLIC_PORT:
+      HTTP_PORT: ${HTTP_PORT:-8000}
+      # Sign-in through pacod-id: the public issuer for the browser's redirects, the internal
+      # listener for everything server-to-server. Not a dependency of this container's health:
+      # with pacod-id down the studio's screens answer 503 and /mgmt-health stays up.
+      PACOD_ID_ISSUER: ${ID_ISSUER:-http://id.localhost:${HTTP_PORT:-8000}}
+      PACOD_ID_INTERNAL_URL: http://id:8071
+      PACOD_ID_STUDIO_SECRET: ${CMS_ID_STUDIO_SECRET:?run make init}
+      PACOD_ID_SERVICE_SECRET: ${CMS_ID_SERVICE_SECRET:?run make init}
+      STUDIO_ORIGIN: ${STUDIO_ORIGIN:-http://studio.localhost:${HTTP_PORT:-8000}}
+      # The provisioner's pidt_ token (make up writes it into .env, make id-provisioner): how the
+      # creator of a new organisation becomes its admin. Empty, only platform admins create
+      # organisations. No default worth publishing exists.
+      PACOD_ID_PROVISIONER_TOKEN: ${PACOD_ID_PROVISIONER_TOKEN:-}
+      # The draft-preview key, the site's too (make init writes it into .env). Empty: no
+      # previews. No default: a published one would be a published key.
+      PACOD_PREVIEW_SECRET: ${PACOD_PREVIEW_SECRET:-}
+      # The portal: every new website answers at <id>.<PACOD_SITE_DOMAIN> first (blank: its
+      # creator names an address); PACOD_ORG_CREATION=platform-admins closes self-service whatever
+      # the installation screen says. The limits are starting values the screen then owns.
+      # A blank value stays blank (no :-): production may leave the address to each website's creator.
+      PACOD_SITE_DOMAIN: ${PACOD_SITE_DOMAIN-localhost}
+      PACOD_ORG_CREATION: ${PACOD_ORG_CREATION:-self-service}
+      PACOD_MAX_ORGS_PER_USER:
+      PACOD_MAX_SITES_PER_ORG:
+      PACOD_AI_FOR_NEW_ORGS:
+      # A fresh platform gets two demo websites, one per template set, at these hosts, unless
+      # DEMO_WEBSITES=false (production); nothing happens once any website exists.
+      PACOD_BOOTSTRAP_DEMO_ENABLED: ${DEMO_WEBSITES:-true}
+      PACOD_BOOTSTRAP_DEMO_HOSTS: ${DEMO_HOSTS:-demo.localhost,localhost}
+      PACOD_BOOTSTRAP_DEMO_MINIMAL_HOSTS: ${DEMO_MINIMAL_HOSTS:-minimal.localhost}
+      # What an article image must be. Set on this service only: it is the one application with
+      # an upload endpoint an operator reaches.
+      #
+      # The two checks switch INDEPENDENTLY -- both, neither, dimensions only, weight only. Each
+      # leaves the content-type allow-list and the "is this actually an image" check in force,
+      # and the studio's own help text follows both, so the screens never promise a refusal that
+      # will not happen. IMAGE_FILE_SIZE_CHECK=false does not mean unlimited: Caddy and the
+      # servlet container still refuse above 4MB, and the screens state that ceiling instead.
+      IMAGE_REQUIRED_WIDTH: ${IMAGE_REQUIRED_WIDTH:-600}
+      IMAGE_REQUIRED_HEIGHT: ${IMAGE_REQUIRED_HEIGHT:-400}
+      IMAGE_MAX_BYTES: ${IMAGE_MAX_BYTES:-131072}
+      IMAGE_DIMENSION_CHECK: ${IMAGE_DIMENSION_CHECK:-true}
+      IMAGE_FILE_SIZE_CHECK: ${IMAGE_FILE_SIZE_CHECK:-true}
+    ports:
+      - "${PUBLISH_IP:-}:${MGMT_PORT:-7070}:7443"
+    volumes:
+      - ${LOG_DIR_HOST:-./.data/logs}:/data/logs
+      # Read-write, and the one service that needs it: article images and banner creatives are
+      # written here, each into its website's own folder, created on first upload.
+      - ${STORAGE_HOST:-./.data/storage}:/data/storage
+      # - ./config:/app/config:ro   # uncomment to supply a TLS keystore
+    networks:
+      - pacod-cms-net
+    healthcheck:
+      # /mgmt-health, outside the authenticated /mgmt/** matcher -- a healthcheck that has to log
+      # in is not a healthcheck. Liveness only: it cannot tell you pacod-id is unreachable and
+      # nobody can sign in (the studio's screens then answer 503, and this container logs why).
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:7443/mgmt-health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+
+  # ---- PDF export: Gotenberg ------------------------------------------------------------------
+  #
+  # The studio's PDF jobs render each article's print view here. Its Chromium is the one thing on
+  # the stack that fetches what an author wrote -- an article body accepts any markup -- so it may
+  # reach the site's internal address and nothing else: not the studio, pacod-id, MongoDB or the
+  # internet (the web fonts of the print view simply do not load). No port is published; only the
+  # studio talks to it. JavaScript is off: the print view needs none.
+  gotenberg:
+    image: gotenberg/gotenberg:8.38.1
+    container_name: gotenberg
+    restart: unless-stopped
+    command:
+      - gotenberg
+      - --chromium-allow-list=^http://site:8443(/|$$)
+      - --chromium-deny-private-ips
+      - --chromium-deny-public-ips
+      - --chromium-disable-javascript
+      - --api-disable-download-from
+      - --api-timeout=120s
+      - --log-level=info
+    networks:
+      - pacod-cms-net
+
+  # ---- AI: the development gateway (profile dev-gateway) ---------------------------------------
+  #
+  # pacod-gw-lite in front of pacod-gw's mock providers: a chat answer is an echo of the last user
+  # message, a JSON-schema answer an instance of the schema, and nothing leaves the machine. The
+  # studio reaches it at http://gw:8080 with the key make init wrote (PACOD_GW_API_KEY). A
+  # deployment sets COMPOSE_PROFILES= and points PACOD_GW_URL and PACOD_GW_API_KEY at a real
+  # gateway. Images: make images, from PACOD_GW_SRC.
+  gw:
+    image: ${PACOD_GW_LITE_IMAGE:-pacod-gw-lite:dev}
+    container_name: gw
+    profiles: [dev-gateway]
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command: ["serve"]
+    environment:
+      PGW_LISTEN: 0.0.0.0:8080
+      PGW_LOG_FORMAT: text
+      PGW_EGRESS_ALLOW_PRIVATE: gw-mock
+      PGW_PROVIDER_OPENAI_KEY: dev-openai-key
+      PGW_PROVIDER_OPENAI_BASE_URL: http://gw-mock:9000/v1
+      PGW_PROVIDER_ANTHROPIC_KEY: dev-anthropic-key
+      PGW_PROVIDER_ANTHROPIC_BASE_URL: http://gw-mock:9000
+      PGW_MODEL_GPT: openai/gpt-dev
+      PGW_MODEL_GPT_PRICE: input=1.25,output=10
+      PGW_MODEL_CLAUDE: anthropic/claude-dev
+      PGW_MODEL_CLAUDE_PRICE: input=3,output=15
+      PGW_POOL_FAST: openai/gpt-dev,anthropic/claude-dev
+      # The studio's key: generated into .env by make init, the same on both sides.
+      PGW_CLIENT_CMS_KEY: ${PACOD_GW_API_KEY:-}
+    depends_on:
+      gw-mock:
+        condition: service_healthy
+    networks:
+      - pacod-cms-net
+
+  gw-mock:
+    image: ${PACOD_GW_MOCK_IMAGE:-pacod-gw-mock:dev}
+    container_name: gw-mock
+    profiles: [dev-gateway]
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck", "http://127.0.0.1:9000/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    networks:
+      - pacod-cms-net
+
+  # ---- sign-in: pacod-id, its PostgreSQL, and a mail catcher --------------------------------
+  #
+  # pacod-id owns accounts, sessions and role bindings; the studio signs people in through it
+  # (OIDC) and reads their roles from its feed. Its secrets have no defaults here -- a published
+  # fallback would be a published key -- and `make init` generates them once into .env.
+  # Readers of the websites never touch any of this.
+  id-postgres:
+    image: postgres:18.6-alpine3.24
+    container_name: id-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${PID_PG_SUPERUSER_PASSWORD:?run make init}
+      PID_DB_PASSWORD: ${PID_DB_PASSWORD:?run make init}
+    volumes:
+      - id-pg-data:/var/lib/postgresql
+      - ./docker/pacod-id/initdb:/docker-entrypoint-initdb.d:ro
+    networks:
+      - pacod-cms-net
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "pacod_id"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  id:
+    # Built from pacod-id's own sources by `make images` (only when the image is missing): a Rust
+    # build, slow the first time. PACOD_ID_SRC names the checkout, ../pacod-id by default.
+    image: ${PACOD_ID_IMAGE:-pacod-id:dev}
+    container_name: id
+    restart: unless-stopped
+    depends_on:
+      id-postgres:
+        condition: service_healthy
+      # Only where it runs (profile mailpit: dev and stage); pacod-id connects only to send.
+      mailpit:
+        condition: service_started
+        required: false
+    environment:
+      PID_DATABASE_URL: postgres://pacod_id:${PID_DB_PASSWORD:?run make init}@id-postgres:5432/pacod_id
+      PID_KEK: ${PID_KEK:?run make init}
+      PID_TOKEN_PEPPER: ${PID_TOKEN_PEPPER:?run make init}
+      CMS_ID_STUDIO_SECRET: ${CMS_ID_STUDIO_SECRET:?run make init}
+      CMS_ID_SERVICE_SECRET: ${CMS_ID_SERVICE_SECRET:?run make init}
+      # The issuer is the address browsers use, and pacod-id answers its sign-in pages only on that
+      # exact host and port. Development: Caddy's id host.
+      CMS_ID_ISSUER: ${ID_ISSUER:-http://id.localhost:${HTTP_PORT:-8000}}
+      CMS_STUDIO_ORIGIN: ${STUDIO_ORIGIN:-http://studio.localhost:${HTTP_PORT:-8000}}
+      # Caddy forwards every sign-in; without this pacod-id sees Caddy's address for everyone and
+      # its sign-in throttle would be shared by all of them.
+      PID_TRUSTED_PROXIES: private_ranges
+      # The first account, created once: a platform admin of the studio.
+      PID_BOOTSTRAP_ADMIN_EMAIL: ${ID_ADMIN_EMAIL:-admin@pacod-cms.test}
+      PID_BOOTSTRAP_ADMIN_PASSWORD: ${ID_ADMIN_PASSWORD:?run make init}
+      PID_BOOTSTRAP_ADMIN_REALM: cms
+      PID_BOOTSTRAP_ADMIN_ROLES: id.admin,cms.platform_admin
+      # Mail: mailpit unless PID_SMTP_HOST names a relay (production must). TLS is starttls, tls
+      # or none. The account's name and password are passed only when set.
+      PID_SMTP_HOST: ${PID_SMTP_HOST:-mailpit}
+      PID_SMTP_PORT: ${PID_SMTP_PORT:-1025}
+      PID_SMTP_TLS: ${PID_SMTP_TLS:-none}
+      PID_SMTP_USERNAME:
+      PID_SMTP_PASSWORD:
+      PID_EMAIL_FROM_ADDRESS: ${ID_MAIL_FROM:-id@pacod-cms.test}
+      PID_EMAIL_FROM_NAME: pacod-cms
+      PID_LOG_FORMAT: text
+    volumes:
+      - ./docker/pacod-id/pacod-id.toml:/etc/pacod-id/pacod-id.toml:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    networks:
+      - pacod-cms-net
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck", "http://127.0.0.1:9170/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  # Every mail pacod-id sends (address confirmations, invitations, resets) ends here; none leaves
+  # the machine. Its page: http://localhost:${MAILPIT_PORT:-8125}/ (on a stage server, through an
+  # SSH tunnel). Profile mailpit: dev and stage; production sends through PID_SMTP_HOST.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: mailpit
+    profiles: [mailpit]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAILPIT_PORT:-8125}:8025"
+    networks:
+      - pacod-cms-net
+
+  # The front door, for every host: the studio's (STUDIO_HOST), pacod-id's (ID_HOST) and every
+  # website's. The rules are docker/caddy/routes.caddy; CADDYFILE picks the addresses and the
+  # certificates around them -- docker/caddy/Caddyfile (the default: production, HTTPS for every
+  # host, a website's certificate obtained on demand once the site confirms the host is an active
+  # website's) or docker/caddy/Caddyfile.dev (a developer machine: plain HTTP on HTTP_PORT, HTTPS
+  # from Caddy's local CA on HTTPS_PORT), which env/dev.env names.
+  caddy:
+    image: caddy:2.10.2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    environment:
+      STUDIO_HOST: ${STUDIO_HOST:-studio.localhost}
+      ID_HOST: ${ID_HOST:-id.localhost}
+      # One extra line for Caddy's global options: `email ops@example.com`, or `local_certs` to try
+      # the production Caddyfile without a public CA.
+      CADDY_GLOBAL_OPTIONS: ${CADDY_GLOBAL_OPTIONS:-}
+      # A certificate pair of the deployment's own: naming SSL_CERT_FILE is the whole switch. The
+      # Caddyfile then imports routes.caddy's supplied-pair, which serves the pair for every name
+      # it covers; otherwise this is empty and Caddy obtains every certificate itself.
+      CADDY_SUPPLIED_PAIR: ${SSL_CERT_FILE:+import supplied-pair}
+    depends_on:
+      site:
+        condition: service_healthy
+      studio:
+        condition: service_healthy
+      # Started, not healthy: a pacod-id that is down must cost sign-in, not the websites.
+      id:
+        condition: service_started
+    ports:
+      - "${HTTP_PORT:-8000}:80"
+      - "${HTTPS_PORT:-8443}:443"
+      - "${HTTPS_PORT:-8443}:443/udp"
+    volumes:
+      - ${CADDYFILE:-./docker/caddy/Caddyfile}:/etc/caddy/Caddyfile:ro
+      - ./docker/caddy/routes.caddy:/etc/caddy/routes.caddy:ro
+      # The supplied pair, file by file, so certbot's symlinks in live/<domain>/ resolve on the
+      # host. Unset, a placeholder stands in -- a bind mount needs a source -- and is never read.
+      - ${SSL_CERT_FILE:-./docker/caddy/no-certificate}:/etc/caddy/tls/fullchain.pem:ro
+      - ${SSL_KEY_FILE:-./docker/caddy/no-certificate}:/etc/caddy/tls/privkey.pem:ro
+      # The certificates, Caddy's local CA and the account with the CA. Keep it: a CA rate-limits
+      # re-issuing.
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - pacod-cms-net
+    healthcheck:
+      # Caddy's admin API, inside the container only. Not a site address: in production every one
+      # of those redirects to HTTPS or needs a certificate. 127.0.0.1: busybox wget tries ::1 first.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+networks:
+  pacod-cms-net:
+    # External, so containers outside this project can join it. Compose therefore never
+    # creates it: `make network` (run by `make up`) does, idempotently.
+    name: ${DOCKER_NETWORK:-pacod-cms-net}
+    external: true
+
+volumes:
+  # pacod-id's PostgreSQL: accounts, sessions, role bindings. `make destroy` drops it.
+  id-pg-data:
+  # For MONGO_DATA_DIR=mongo-data: a Docker volume rather than a host folder. On macOS a bind mount
+  # into the Docker VM intermittently refuses MongoDB's file operations ("Operation not
+  # permitted"), which surfaces as an index that silently fails to build.
+  mongo-data:
+  # Caddy's certificates, its local CA and its account with the CA.
+  caddy-data:
+  caddy-config:

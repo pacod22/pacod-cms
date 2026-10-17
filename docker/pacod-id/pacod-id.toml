@@ -1,0 +1,40 @@
+# pacod-id for pacod-cms: one realm and the studio's two clients.
+#
+# pacod-id expands the variables below at start; an unset or empty one is fatal. docker-compose.yml
+# sets them from ID_ISSUER and STUDIO_ORIGIN (development: the hosts Caddy routes on HTTP_PORT).
+#
+# Browser endpoints (sign-in, authorize, logout) answer only when the Host is the issuer's own, so
+# the issuer is the address Caddy publishes. The studio calls the token and key endpoints, and the
+# internal API, on the internal listener (http://id:8071) instead.
+
+[[realm]]
+name = "cms"
+issuer = "${CMS_ID_ISSUER}"
+brand = "pacod"
+# Anyone may create an account; what they may do in the studio is decided by role bindings, and a
+# new account holds none until an organisation is created or someone invites them.
+self_signup = true
+
+# The studio's sign-in. Authorization code with PKCE (pacod-id requires it of every client). The
+# redirect URIs are exact: the studio sends absolute ones from its configuration, never ones built
+# from a request, which under /sites/<id>/ would carry the website prefix.
+[[client]]
+id = "pacod-cms-studio"
+realm = "cms"
+kind = "confidential"
+secret_env = "CMS_ID_STUDIO_SECRET"
+redirect_uris = ["${CMS_STUDIO_ORIGIN}/mgmt/oauth2/code/pacod-id"]
+post_logout_redirect_uris = ["${CMS_STUDIO_ORIGIN}/mgmt/login?loggedOut"]
+initiate_login_uri = "${CMS_STUDIO_ORIGIN}/mgmt/login"
+audience = "pacod-cms"
+
+# The studio as a service: pushes the cms catalogue, registers organisations and websites as
+# scopes, follows the authorization feed, and exchanges tokens for the admin API. Same audience as
+# the studio client: token exchange accepts only user tokens issued for its own audience.
+[[client]]
+id = "pacod-cms-service"
+realm = "cms"
+kind = "service"
+product = "cms"
+secret_env = "CMS_ID_SERVICE_SECRET"
+audience = "pacod-cms"

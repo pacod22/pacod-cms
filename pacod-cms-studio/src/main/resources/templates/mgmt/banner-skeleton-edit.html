@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<!--/*
+  A skeleton, edited as the one index.html it came from plus its stylesheet.
+
+  Plain monospace textareas, deliberately NOT id="text": that is what mgmt.js binds TinyMCE to, and
+  an editor configured to preserve stored article bodies would still reformat this markup on every
+  open. There is nothing rich about a banner skeleton.
+
+  The console stores the file split in three -- head, container tag, tail -- and BannerSkeletonParser
+  puts it back together for this screen and splits it again on save, so a mistake is refused at the
+  moment it is made rather than on every folder generated from it afterwards.
+*/-->
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{banners.skel.title})}"></head>
+
+<body>
+
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('layouts')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{banners.skel.heading})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+            <!--/*
+              Прочитане от архив: попълва формата, а не записва документ. Шаблонът е markup, който
+              операторът тепърва ще прегледа — а прегледът е точно стъпката, заради която този
+              екран съществува.
+            */-->
+            <div class="card" th:if="${isNew}">
+                <h2>
+                    <svg class="i"><use href="#i-upload"></use></svg>
+                    <span th:text="#{banners.skel.read.heading}">Read from archive</span>
+                    <span class="hint" th:text="#{banners.skel.read.headingHint}">.zip with index.html and css/banner.css</span>
+                </h2>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data"
+                          th:action="@{/mgmt/banners/layouts/skeletons/read}">
+                        <div class="field">
+                            <label for="skeleton-file" th:text="#{banners.skel.read.file}">Archive of an existing folder</label>
+                            <input type="file" id="skeleton-file" name="file"
+                                   accept=".zip,application/zip" required>
+                            <span class="hint" th:utext="#{banners.skel.read.fileHint}">Images are ignored.</span>
+                        </div>
+                        <div class="actions">
+                            <button class="btn" type="submit">
+                                <svg class="i"><use href="#i-upload"></use></svg> <th:block th:text="#{banners.skel.read.submit}">Read</th:block>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <form id="skeleton-form" method="post" th:object="${form}"
+                  th:action="${isNew}
+                        ? @{/mgmt/banners/layouts/skeletons}
+                        : @{/mgmt/banners/layouts/skeletons/{id}(id=${form.id})}">
+
+                <div th:replace="~{mgmt/fragments :: errors}"></div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-code"></use></svg> <span th:text="#{banners.skel.card}">Template</span></h2>
+                    <div class="card-body">
+
+                        <div class="field" th:if="${isNew}">
+                            <label for="id" th:text="#{banners.skel.id}">Name</label>
+                            <input type="text" id="id" th:field="*{id}" maxlength="40" required
+                                   placeholder="sidebar-wide">
+                            <span class="hint" th:utext="#{banners.skel.id.hint}">Lowercase letters.</span>
+                        </div>
+                        <div class="field" th:unless="${isNew}">
+                            <label th:text="#{banners.skel.id}">Name</label>
+                            <input type="text" th:value="*{id}" readonly>
+                            <input type="hidden" th:field="*{id}">
+                        </div>
+
+                        <div class="field">
+                            <label for="title" th:text="#{banners.skel.titleField}">Title</label>
+                            <input type="text" id="title" th:field="*{title}" maxlength="128">
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="width" th:text="#{banners.skel.width}">Default width (px)</label>
+                                <input type="number" id="width" th:field="*{width}" min="1" max="4000">
+                            </div>
+                            <div class="field">
+                                <label for="height" th:text="#{banners.skel.height}">Default height (px)</label>
+                                <input type="number" id="height" th:field="*{height}" min="1" max="4000">
+                            </div>
+                        </div>
+                        <span class="hint" th:text="#{banners.skel.size.hint}">Defaults only.</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-file-text"></use></svg>
+                        <span>index.html</span>
+                    </h2>
+                    <div class="card-body">
+                        <p class="muted" style="margin-top:0" th:utext="#{banners.skel.html.intro}">Must contain exactly one container.</p>
+                        <div class="field">
+                            <label for="html" th:text="#{banners.skel.content}">Content</label>
+                            <textarea id="html" th:field="*{html}" rows="22" spellcheck="false"
+                                      style="font-family:var(--mono); font-size:12.5px"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-code"></use></svg> <span>css/banner.css</span></h2>
+                    <div class="card-body">
+                        <p class="muted" style="margin-top:0" th:utext="#{banners.skel.css.intro}">Written verbatim.</p>
+                        <div class="field">
+                            <label for="css" th:text="#{banners.skel.content}">Content</label>
+                            <textarea id="css" th:field="*{css}" rows="14" spellcheck="false"
+                                      style="font-family:var(--mono); font-size:12.5px"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="savebar">
+                    <span class="spacer"></span>
+                    <button class="btn btn-primary" type="submit" form="skeleton-form">
+                        <svg class="i"><use href="#i-save"></use></svg>
+                        <span th:text="${isNew} ? #{banners.skel.create} : #{banners.skel.save}">Save</span>
+                    </button>
+                </div>
+            </form>
+
+            <div class="card danger" th:if="${!isNew and skeleton != null and !skeleton.builtIn}">
+                <h2><svg class="i"><use href="#i-trash"></use></svg> <span th:text="#{banners.skel.delete.heading}">Delete the template</span></h2>
+                <div class="card-body">
+                    <p class="muted" th:text="#{banners.skel.delete.help}">Refused while a layout uses it.</p>
+                </div>
+                <div class="card-foot">
+                    <form method="post" th:data-confirm="#{banners.skel.delete.confirm}"
+                          th:action="@{/mgmt/banners/layouts/skeletons/{id}/delete(id=${skeleton.id})}">
+                        <button class="btn btn-danger" type="submit" th:text="#{banners.skel.delete.submit}">Delete the template</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card" th:if="${!isNew and skeleton != null and skeleton.builtIn}">
+                <div class="card-body">
+                    <p class="muted" style="margin:0" th:text="#{banners.skel.builtIn}">This is a built-in template.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

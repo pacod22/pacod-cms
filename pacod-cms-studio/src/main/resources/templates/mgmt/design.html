@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  A website's design at a glance: its template set, each page type's layout (the set's default, or
+  the website's own; a draft waiting; what the set cannot render), the theme, the menus.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{design.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('design')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{design.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <span class="spacer" style="margin-left:auto"></span>
+                <a class="btn" th:href="@{/mgmt/design/preview}">
+                    <svg class="i"><use href="#i-eye"></use></svg> <span th:text="#{design.preview}">Preview</span>
+                </a>
+            </div>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-layout"></use></svg> <span th:text="#{design.template.current}">Template</span></h2>
+                <div class="card-body">
+                    <p style="margin:0"><strong th:text="${set.name}">Editorial</strong>
+                        <span class="muted" th:text="${set.description}">A magazine front page.</span></p>
+                </div>
+                <div class="card-foot" th:if="${can != null and can.site('design.publish')}">
+                    <a class="btn" th:href="@{/mgmt/design/template}" th:text="#{design.template.change}">Change the template</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-file-text"></use></svg> <span th:text="#{design.layouts}">Layouts</span></h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{design.col.pageType}">Page</th>
+                            <th th:text="#{design.col.layout}">Layout</th>
+                            <th class="shrink"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="p : ${pageTypes}">
+                            <td class="title-cell">
+                                <a th:href="@{/mgmt/design/layouts/{t}(t=${#strings.toLowerCase(p.pageType.name())})}"
+                                   th:text="${mgmtText.label(p.pageType)}">Home</a>
+                            </td>
+                            <td>
+                                <span class="badge" th:classappend="${p.custom} ? 'published'"
+                                      th:text="${p.custom} ? #{design.layout.custom} : #{design.layout.default}">default</span>
+                                <span class="badge" th:if="${p.unpublished}" th:text="#{design.layout.draft}">draft</span>
+                                <span class="badge off" th:if="${p.issues > 0}"
+                                      th:text="#{design.layout.issues(${p.issues})}">2 not rendered</span>
+                            </td>
+                            <td>
+                                <a class="btn btn-sm" th:href="@{/mgmt/design/layouts/{t}(t=${#strings.toLowerCase(p.pageType.name())})}"
+                                   th:text="#{design.edit}">Edit</a>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-sun"></use></svg> <span th:text="#{design.theme}">Theme</span></h2>
+                <div class="card-body">
+                    <p class="muted" style="margin:0" th:if="${theme.published == null or theme.published.isEmpty()}"
+                       th:text="#{design.theme.none}">The template's own look.</p>
+                    <p class="muted" style="margin:0" th:unless="${theme.published == null or theme.published.isEmpty()}"
+                       th:text="#{design.theme.some(${theme.published.size()})}">5 values set.</p>
+                    <span class="badge" th:if="${theme.hasUnpublishedChanges()}" th:text="#{design.layout.draft}">draft</span>
+                </div>
+                <div class="card-foot">
+                    <a class="btn" th:href="@{/mgmt/design/theme}" th:text="#{design.edit}">Edit</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-menu"></use></svg> <span th:text="#{design.menus}">Menus</span></h2>
+                <div class="card-foot">
+                    <a class="btn" th:href="@{/mgmt/design/menus/main}" th:text="#{design.menu.main}">Main menu</a>
+                    <a class="btn" th:href="@{/mgmt/design/menus/footer}" th:text="#{design.menu.footer}">Footer menu</a>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

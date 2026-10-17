@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*
+  The article widgets, one per article-list style. Their class names are this repository's own,
+  and site.css is the only thing styling them.
+
+  Two rules hold for every one of them:
+
+    * Item counts are not decided here. PageComposer slices each slot to its section's offset
+      and count; every fragment renders everything it is handed.
+    * Articles with no image are skipped in the image-bearing widgets. getImageFilename()
+      returns "" when images are absent, which would otherwise emit
+      src="/assets/img/articles/" and request a nonexistent file. One fewer item beats one
+      broken one. The `ranked` widget is the exception -- it shows no thumbnails at all, so it
+      has nothing to guard and renders every item it is given.
+*/-->
+
+<!--/* ===================================================================================
+       metaLine: the date + view-count pair. Callers supply the wrapper, because the three
+       widgets place it differently.
+
+       The eye is inline SVG: the site loads no icon font.
+       =================================================================================== */-->
+<th:block th:fragment="metaLine(item, lang)">
+    <span th:text="#{article.date} + ' '">Date: </span><span th:text="${item.dateAsText}"></span>
+    <span aria-hidden="true">·</span>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+         aria-hidden="true" focusable="false" style="vertical-align:-2px">
+        <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>
+    </svg>
+    <span th:text="${item.counter != null ? item.counter : 0}">0</span>
+</th:block>
+
+<!--/* ===================================================================================
+       hero: one article, rendered large. Video variant first, image variant otherwise.
+       =================================================================================== */-->
+<th:block th:fragment="hero(slot, lang)">
+    <div th:with="item=${slot.first}">
+        <th:block th:if="${item != null}">
+
+            <article class="lead">
+                <!--/* #strings.isEmpty, not a null test: the studio posts "" for an article with
+                       no embedded video, and a null test then draws an empty .video-container --
+                       a black box where the thumbnail should be, on the landing page. The
+                       imageFilename half of this pair makes the same test: "" is not null. */-->
+                <div class="lead__media" th:if="${!#strings.isEmpty(item.embedded)}">
+                    <div class="video-container" th:utext="${item.embedded}"></div>
+                </div>
+                <a class="lead__media" th:if="${#strings.isEmpty(item.embedded) and !#strings.isEmpty(item.imageFilename)}"
+                   th:href="@{/article/{id}(id=${item.id}, lang=${lang})}">
+                    <img th:src="'/assets/img/articles/' + ${item.imageFilename}"
+                         th:alt="${item.imageAlt}" fetchpriority="high"/>
+                </a>
+
+                <div class="lead__meta">
+                    <a class="kicker" th:if="${slot.categoryId != null}"
+                       th:href="@{/list/{id}(id=${slot.categoryId}, lang=${lang})}"
+                       th:text="${slot.name}"></a>
+                    <span class="meta-note"><th:block
+                            th:replace="~{fragments/widgets :: metaLine(${item}, ${lang})}"></th:block></span>
+                </div>
+
+                <h1 class="lead__title">
+                    <a th:href="@{/article/{id}(id=${item.id}, lang=${lang})}" th:utext="${item.title}"></a>
+                </h1>
+                <p class="lead__dek" th:if="${!#strings.isEmpty(item.description)}" th:utext="${item.description}"></p>
+                <p class="lead__dek" th:if="${#strings.isEmpty(item.description)}"
+                   ><th:block th:replace="~{fragments/widgets :: authors(${item})}"></th:block></p>
+            </article>
+
+        </th:block>
+    </div>
+</th:block>
+
+<!--/* ===================================================================================
+       cards: the three-across grid, an article list's default style.
+       Its heading is an h2: these are all section-level headings.
+       =================================================================================== */-->
+<th:block th:fragment="cards(slot, lang, showHeading)">
+    <div class="section-head" th:if="${showHeading and !#strings.isEmpty(slot.name)}">
+        <h2 class="section-head__title" th:text="${slot.name}"></h2>
+        <a class="section-head__link" th:if="${slot.categoryId != null}"
+           th:href="@{/list/{id}(id=${slot.categoryId}, lang=${lang})}"
+           th:text="#{list.showAll}">All articles</a>
+    </div>
+
+    <div class="card-grid">
+        <article class="card" th:each="item : ${slot.items}"
+                 th:if="${!#strings.isEmpty(item.imageFilename)}">
+            <a class="card__media" th:href="@{/article/{id}(id=${item.id}, lang=${lang})}">
+                <img th:src="'/assets/img/articles/' + ${item.imageFilename}" th:alt="${item.imageAlt}"
+                     loading="lazy"/>
+            </a>
+            <div class="card__meta">
+                <th:block th:replace="~{fragments/widgets :: metaLine(${item}, ${lang})}"></th:block>
+            </div>
+            <h3 class="card__title">
+                <a th:href="@{/article/{id}(id=${item.id}, lang=${lang})}" th:utext="${item.title}"></a>
+            </h3>
+            <p class="card__byline" ><th:block th:replace="~{fragments/widgets :: authors(${item})}"></th:block></p>
+        </article>
+    </div>
+</th:block>
+
+<!--/* ===================================================================================
+       vertical: one narrow column of articles, stacked (the `list` style).
+       =================================================================================== */-->
+<th:block th:fragment="vertical(slot, lang)">
+    <div class="section-head">
+        <h2 class="section-head__title" th:text="${slot.name}"></h2>
+    </div>
+    <div class="stack">
+        <article class="stack__item" th:each="item : ${slot.items}"
+                 th:if="${!#strings.isEmpty(item.imageFilename)}">
+            <a class="stack__media" th:href="@{/article/{id}(id=${item.id}, lang=${lang})}">
+                <img th:src="'/assets/img/articles/' + ${item.imageFilename}" th:alt="${item.imageAlt}"
+                     loading="lazy"/>
+            </a>
+            <h3 class="stack__title">
+                <a th:href="@{/article/{id}(id=${item.id}, lang=${lang})}" th:utext="${item.title}"></a>
+            </h3>
+            <span class="stack__meta"><th:block th:replace="~{fragments/widgets :: authors(${item})}"></th:block></span>
+            <span class="stack__meta">
+                <th:block th:replace="~{fragments/widgets :: metaLine(${item}, ${lang})}"></th:block>
+            </span>
+        </article>
+    </div>
+    <a class="button-ghost button-ghost--block" th:if="${slot.categoryId != null}"
+       th:href="@{/list/{id}(id=${slot.categoryId}, lang=${lang})}"
+       th:text="#{list.showAll}">All articles</a>
+</th:block>
+
+<!--/* ===================================================================================
+       ranked: most read. No thumbnails, so unlike every other widget here it has no image
+       guard and shows the whole slot.
+       =================================================================================== */-->
+<th:block th:fragment="ranked(slot, lang)">
+    <div class="section-head">
+        <h2 class="section-head__title" th:text="${slot.name}"></h2>
+    </div>
+    <div class="ranked">
+        <article class="ranked__item" th:each="item, i : ${slot.items}">
+            <span class="ranked__no" th:text="${i.count}">1</span>
+            <span>
+                <span class="ranked__title">
+                    <a th:href="@{/article/{id}(id=${item.id}, lang=${lang})}" th:utext="${item.title}"></a>
+                </span>
+                <span class="ranked__meta">
+                    <th:block th:replace="~{fragments/widgets :: metaLine(${item}, ${lang})}"></th:block>
+                </span>
+            </span>
+        </article>
+    </div>
+</th:block>
+
+<!--/* ===================================================================================
+       videos: four across (the `video` style). Embedded players where the article has one,
+       the lead image otherwise.
+       =================================================================================== */-->
+<th:block th:fragment="videos(slot, lang)">
+    <div class="card-grid card-grid--four">
+        <article class="card" th:each="item : ${slot.items}"
+                 th:if="${!#strings.isEmpty(item.embedded) or !#strings.isEmpty(item.imageFilename)}">
+
+            <!--/* Same "" -- is -- not -- null test as the hero widget (`lead`) above. */-->
+            <div class="video-container" th:if="${!#strings.isEmpty(item.embedded)}" th:utext="${item.embedded}"></div>
+            <a class="card__media" th:if="${#strings.isEmpty(item.embedded)}"
+               th:href="@{/article/{id}(id=${item.id}, lang=${lang})}">
+                <img th:src="'/assets/img/articles/' + ${item.imageFilename}" th:alt="${item.imageAlt}"
+                     loading="lazy"/>
+            </a>
+
+            <!--/* Same order as the `cards` widget -- media, meta, title, byline -- so the
+                   spacing comes from the same rules rather than from overrides. */-->
+            <div class="card__meta">
+                <th:block th:replace="~{fragments/widgets :: metaLine(${item}, ${lang})}"></th:block>
+            </div>
+            <h3 class="card__title card__title--compact">
+                <a th:href="@{/article/{id}(id=${item.id}, lang=${lang})}" th:utext="${item.title}"></a>
+            </h3>
+            <p class="card__byline" ><th:block th:replace="~{fragments/widgets :: authors(${item})}"></th:block></p>
+        </article>
+    </div>
+</th:block>
+
+<!--/* A listing item's byline: the label in the page's language, then the names. Shared by every
+       list on the site so the label cannot drift between them. */-->
+<th:block th:fragment="authors(item)"><th:block th:if="${item.authorCount > 0}"><th:block
+        th:text="${(item.authorCount == 1 ? #messages.msg('list.author') : #messages.msg('list.authors')) + ' '}">Author: </th:block><th:block
+        th:utext="${item.authorsAsText}"></th:block></th:block></th:block>
+</body>
+</html>

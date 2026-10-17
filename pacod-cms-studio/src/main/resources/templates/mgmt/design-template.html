@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  Switching the website's template set: the sets this installation has, and -- for the one picked --
+  the report of what the website's layouts would leave unrendered there. Nothing is removed by the
+  switch; what is not rendered stays in the layouts, flagged, and comes back on a switch back.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{design.template.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('design')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{design.template.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <a class="btn btn-ghost" th:href="@{/mgmt/design}">
+                    <svg class="i"><use href="#i-arrow-up"></use></svg> <span th:text="#{design.title}">Design</span>
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{design.template.col}">Template</th>
+                            <th class="shrink"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="s : ${sets}">
+                            <td class="title-cell">
+                                <strong th:text="${s.name}">Minimal</strong>
+                                <span class="badge published" th:if="${s.id == set.id}" th:text="#{design.template.inUse}">in use</span>
+                                <span class="cell-sub" th:text="${s.description}">One column.</span>
+                            </td>
+                            <td>
+                                <a class="btn btn-sm" th:unless="${s.id == set.id}"
+                                   th:href="@{/mgmt/design/template(set=${s.id})}" th:text="#{design.template.check}">Check the switch</a>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card" th:if="${report != null}">
+                <h2><svg class="i"><use href="#i-alert"></use></svg> <span th:text="#{design.template.report}">What the switch would leave out</span></h2>
+                <div class="card-body">
+                    <p th:if="${reportClean}" th:text="#{design.template.clean}">Everything renders on the new template.</p>
+                    <div th:each="p : ${report}" th:unless="${p.clean()}">
+                        <h3 th:text="${mgmtText.label(p.pageType())}">Home</h3>
+                        <ul>
+                            <li th:each="i : ${p.published()}">
+                                <span class="badge" th:text="#{design.template.live}">live</span>
+                                <strong th:text="${labels.section(i.type)}">Search box</strong>
+                                <span class="muted" th:text="'(' + ${labels.region(i.region)} + ')'">(aside)</span>:
+                                <span th:text="${labels.issue(i)}">not rendered</span>
+                            </li>
+                            <li th:each="i : ${p.draft()}">
+                                <span class="badge" th:text="#{design.layout.draft}">draft</span>
+                                <strong th:text="${labels.section(i.type)}">Search box</strong>
+                                <span class="muted" th:text="'(' + ${labels.region(i.region)} + ')'">(aside)</span>:
+                                <span th:text="${labels.issue(i)}">not rendered</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <p class="muted" th:text="#{design.template.kept}">Nothing is removed.</p>
+                </div>
+                <div class="card-foot">
+                    <a class="btn" th:href="@{/mgmt/design/preview(set=${candidate})}">
+                        <svg class="i"><use href="#i-eye"></use></svg> <span th:text="#{design.template.preview}">Preview with this template</span>
+                    </a>
+                    <form method="post" class="inline-form" th:if="${can != null and can.site('design.publish')}"
+                          th:action="@{/mgmt/design/template}" th:data-confirm="#{design.template.confirm}">
+                        <input type="hidden" name="set" th:value="${candidate}">
+                        <button class="btn btn-primary" type="submit" th:text="#{design.template.apply}">Switch</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

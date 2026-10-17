@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  [minimal] One column: this is editorial's template with the aside removed -- see
+  design/sets/minimal.yaml. Keep the two in step when the page's own content changes.
+
+  Full-text search over the website's articles: GET /search?q=….
+
+  Rendered on the server; see SearchController for why it is not a Page document. The
+  consequence for this file: everything below is rendered by Thymeleaf and nothing here needs a
+  script to mean anything, which is the same rule the article gallery follows -- markup that
+  needs JavaScript to work is dead controls wherever the script does not run.
+
+  ${results} is an ArticleListPageable, reused for its pager arithmetic only. It is ABSENT, not
+  empty, until a query is submitted -- `searched` is what distinguishes "no query yet" from "no
+  matches", and the two must not render the same. Reporting "nothing found" to a reader who has
+  not searched yet is the same class of wrong answer as a chart drawing a flat zero line for a
+  period with no data.
+
+  The row markup is deliberately identical to list.html's: a search result and a listing row are
+  the same thing and a reader moving between them should not be told otherwise.
+*/-->
+<head th:replace="~{fragments/head :: head(
+        lang=${lang},
+        pageTitle=${(#strings.isEmpty(q) ? #messages.msg('search.title') : #messages.msg('search.title') + ': ' + q) + ' | ' + site.name(lang)},
+        pageDesc=${site.description(lang)},
+        ogUrl=${site.url('/search')},
+        ogImagePath=null,
+        ogImageType=null)}"></head>
+
+<body>
+<th:block th:replace="~{fragments/scripts :: gtmNoscript}"></th:block>
+
+<th:block th:replace="~{fragments/navbar :: navbar(${lang})}"></th:block>
+
+<div class="shell">
+    <th:block th:replace="~{fragments/ad-sidebar :: topBanners(${topBanners})}"></th:block>
+</div>
+
+<div class="shell shell--narrow">
+    <main class="column">
+        <!--/* The main region: this page's own content where its primary section stands, the
+               layout's other sections around it (PageComposer; sections.html). */-->
+        <th:block th:each="s : ${regions.get('main')}">
+            <th:block th:if="${s.primary}">
+
+                <div class="page-head">
+                    <h1 class="page-head__title"
+                        th:text="#{search.title}">Search</h1>
+                </div>
+
+                <!--/* A real GET form: it works with scripting off, and the query stays in the URL so a
+                       result set can be linked and bookmarked. `page` is deliberately NOT carried here --
+                       a new search starts at the first page, and a hidden page field would silently land
+                       the reader on page 4 of a different query. */-->
+                <form class="search-form" action="/search" method="get" role="search">
+                    <label class="visually-hidden" for="search-q"
+                           th:text="#{search.title}">Search</label>
+                    <input class="search-form__input" id="search-q" type="search" name="q"
+                           th:value="${q}"
+                           th:placeholder="#{search.placeholder}"/>
+                    <input type="hidden" name="lang" th:value="${lang}"/>
+                    <button class="search-form__button" type="submit"
+                            th:text="#{search.submit}">Search</button>
+                </form>
+
+                <!--/* Not yet searched. Distinct from "no matches" -- see the header comment. */-->
+                <div class="empty-note" th:unless="${searched}"
+                     th:text="#{search.prompt}">Type a word or a phrase to search the archive.</div>
+
+                <th:block th:if="${searched}">
+                    <div class="page-head__kicker">
+                        <span th:text="${results.page.totalElements}">0</span>
+                        <span th:text="#{search.count}">results</span>
+                    </div>
+
+                    <div class="empty-note" th:if="${results.page.totalElements == 0}"
+                         th:text="#{search.none}">Nothing matched this search.</div>
+
+                    <article class="list-row" th:each="item : ${results.page.content}">
+                        <a class="list-row__thumb" th:if="${!#strings.isEmpty(item.imageFilename)}"
+                           th:href="@{/article/{id}(id=${item.id}, lang=${lang})}">
+                            <img th:src="'/assets/img/articles/' + ${item.imageFilename}"
+                                 th:alt="${item.imageAlt}" loading="lazy"/>
+                        </a>
+                        <!--/* Placeholder rather than a skipped row, exactly as list.html: a result set
+                               that silently omits matches would disagree with the count above it. */-->
+                        <span class="list-row__thumb list-row__thumb--empty"
+                              th:if="${#strings.isEmpty(item.imageFilename)}" aria-hidden="true"></span>
+
+                        <div class="list-row__body">
+                            <span class="list-row__meta">
+                                <th:block th:replace="~{fragments/widgets :: metaLine(${item}, ${lang})}"></th:block>
+                            </span>
+                            <h2 class="list-row__title">
+                                <a th:href="@{/article/{id}(id=${item.id}, lang=${lang})}"
+                                   th:utext="${item.title}"></a>
+                            </h2>
+                            <p class="card__byline" th:if="${!#strings.isEmpty(item.description)}"
+                               th:utext="${item.description}"></p>
+                            <span class="list-row__author"><th:block th:replace="~{fragments/widgets :: authors(${item})}"></th:block></span>
+                        </div>
+                    </article>
+
+                    <!--/* Every link carries `q`, or page 2 of a search would be page 2 of nothing.
+                           th:classappend with the modifier ALONE -- two BEM __ separators in one
+                           expression is the Thymeleaf preprocessing trap list.html documents. */-->
+                    <nav class="pager" th:if="${results.page.totalPages > 1}" th:aria-label="#{pager.label}">
+                        <a class="pager__item"
+                           th:href="@{/search(q=${q}, page=${results.previousPage}, lang=${lang})}"
+                           th:aria-label="#{pager.previous}">«</a>
+
+                        <a th:each="i : ${#numbers.sequence(results.startPage, results.lastPage)}"
+                           class="pager__item"
+                           th:classappend="${results.pageNumber == i} ? 'pager__item--current' : ''"
+                           th:href="@{/search(q=${q}, page=${i}, lang=${lang})}"
+                           th:text="${i + 1}"></a>
+
+                        <a class="pager__item"
+                           th:href="@{/search(q=${q}, page=${results.nextPage}, lang=${lang})}"
+                           th:aria-label="#{pager.next}">»</a>
+
+                        <span class="pager__count" id="total-pages">
+                            <span th:text="#{list.pages} + ' '">Pages: </span>
+                            <span th:text="${results.page.totalPages}">1</span>
+                        </span>
+                    </nav>
+                </th:block>
+            </th:block>
+            <th:block th:unless="${s.primary}">
+                <th:block th:replace="~{sections :: ${s.fragment}(s=${s}, lang=${lang})}"></th:block>
+            </th:block>
+        </th:block>
+    </main>
+
+    <!--/* No aside in this set: the sidebar bookings follow the content, in a row. */-->
+    <div class="column-partners">
+        <th:block th:replace="~{fragments/ad-sidebar :: adSidebar(${sidebarBanners})}"></th:block>
+    </div>
+</div>
+
+
+<th:block th:replace="~{fragments/footer :: footer(${lang})}"></th:block>
+<th:block th:replace="~{fragments/scripts :: siteScripts}"></th:block>
+</body>
+</html>

@@ -1,0 +1,7 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<section th:fragment="richText(settings)" class="ed-rich" th:utext="${settings.html}">text</section>
+<section th:fragment="articleList(settings)" class="ed-list"><h2 th:text="${settings.heading}">h</h2></section>
+</body>
+</html>

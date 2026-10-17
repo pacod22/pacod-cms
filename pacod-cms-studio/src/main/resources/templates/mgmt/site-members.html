@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  Who works on this website. Roles held at the organisation show as inherited and are changed on
+  the organisation's screen; roles at the website are given and taken here.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{portal.members.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('members')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{portal.members.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar" th:if="${currentSite != null and can.organisation(currentSite.organisationId, 'org.read')}">
+                <a class="btn btn-ghost" th:href="${studioRoot} + '/mgmt/organisations/' + ${currentSite.organisationId}">
+                    <svg class="i"><use href="#i-building"></use></svg> <span th:text="#{portal.members.toOrganisation}">The organisation's members</span>
+                </a>
+            </div>
+
+            <div th:replace="~{mgmt/members :: card(${membersBase})}"></div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

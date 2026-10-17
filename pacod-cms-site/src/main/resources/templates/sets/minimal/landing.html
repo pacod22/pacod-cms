@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  [minimal] One column: this is editorial's template with the aside removed -- see
+  design/sets/minimal.yaml. Keep the two in step when the page's own content changes.
+
+  The home page: GET /. It has no content of its own -- its layout's sections are all of it:
+  ${regions}, composed by PageComposer from the website's published HOME layout, or this set's
+  default (design/sets/minimal.yaml in core). One region: main.
+
+  The widgets are rendered here, on the server. No script may re-fetch them over /web/v1 and
+  overwrite this markup with its own: fragments/scripts loads none that does, and
+  LandingTemplateRenderTest checks.
+*/-->
+<head th:replace="~{fragments/head :: head(
+        lang=${lang},
+        pageTitle=${site.name(lang)},
+        pageDesc=${site.description(lang) ?: site.tagline(lang)},
+        ogUrl=${site.url('/')},
+        ogImagePath=null,
+        ogImageType=null)}"></head>
+
+<body>
+<th:block th:replace="~{fragments/scripts :: gtmNoscript}"></th:block>
+<th:block th:replace="~{fragments/scripts :: facebookSdk(${lang})}"></th:block>
+<th:block th:replace="~{fragments/navbar :: navbar(${lang})}"></th:block>
+
+<div class="shell">
+    <th:block th:replace="~{fragments/ad-sidebar :: topBanners(${topBanners})}"></th:block>
+</div>
+
+<div class="shell shell--narrow">
+    <main class="column">
+        <th:block th:replace="~{sections :: region(${regions.get('main')}, ${lang})}"></th:block>
+    </main>
+    <!--/* No aside in this set: the sidebar bookings follow the content, in a row. */-->
+    <div class="column-partners">
+        <th:block th:replace="~{fragments/ad-sidebar :: adSidebar(${sidebarBanners})}"></th:block>
+    </div>
+</div>
+
+
+<th:block th:replace="~{fragments/footer :: footer(${lang})}"></th:block>
+<th:block th:replace="~{fragments/scripts :: siteScripts}"></th:block>
+</body>
+</html>

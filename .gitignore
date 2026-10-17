@@ -1,0 +1,55 @@
+target/
+!.mvn/wrapper/maven-wrapper.properties
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### Eclipse / STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+
+### VS Code ###
+.vscode/
+
+### OS ###
+.DS_Store
+
+HELP.md
+
+### Secrets — never commit keystores or private keys ###
+*.p12
+*.jks
+*.pem
+*.key
+# config/
+.local/
+
+# A machine's settings: .env (ENV, its hosts and secrets; make init writes it) and an optional
+# .env-local layered over it. The presets they override, env/*.env, hold no secret and ARE tracked.
+.env
+.env-local
+
+# Local runtime data created by docker compose
+.data/
+
+# Local tool output: screenshots, and a studio session cookie jar (make e2e-signin writes one).
+# The jar holds a live JSESSIONID, so this line is a secret rule, not a tidiness one.
+.artifacts/
+*.crt
+*.csr

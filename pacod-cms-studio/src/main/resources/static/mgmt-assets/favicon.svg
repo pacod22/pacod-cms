@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img"
+     aria-label="pacod-cms studio">
+  <!--
+    The console's tab icon: the sidebar's .brand-mark, drawn once more at favicon size.
+
+    NOTE FOR EDITORS: this is XML, so a double hyphen cannot appear anywhere inside this comment.
+    The repository's Java and Thymeleaf comments use them constantly; one pasted in here does not
+    fail loudly. The file still serves 200 as image/svg+xml, and the browser silently refuses to
+    parse it, so the tab falls back to no icon at all. MgmtFaviconTest parses this file for that
+    reason, and a status probe in `make smoke` cannot see it.
+
+    WHY IT IS IN THE JAR, under /mgmt-assets/. A website's icons are its own, named in its
+    settings; this one is the console's. /mgmt-assets/ is served from the classpath by
+    MgmtAssetsConfiguration and sits OUTSIDE MgmtSecurityConfig's authenticated matcher, which is
+    what makes it reachable from the sign-in page: the same two reasons mgmt.css lives here. An
+    icon on the volume would be missing on any host that has not mounted it, and unreachable
+    before sign-in on every host.
+
+    WHY IT EXISTS AT ALL. Without a declared icon the browser asks for /favicon.ico at the root
+    of the host, which the console does not serve, so the console's tab would carry no mark of its
+    own and an operator could not tell it at a glance from the website tab open beside it.
+
+    WHY THE BLADE IS FILLED. The sprite draws i-leaf as a 1.75px stroke, which is right at 18px
+    and mush at 16. The outline of the blade is the same closed path as the sprite's; it is filled
+    here instead, and only the stem stays a stroke. Two shapes that survive being 16 pixels wide.
+
+    ONE COLOUR, NOT TWO. An SVG favicon can carry a prefers-color-scheme media query, and this one
+    deliberately does not: it is drawn on the BROWSER's tab strip, not on the console's background,
+    so it has to read against a light and a dark chrome at once rather than follow either. A
+    saturated green square does. The green is the accent token of mgmt.css's light palette, spelled
+    out as a literal because a favicon has no stylesheet to inherit a custom property from. (The
+    token's own name cannot be written here either: it starts with the two hyphens this comment
+    may not contain.)
+  -->
+  <rect width="32" height="32" rx="7" fill="#2e7d46"/>
+  <g transform="translate(5.2 5.2) scale(0.9)" fill="none" stroke="#ffffff"
+     stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"
+          fill="#ffffff" stroke-width="1.6"/>
+    <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
+  </g>
+</svg>

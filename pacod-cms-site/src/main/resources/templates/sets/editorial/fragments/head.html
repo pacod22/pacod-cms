@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<!--/*
+  Shared <head> for every public page.
+
+  Site-level identity -- the name, the share image, the tracking and verification ids -- comes
+  from ${site} (SiteChrome, put in the model by SiteChromeAdvice); everything that varies per
+  page is a parameter.
+
+  Parameters (pass them by name at the call site -- there are six):
+
+    lang          resolved two-letter code; drives og:locale and CONTENT-LANGUAGE
+    pageTitle     <title> and og:title
+    pageDesc      description meta and og:description
+    ogUrl         canonical absolute URL of this page
+    ogImagePath   site-relative image path, e.g. /assets/img/articles/x.jpg. Made absolute
+                  here, and also emitted as a high-priority preload -- it is the LCP image
+                  on the article page.
+    ogImageType   MIME type of that image, or null
+
+  THE STYLESHEET SET IS DELIBERATE: the design is a self-contained system in site.css, served
+  from the jar. Nothing else is layered under it.
+
+  The theme snippet is inline and synchronous on purpose. Deferring it to site.js would flash
+  the light theme for a frame on every navigation, and this is a full page-load site.
+*/-->
+<head th:fragment="head(lang, pageTitle, pageDesc, ogUrl, ogImagePath, ogImageType)"
+      th:with="ogLocale=${site != null ? site.ogLocale(lang) : 'en_US'},
+               siteName=${site != null ? site.name(lang) : ''},
+               shareImage=${!#strings.isEmpty(ogImagePath) ? ogImagePath : (site != null ? site.ogImage() : null)}">
+    <!--/* Restores the stored theme before first paint. localStorage can throw in private
+           browsing, hence the try. Key and values match site.js. */-->
+    <!--/* Also included on its own, as fragments/head :: theme, by social.html -- which has a head of
+           its own for the reason given there. th:fragment renders in place here unchanged. */-->
+    <script th:fragment="theme">(function(){try{if(localStorage.getItem('pacod-theme')==='night'){document.documentElement.classList.add('night');}}catch(e){}})();</script>
+    <!--/* Google Tag Manager, only for a website that has configured a container. The id is
+           validated by SiteChrome and written through JavaScript inlining, so it is escaped as a
+           string literal as well. fragments/head :: gtm, so a page with its own head
+           (social.html) carries the same container. */-->
+    <th:block th:fragment="gtm">
+    <script th:if="${site != null and site.gtmId() != null}" th:inline="javascript">(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer',/*[[${site.gtmId()}]]*/ 'GTM-XXXXXXX');</script>
+    </th:block>
+    <!--/* The studio's draft preview (SitePreview), and only that: the token for preview.js, which
+           keeps every same-origin link and search inside the preview, and the label it shows.
+           fragments/head :: preview, so social.html carries it too. */-->
+    <th:block th:fragment="preview">
+    <th:block th:if="${preview != null}">
+    <meta name="pacod-preview" th:content="${preview.token()}" th:data-label="#{preview.label}"/>
+    <meta name="robots" content="noindex, nofollow"/>
+    <script defer src="/site-assets/preview.js"></script>
+    </th:block>
+    </th:block>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="${pageTitle}">Website</title>
+    <meta name="google-site-verification" th:if="${site?.googleSiteVerification() != null}"
+          th:content="${site.googleSiteVerification()}"/>
+    <meta name="msvalidate.01" th:if="${site?.bingSiteVerification() != null}"
+          th:content="${site.bingSiteVerification()}"/>
+    <meta name="author" th:if="${!#strings.isEmpty(siteName)}" th:content="${siteName}"/>
+    <meta name="description" th:content="${pageDesc != null ? pageDesc : (site?.description(lang) ?: pageTitle)}"/>
+    <meta property="og:url" th:content="${ogUrl}"/>
+    <meta property="og:title" th:content="${pageTitle}"/>
+    <meta property="og:type" content="website"/>
+    <meta property="og:site_name" th:if="${!#strings.isEmpty(siteName)}" th:content="${siteName}"/>
+    <meta property="og:description" th:content="${pageDesc != null ? pageDesc : (site?.description(lang) ?: pageTitle)}"/>
+    <!--/* ArticleModel.getImage() and getContent() return "" -- not null -- for an article
+           with no images, so these test for emptiness; the website's own share image stands in.
+           A bare th:if="!= null" would emit an og:image naming the bare host. */-->
+    <meta property="og:image" th:if="${!#strings.isEmpty(shareImage)}"
+          th:content="${site != null ? site.url(#uris.escapePath(shareImage)) : #uris.escapePath(shareImage)}"/>
+    <meta property="og:image:secure_url" th:if="${!#strings.isEmpty(shareImage)}"
+          th:content="${site != null ? site.url(#uris.escapePath(shareImage)) : #uris.escapePath(shareImage)}"/>
+    <meta property="og:image:type" th:if="${!#strings.isEmpty(ogImagePath) and !#strings.isEmpty(ogImageType)}" th:content="${ogImageType}"/>
+    <meta property="og:image:width" th:if="${!#strings.isEmpty(ogImagePath)}" content="600"/>
+    <meta property="og:image:height" th:if="${!#strings.isEmpty(ogImagePath)}" content="400"/>
+    <meta property="fb:app_id" th:if="${site?.facebookAppId() != null}" th:content="${site.facebookAppId()}"/>
+    <meta property="og:locale" th:content="${ogLocale}"/>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta http-equiv="CONTENT-LANGUAGE" th:content="${ogLocale}"/>
+    <link rel="preload" fetchpriority="high" as="image"
+          th:if="${!#strings.isEmpty(ogImagePath)}" th:href="${ogImagePath}" th:type="${ogImageType}"/>
+    <script type="application/ld+json" th:if="${site != null}" th:inline="javascript">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": /*[[${siteName}]]*/ "Website",
+      "url": /*[[${site.url('/')}]]*/ "https://www.example.com/"
+    }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <th:block th:if="${site?.gtmId() != null}">
+        <link rel="preconnect" href="https://www.googletagmanager.com">
+        <link rel="dns-prefetch" href="https://www.google-analytics.com">
+    </th:block>
+    <link rel="preconnect" href="https://connect.facebook.net" th:if="${site?.facebookAppId() != null}">
+    <link rel="icon" type="image/svg+xml" th:href="${site?.favicon() ?: '/site-assets/favicon.svg'}"
+          href="/site-assets/favicon.svg"/>
+    <!--/* Lora carries the display type, IBM Plex Sans the UI, IBM Plex Mono the label
+           system. All three ship Latin, Cyrillic and Greek. */-->
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"/>
+    <!--/* The template set's stylesheets: fragments/stylesheets, which a set extending this one
+           replaces. */-->
+    <th:block th:replace="~{fragments/stylesheets :: stylesheets}"></th:block>
+    <!--/* The website's theme (ThemeCssController): values for the tokens site.css reads, and its
+           own CSS. After site.css, so it wins; absent when nothing is published. A preview links
+           the draft, by its token (ThemeReader.Stylesheet.href). */-->
+    <link rel="stylesheet" th:if="${theme != null and theme.present}" th:href="${theme.href()}"/>
+</head>
+</html>

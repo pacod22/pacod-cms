@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body class="editorial">
+<main>
+    <th:block th:each="s : ${sections}">
+        <th:block th:replace="~{${s.template} :: ${s.fragment}(settings=${s.settings})}"></th:block>
+    </th:block>
+</main>
+</body>
+</html>

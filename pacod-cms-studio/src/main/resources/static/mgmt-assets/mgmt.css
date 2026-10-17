@@ -1,0 +1,2450 @@
+/*
+ * Management console design system.
+ *
+ * Hand-written and self-contained on purpose. Nothing here loads from the storage volume or from
+ * a CDN, so a clean checkout builds and tests the console's look with nothing copied anywhere, and
+ * there is no build step: this file is the whole stylesheet.
+ *
+ * Layout in one line: a fixed sidebar, a sticky topbar, and cards on a neutral canvas. The
+ * palette is token-driven and defined twice -- once for light, once for dark. Dark is chosen by
+ * `prefers-color-scheme` and overridden by a `data-theme` attribute that the topbar toggle sets
+ * (written synchronously in <head>, see the head fragment, so there is no flash on navigation).
+ */
+
+/* ============================================================== design tokens */
+
+:root {
+    --bg: #f5f7f5;
+    --surface: #ffffff;
+    --surface-2: #eff2ef;
+    --surface-3: #e6eae6;
+    --border: #e0e5e0;
+    --border-strong: #cbd3cc;
+
+    --text: #14201a;
+    --text-soft: #46564e;
+    --text-muted: #6b7a72;
+
+    --accent: #2e7d46;
+    --accent-hover: #24633a;
+    --accent-soft: #e7f2ea;
+    --accent-line: #bcdcc5;
+    --accent-contrast: #ffffff;
+
+    --danger: #b3261e;
+    --danger-soft: #fceceb;
+    --danger-line: #f2c9c6;
+
+    --ok: #2e7d46;
+    --ok-soft: #e7f2ea;
+    --ok-line: #bcdcc5;
+
+    --warn: #8a5a10;
+    --warn-soft: #fdf2df;
+    --warn-line: #f0dcb4;
+    /* Two series colours of their own, for charts with more lines than --accent/--warn/--danger
+       can tell apart (--accent and --ok are the same green). /mgmt/crawlers' categories. */
+    --series-blue: #2f6fb5;
+    --series-violet: #7b4fb3;
+
+    --shadow-xs: 0 1px 2px rgba(20, 32, 26, .05);
+    --shadow-sm: 0 1px 2px rgba(20, 32, 26, .05), 0 2px 6px rgba(20, 32, 26, .04);
+    --shadow-md: 0 2px 4px rgba(20, 32, 26, .06), 0 8px 24px rgba(20, 32, 26, .07);
+    --shadow-pop: 0 -1px 0 var(--border), 0 -8px 24px rgba(20, 32, 26, .06);
+    --focus-ring: 0 0 0 3px rgba(46, 125, 70, .22);
+
+    --r-xs: 6px;
+    --r-sm: 8px;
+    --r: 12px;
+    --r-lg: 16px;
+    --r-pill: 999px;
+
+    --sidebar-w: 250px;
+    --topbar-h: 60px;
+    --content-max: 1500px;
+
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto,
+            "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    --ease: cubic-bezier(.2, .6, .3, 1);
+    color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #101413;
+        --surface: #191e1d;
+        --surface-2: #212827;
+        --surface-3: #2a3231;
+        --border: #2e3735;
+        --border-strong: #3d4846;
+
+        --text: #e8eeeb;
+        --text-soft: #b9c6c0;
+        --text-muted: #8d9c95;
+
+        --accent: #5fb377;
+        --accent-hover: #74c48a;
+        --accent-soft: #1b2c21;
+        --accent-line: #2f4b39;
+        --accent-contrast: #0c1710;
+
+        --danger: #f0918a;
+        --danger-soft: #2e1c1b;
+        --danger-line: #4d2c29;
+
+        --ok: #79c68f;
+        --ok-soft: #1b2c21;
+        --ok-line: #2f4b39;
+
+        --warn: #e0b45f;
+        --warn-soft: #2c2517;
+        --warn-line: #4a3f22;
+
+        --series-blue: #7fb0e8;
+        --series-violet: #b99ae6;
+
+        --shadow-xs: 0 1px 2px rgba(0, 0, 0, .4);
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, .45), 0 2px 8px rgba(0, 0, 0, .3);
+        --shadow-md: 0 2px 6px rgba(0, 0, 0, .5), 0 12px 32px rgba(0, 0, 0, .4);
+        --shadow-pop: 0 -1px 0 var(--border), 0 -10px 28px rgba(0, 0, 0, .35);
+        --focus-ring: 0 0 0 3px rgba(95, 179, 119, .25);
+        color-scheme: dark;
+    }
+}
+
+/*
+ * The explicit choice wins over the media query in both directions, so an operator on a dark
+ * desktop can put the console in light mode and vice versa.
+ */
+:root[data-theme="light"] {
+    --bg: #f5f7f5;
+    --surface: #ffffff;
+    --surface-2: #eff2ef;
+    --surface-3: #e6eae6;
+    --border: #e0e5e0;
+    --border-strong: #cbd3cc;
+    --text: #14201a;
+    --text-soft: #46564e;
+    --text-muted: #6b7a72;
+    --accent: #2e7d46;
+    --accent-hover: #24633a;
+    --accent-soft: #e7f2ea;
+    --accent-line: #bcdcc5;
+    --accent-contrast: #ffffff;
+    --danger: #b3261e;
+    --danger-soft: #fceceb;
+    --danger-line: #f2c9c6;
+    --ok: #2e7d46;
+    --ok-soft: #e7f2ea;
+    --ok-line: #bcdcc5;
+    --warn: #8a5a10;
+    --warn-soft: #fdf2df;
+    --warn-line: #f0dcb4;
+    --series-blue: #2f6fb5;
+    --series-violet: #7b4fb3;
+    --shadow-xs: 0 1px 2px rgba(20, 32, 26, .05);
+    --shadow-sm: 0 1px 2px rgba(20, 32, 26, .05), 0 2px 6px rgba(20, 32, 26, .04);
+    --shadow-md: 0 2px 4px rgba(20, 32, 26, .06), 0 8px 24px rgba(20, 32, 26, .07);
+    --shadow-pop: 0 -1px 0 var(--border), 0 -8px 24px rgba(20, 32, 26, .06);
+    --focus-ring: 0 0 0 3px rgba(46, 125, 70, .22);
+    color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+    --bg: #101413;
+    --surface: #191e1d;
+    --surface-2: #212827;
+    --surface-3: #2a3231;
+    --border: #2e3735;
+    --border-strong: #3d4846;
+    --text: #e8eeeb;
+    --text-soft: #b9c6c0;
+    --text-muted: #8d9c95;
+    --accent: #5fb377;
+    --accent-hover: #74c48a;
+    --accent-soft: #1b2c21;
+    --accent-line: #2f4b39;
+    --accent-contrast: #0c1710;
+    --danger: #f0918a;
+    --danger-soft: #2e1c1b;
+    --danger-line: #4d2c29;
+    --ok: #79c68f;
+    --ok-soft: #1b2c21;
+    --ok-line: #2f4b39;
+    --warn: #e0b45f;
+    --warn-soft: #2c2517;
+    --warn-line: #4a3f22;
+    --series-blue: #7fb0e8;
+    --series-violet: #b99ae6;
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .45), 0 2px 8px rgba(0, 0, 0, .3);
+    --shadow-md: 0 2px 6px rgba(0, 0, 0, .5), 0 12px 32px rgba(0, 0, 0, .4);
+    --shadow-pop: 0 -1px 0 var(--border), 0 -10px 28px rgba(0, 0, 0, .35);
+    --focus-ring: 0 0 0 3px rgba(95, 179, 119, .25);
+    color-scheme: dark;
+}
+
+/* ==================================================================== reset */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14.5px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+h1, h2, h3 { line-height: 1.25; letter-spacing: -.01em; }
+
+/* One visible focus treatment everywhere, and only for keyboard users. */
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--r-xs);
+}
+
+svg.i {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+}
+
+/* =================================================================== layout */
+
+.shell { min-height: 100vh; }
+
+/* -- sidebar --------------------------------------------------------------- */
+
+.sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: var(--sidebar-w);
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 18px 14px 16px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px 2px;
+    color: var(--text);
+    text-decoration: none;
+}
+
+.brand-mark {
+    width: 34px;
+    height: 34px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: var(--accent);
+    color: var(--accent-contrast);
+}
+
+.brand-mark svg.i { width: 20px; height: 20px; }
+
+.brand-text { display: flex; flex-direction: column; min-width: 0; }
+
+.brand-name { font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
+
+.brand-sub { font-size: 11.5px; color: var(--text-muted); letter-spacing: .04em; text-transform: uppercase; }
+
+.nav-label {
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 0 10px;
+    margin-bottom: 6px;
+}
+
+.nav { display: flex; flex-direction: column; gap: 2px; }
+
+.nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: var(--r-sm);
+    color: var(--text-soft);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background .12s var(--ease), color .12s var(--ease);
+}
+
+.nav a:hover { background: var(--surface-2); color: var(--text); }
+
+.nav a.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 650;
+}
+
+.nav a.active svg.i { stroke-width: 2; }
+
+.sidebar-foot {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.sidebar-foot a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--r-sm);
+    font-size: 13px;
+    color: var(--text-muted);
+    text-decoration: none;
+}
+
+.sidebar-foot a:hover { background: var(--surface-2); color: var(--text); }
+
+/* -- topbar ---------------------------------------------------------------- */
+
+.main {
+    margin-left: var(--sidebar-w);
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: var(--topbar-h);
+    padding: 10px 24px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: saturate(150%) blur(10px);
+    border-bottom: 1px solid var(--border);
+}
+
+@supports not (backdrop-filter: blur(4px)) {
+    .topbar { background: var(--surface); }
+}
+
+.topbar h1 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 650;
+    letter-spacing: -.015em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.topbar .spacer { margin-left: auto; }
+
+.who {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px 4px 4px;
+    border-radius: var(--r-pill);
+    background: var(--surface-2);
+    font-size: 13px;
+    color: var(--text-soft);
+    white-space: nowrap;
+}
+
+/*
+ * The console's language switch: four plain links, BG EN DE RU, in the topbar and under the
+ * sign-in form. Links rather than a <select> so it works with scripting off -- each one is a GET to
+ * /mgmt/ui-language/{code}, which sets the cookie and comes back to the same screen.
+ */
+.ui-lang {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--r-pill);
+    background: var(--surface-2);
+    font-size: 11.5px;
+    font-weight: 650;
+    letter-spacing: .02em;
+}
+
+.ui-lang a {
+    padding: 3px 7px;
+    border-radius: var(--r-pill);
+    color: var(--text-muted);
+    text-decoration: none;
+}
+
+.ui-lang a:hover { color: var(--text); }
+
+.ui-lang a[aria-current="true"] {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 0 0 1px var(--border);
+}
+
+.login-card .ui-lang { margin-top: 14px; }
+
+@media (max-width: 700px) {
+    .topbar .ui-lang a { padding: 3px 5px; }
+}
+
+.who .avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: var(--r-pill);
+    display: grid;
+    place-items: center;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.content {
+    flex: 1;
+    width: 100%;
+    max-width: var(--content-max);
+    padding: 22px 24px 72px;
+}
+
+/* -- responsive: the sidebar becomes a drawer ------------------------------ */
+
+/*
+ * Pure CSS, driven by a hidden checkbox that sits in front of the sidebar in the DOM. No
+ * JavaScript is involved, so navigation still works on a phone with scripting off.
+ */
+.nav-toggle { position: absolute; opacity: 0; pointer-events: none; }
+
+.nav-scrim { display: none; }
+
+.nav-open { display: none; }
+
+/*
+ * -- the collapsed icon rail ------------------------------------------------
+ *
+ * `--sidebar-w` is declared once, at the top of this file, and is NOT redefined by either
+ * data-theme block -- so overriding the token is the whole layout change: the sidebar's own width,
+ * `.main`'s margin-left and `.savebar`'s left all follow it. Nothing else needs to know.
+ *
+ * Scoped to min-width 1001px on purpose. Unscoped, the phone drawer would slide open 68px wide
+ * with its labels clipped. The seam that leaves -- a fractional 1000.5px viewport matches neither
+ * this query nor the drawer's -- keeps the full 250px rail, which is the harmless side.
+ *
+ * `data-nav` is written by mgmt.js and applied before the first paint by the snippet in
+ * fragments.html's head; absent means expanded.
+ */
+@media (min-width: 1001px) {
+    :root[data-nav="collapsed"] { --sidebar-w: 68px; }
+
+    [data-nav="collapsed"] .sidebar { padding: 18px 10px 16px; }
+
+    [data-nav="collapsed"] .brand { justify-content: center; padding: 4px 0 2px; gap: 0; }
+
+    [data-nav="collapsed"] .nav a,
+    [data-nav="collapsed"] .sidebar-foot a { justify-content: center; gap: 0; padding: 9px 0; }
+
+    /*
+     * CLIPPED, not display:none -- the same declarations as .sr-only at the foot of this file.
+     * Hiding the labels outright would strip the accessible name from every link in the rail and
+     * leave a screen reader with six unlabelled icons. The `title` on each link is what names it
+     * on hover; this is what still names it to assistive technology.
+     */
+    [data-nav="collapsed"] .nav-text,
+    [data-nav="collapsed"] .brand-text,
+    [data-nav="collapsed"] .nav-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
+    }
+}
+
+@media (max-width: 1000px) {
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform .22s var(--ease);
+        box-shadow: var(--shadow-md);
+    }
+
+    .nav-toggle:checked ~ .sidebar { transform: translateX(0); }
+
+    .nav-toggle:checked ~ .nav-scrim {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 25;
+        background: rgba(8, 14, 11, .45);
+    }
+
+    .main { margin-left: 0; }
+
+    .nav-open {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: var(--r-sm);
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+        cursor: pointer;
+        flex: none;
+    }
+
+    .nav-open:hover { background: var(--surface-2); }
+
+    /*
+     * The mirror image of .nav-open above: the drawer is the mechanism at this width, so the
+     * collapse button would write a stored value and move nothing. Hidden rather than left to be
+     * clicked once and distrusted afterwards.
+     */
+    #nav-collapse { display: none; }
+
+    .topbar { padding: 10px 14px; }
+
+    .content { padding: 16px 14px 88px; }
+}
+
+/* =============================================================== components */
+
+/* -- card ------------------------------------------------------------------ */
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 18px;
+}
+
+.card > h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 14px 18px;
+    font-size: 14px;
+    font-weight: 650;
+    border-bottom: 1px solid var(--border);
+}
+
+.card > h2 svg.i { color: var(--text-muted); }
+
+.card > h2 .hint {
+    margin-left: auto;
+    font-weight: 400;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+.card-body { padding: 18px; }
+
+/* Actions belong at the foot of the card they act on, on their own tinted band. */
+.card-foot {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+    border-radius: 0 0 var(--r) var(--r);
+}
+
+.card-foot .spacer { margin-left: auto; }
+
+/* The article editor's language switcher: one wrapping row at the foot of the text card. */
+.lang-strip { gap: 6px; }
+.lang-strip-label { display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; font-size: 12px; color: var(--text-muted); }
+
+/* The short edit screens read better constrained than stretched across a 27-inch display. */
+.form-page { max-width: 760px; }
+
+.card-body > :first-child { margin-top: 0; }
+
+.card-body > p.muted:first-child { margin-top: 0; }
+
+.card.danger { border-color: var(--danger-line); }
+
+.card.danger > h2 { color: var(--danger); border-bottom-color: var(--danger-line); }
+
+.card.danger > h2 svg.i { color: var(--danger); }
+
+/* -- buttons --------------------------------------------------------------- */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 550;
+    line-height: 1.35;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background .12s var(--ease), border-color .12s var(--ease),
+                box-shadow .12s var(--ease), transform .06s var(--ease);
+}
+
+.btn:hover { background: var(--surface-2); border-color: var(--border-strong); }
+
+.btn:active { transform: translateY(1px); }
+
+.btn:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
+
+.btn svg.i { width: 16px; height: 16px; }
+
+.btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+    font-weight: 650;
+    box-shadow: var(--shadow-xs);
+}
+
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+.btn-danger { color: var(--danger); border-color: var(--danger-line); background: var(--surface); }
+
+.btn-danger:hover { background: var(--danger-soft); border-color: var(--danger); }
+
+.btn-ghost { border-color: transparent; background: transparent; color: var(--text-soft); }
+
+.btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+
+.btn-sm { padding: 5px 10px; font-size: 12.5px; gap: 5px; }
+
+.btn-sm svg.i { width: 14px; height: 14px; }
+
+.btn-icon { padding: 7px; width: 34px; height: 34px; }
+
+.btn-icon.btn-sm { padding: 4px; width: 26px; height: 26px; }
+
+.inline-form { display: inline-flex; }
+
+/* -- forms ----------------------------------------------------------------- */
+
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+
+.field:last-child { margin-bottom: 0; }
+
+.field > label, .field-head > label, .label {
+    font-size: 12.5px;
+    font-weight: 650;
+    color: var(--text-soft);
+    letter-spacing: .01em;
+}
+
+/*
+ * A label row that also carries actions. The editor's two writing-mode buttons live here, beside
+ * the field they act on: at this column width TinyMCE keeps its toolbar to one row and collapses
+ * the tail into a `...` overflow button, and its own fullscreen toggle is the last thing in the
+ * toolbar -- i.e. inside that overflow, invisible until you go looking.
+ */
+.field-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.field-head .spacer { margin-left: auto; }
+
+.field .help { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+
+.field-hint { font-size: 12px; color: var(--text-muted); }
+
+/* A line of help beside a control. Without this rule it renders at body size; a card heading's
+   own .hint (above) is more specific and keeps its placement. */
+.hint { font-size: 12px; color: var(--text-muted); }
+.field .hint { display: block; margin-top: 4px; }
+
+input[type=text], input[type=password], input[type=number], input[type=search], input[type=email],
+input[type=datetime-local], select, textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    transition: border-color .12s var(--ease), box-shadow .12s var(--ease);
+}
+
+input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: .8; }
+
+textarea { resize: vertical; min-height: 78px; line-height: 1.5; }
+
+select {
+    appearance: none;
+    padding-right: 34px;
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: calc(100% - 17px) calc(50% + 1px), calc(100% - 12px) calc(50% + 1px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+}
+
+select[multiple] {
+    appearance: auto;
+    background-image: none;
+    padding-right: 12px;
+    min-height: 170px;
+}
+
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
+}
+
+input[readonly] { background: var(--surface-2); color: var(--text-muted); }
+
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 18px; }
+
+.checkline {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    font-size: 13.5px;
+}
+
+.checkline input { width: auto; margin: 2px 0 0; accent-color: var(--accent); }
+
+.checkline label { font-weight: 500; }
+
+.checkline .help { display: block; font-size: 12px; color: var(--text-muted); }
+
+.errors {
+    display: flex;
+    gap: 10px;
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--danger-line);
+    border-radius: var(--r-sm);
+    background: var(--danger-soft);
+    color: var(--danger);
+    font-size: 13.5px;
+}
+
+.errors ul { margin: 0; padding-left: 18px; }
+
+.errors svg.i { margin-top: 2px; }
+
+.field-error { font-size: 12px; color: var(--danger); font-weight: 550; }
+
+.actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.actions .spacer { margin-left: auto; }
+
+/* -- toolbar --------------------------------------------------------------- */
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.toolbar .field { margin-bottom: 0; }
+
+.toolbar .grow { flex: 1 1 260px; min-width: 200px; }
+
+.toolbar .pick { flex: 0 1 200px; min-width: 160px; }
+
+.toolbar .push { margin-left: auto; }
+
+/* The search box: leading icon inside the control, plus a "/" affordance. */
+.search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1 1 260px;
+    min-width: 200px;
+    /* A search box the width of a 27-inch display is harder to aim at, not easier. */
+    max-width: 560px;
+}
+
+.search svg.i {
+    position: absolute;
+    left: 12px;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.search input {
+    padding-left: 38px;
+    padding-right: 42px;
+    height: 40px;
+}
+
+.search input::-webkit-search-cancel-button { cursor: pointer; }
+
+.search kbd {
+    position: absolute;
+    right: 10px;
+    padding: 1px 6px;
+    border: 1px solid var(--border-strong);
+    border-bottom-width: 2px;
+    border-radius: var(--r-xs);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-family: var(--font);
+    font-size: 11px;
+    pointer-events: none;
+}
+
+.search input:focus ~ kbd, .search input:not(:placeholder-shown) ~ kbd { display: none; }
+
+.toolbar select { height: 40px; }
+
+.toolbar .btn { height: 40px; }
+
+/* -- tables ---------------------------------------------------------------- */
+
+.table-wrap { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+
+/*
+ * Deliberately NOT `position: sticky`. The header cannot both stick and live inside
+ * `.table-wrap`: a scroll container is what `overflow-x: auto` makes that element, so the
+ * offset resolves against the wrapper rather than the page -- and Firefox renders the result by
+ * pushing the header row down past the first body row and hiding it. Horizontal scrolling for
+ * the wide article table is worth more than a header that follows the scroll.
+ */
+thead th {
+    text-align: left;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted);
+    font-weight: 650;
+    white-space: nowrap;
+    padding: 10px 14px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+}
+
+/*
+ * Sortable column headers on the author list. The header is a real link -- the ordering is a GET
+ * parameter and the sorting happens on the server -- so this styles an <a> that already works
+ * rather than dressing up something a script has to animate. It inherits the header's own colour
+ * and drops the underline, or the row would read as three links in a band of labels.
+ */
+thead th a {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: inherit;
+    text-decoration: none;
+}
+
+thead th a:hover { color: var(--text); }
+
+/* The active column, marked the same way the arrow beside it is. */
+thead th[aria-sort] { color: var(--text); }
+
+/*
+ * Smaller than the 18px `svg.i` default and a shade heavier: at header size an 18px arrow is
+ * taller than the 11.5px label beside it and pushes the row open.
+ */
+thead th svg.i.sort-mark {
+    width: 13px;
+    height: 13px;
+    stroke-width: 2.25;
+    color: var(--accent);
+}
+
+thead th:first-child { border-top-left-radius: var(--r); }
+
+thead th:last-child { border-top-right-radius: var(--r); }
+
+tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+
+tbody tr:last-child td { border-bottom: none; }
+
+tbody tr { transition: background .1s var(--ease); }
+
+tbody tr:hover { background: var(--surface-2); }
+
+/* Set by mgmt.js only; without scripting the title link is still the way in. */
+tr.row-link { cursor: pointer; }
+
+/* The booking the monitoring screen's banner chart is narrowed to. */
+tbody tr.row-selected { background: var(--accent-soft); }
+tbody tr.row-selected:hover { background: var(--accent-soft); }
+
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+td.shrink, th.shrink { width: 1%; white-space: nowrap; }
+
+.muted { color: var(--text-muted); }
+
+.title-cell { max-width: 460px; }
+
+.title-cell a {
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--text);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.title-cell a:hover { color: var(--accent); }
+
+.cell-sub {
+    display: block;
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 320px;
+}
+
+.thumb {
+    width: 64px;
+    height: 42px;
+    object-fit: cover;
+    border-radius: var(--r-xs);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    display: block;
+}
+
+.thumb-empty {
+    width: 64px;
+    height: 42px;
+    border-radius: var(--r-xs);
+    border: 1px dashed var(--border-strong);
+    display: grid;
+    place-items: center;
+    color: var(--text-muted);
+}
+
+.thumb-empty svg.i { width: 15px; height: 15px; }
+
+/* Initials disc for the author and user lists -- a scanning aid, not decoration. */
+.ava {
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: var(--r-pill);
+    display: grid;
+    place-items: center;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid var(--accent-line);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.named { display: flex; align-items: center; gap: 10px; }
+
+.row-actions { display: flex; gap: 4px; justify-content: flex-end; opacity: .55; transition: opacity .12s var(--ease); }
+
+tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
+
+/* -- badges ---------------------------------------------------------------- */
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px;
+    border-radius: var(--r-pill);
+    font-size: 11.5px;
+    font-weight: 650;
+    letter-spacing: .01em;
+    background: var(--surface-3);
+    color: var(--text-soft);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: var(--r-pill);
+    background: currentColor;
+    flex: none;
+}
+
+.badge.published { background: var(--ok-soft); color: var(--ok); border-color: var(--ok-line); }
+.badge.draft, .badge.new { background: var(--warn-soft); color: var(--warn); border-color: var(--warn-line); }
+.badge.off, .badge.deleted { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-line); }
+
+.badge.plain::before { display: none; }
+
+.chip {
+    display: inline-block;
+    padding: 1px 8px;
+    margin: 1px 3px 1px 0;
+    border-radius: var(--r-xs);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-soft);
+    white-space: nowrap;
+}
+
+/* The editor's «Преводи» card: each chip opens that translation. */
+a.chip { text-decoration: none; }
+a.chip:hover { border-color: var(--accent-line); color: var(--accent); background: var(--accent-soft); }
+
+/*
+ * The article list's languages: a band under the article's row, not a column. A capped column
+ * wrapped fourteen chips into five or six lines and made every translated row that tall; a band
+ * spanning from the title to the end holds them on one line. The two rows read as one record:
+ * no rule between them, and hovering either lights both.
+ */
+tbody tr.has-langs > td { border-bottom: none; }
+tbody tr.lang-row > td { padding-top: 0; padding-bottom: 10px; }
+tbody tr.has-langs:hover + tr.lang-row,
+tbody tr.has-langs:has(+ tr.lang-row:hover) { background: var(--surface-2); }
+
+/* The count reads first and stays put across rows, so the column can be scanned for the gaps. */
+.lang-count {
+    display: inline-block;
+    min-width: 18px;
+    margin-right: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-soft);
+}
+
+/* -- flashes --------------------------------------------------------------- */
+
+.flash {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: var(--r-sm);
+    border: 1px solid transparent;
+    margin-bottom: 16px;
+    font-size: 13.5px;
+}
+
+.flash svg.i { margin-top: 1px; }
+
+.flash .flash-text { flex: 1; min-width: 0; }
+
+.flash .flash-close {
+    flex: none;
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: .6;
+    padding: 0 2px;
+    line-height: 1;
+    font-size: 18px;
+}
+
+.flash .flash-close:hover { opacity: 1; }
+
+.flash.ok { background: var(--ok-soft); color: var(--ok); border-color: var(--ok-line); }
+.flash.err { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-line); }
+
+/*
+ * Shown only when merely opening an article changed its HTML. Deliberately heavier than a normal
+ * flash message: this is the one warning in the console that, if ignored, silently rewrites
+ * markup that has been on the public site for years. It has no close button for the same reason.
+ */
+.fidelity {
+    display: block;
+    border-width: 2px;
+    border-color: var(--danger);
+    line-height: 1.55;
+}
+
+.fidelity details { margin-top: 10px; }
+
+.fidelity summary { cursor: pointer; font-weight: 650; }
+
+.fidelity .fidelity-original {
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.45;
+    background: var(--surface);
+    color: var(--text);
+}
+
+/* -- pager ----------------------------------------------------------------- */
+
+.pager {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+}
+
+.pager a, .pager span.page {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 9px;
+    border-radius: var(--r-sm);
+    border: 1px solid transparent;
+    text-decoration: none;
+    color: var(--text-soft);
+    font-size: 13px;
+    font-weight: 550;
+}
+
+.pager a:hover { background: var(--surface-2); color: var(--text); }
+
+.pager .current {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+    font-weight: 700;
+}
+
+.pager .count { margin-left: auto; color: var(--text-muted); font-size: 12.5px; }
+
+.pager .size-form { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-muted); }
+
+.pager .size-form select { height: 30px; padding: 2px 28px 2px 8px; font-size: 12.5px; width: auto; }
+
+.result-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 0 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+/* -- empty state ----------------------------------------------------------- */
+
+.empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 48px 20px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13.5px;
+}
+
+.empty svg.i { width: 30px; height: 30px; opacity: .5; }
+
+/* ========================================================== editor screen */
+
+/*
+ * Two columns: the article body on the left, everything that describes it in a sticky rail on
+ * the right. The rail is what turns "scroll to the bottom to change the status" into "it is
+ * already on screen".
+ *
+ * ONE grid for the whole screen, and that is load-bearing. Two -- the form as the first, the
+ * image/restore/delete cards a second one below it -- break the layout: the rail runs to roughly
+ * 1300px against the body column's 1000, so `align-items: start` leaves the first grid's row as
+ * tall as the RAIL and strands the images card a few hundred pixels below the text.
+ *
+ * Those cards cannot simply move inside the form: each is its own POST and HTML forbids nesting one
+ * form in another. So the form stops generating a box instead -- `display: contents` promotes its
+ * two children to items of this grid -- and the tail becomes a third item in column one, with the
+ * rail spanning both rows beside them.
+ */
+.editor-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-areas: "main rail"
+                         "tail rail";
+    gap: 18px;
+    align-items: start;
+}
+
+/*
+ * The form owns no box; its children are the grid items. It keeps every one of its controls --
+ * `display` has nothing to do with form ownership -- and input/change still bubble up to it from
+ * the rail, so the unsaved-changes tracker in mgmt.js is unaffected.
+ */
+.editor-form { display: contents; }
+
+.editor-main { grid-area: main; min-width: 0; }
+
+.editor-tail { grid-area: tail; min-width: 0; }
+
+.editor-rail { grid-area: rail; position: sticky; top: calc(var(--topbar-h) + 16px); min-width: 0; }
+
+/* Otherwise the last card's own 18px margin lands on top of the grid's 18px row gap. */
+.editor-main > .card:last-child,
+.editor-tail > .card:last-child { margin-bottom: 0; }
+
+@media (max-width: 1180px) {
+    /*
+     * Resetting grid-template-areas is mandatory here, not tidiness: the named areas are what
+     * define the explicit column count, so overriding grid-template-columns alone would leave the
+     * editor two-column on a phone.
+     */
+    .editor-grid {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "main"
+                             "rail"
+                             "tail";
+    }
+
+    .editor-rail { position: static; }
+
+    /*
+     * Every wide-mode rule is scoped above this breakpoint, because below it the layout is already
+     * one column -- so here the button would relabel itself and move nothing. Hidden for the same
+     * reason #nav-collapse is hidden inside the drawer breakpoint. Stated as display:none rather
+     * than as a base rule plus an override, which would beat the `hidden` attribute the button
+     * carries until mgmt.js takes it off.
+     */
+    #editor-wide { display: none; }
+}
+
+/*
+ * -- wide writing mode -------------------------------------------------------
+ *
+ * `data-editor="wide"` folds the rail below the body so the editor gets the whole content width.
+ * Written by mgmt.js, applied before the first paint by the head snippet -- otherwise TinyMCE is
+ * built at one width and immediately reflowed to another.
+ *
+ * The rail goes LAST here, where the narrow layout above puts it second: the whole point of the
+ * single grid is that the images sit directly under the text. It is folded away rather than
+ * display:none'd, so Публикуване and Класификация stay reachable by scrolling.
+ *
+ * Scoped above 1180px because below it the layout is already one column.
+ */
+@media (min-width: 1181px) {
+    :root[data-editor="wide"] .editor-grid {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "main"
+                             "tail"
+                             "rail";
+    }
+
+    :root[data-editor="wide"] .editor-rail { position: static; }
+
+    /*
+     * The `height: 620` init option lands as an inline style on the editor container, so a taller
+     * writing surface has to out-specify an inline declaration. The one !important in this file.
+     *
+     * 420px is what the title, the description and the chrome above the editor occupy, so the
+     * editor ends roughly where the viewport does and its toolbar stays on screen -- TinyMCE 8 has
+     * no sticky-toolbar option (no `toolbar_sticky`; `toolbar_sticky_offset` is not in the bundle
+     * at all), so a taller editor than this would scroll its own toolbar out of reach. The
+     * floor is the 620px the editor already has, which is what a short viewport gets.
+     *
+     * :not(.tox-fullscreen) is load-bearing, not defensive. Wide mode and fullscreen are stored
+     * independently and combine: the fullscreen plugin CLEARS that inline height on the way in and
+     * relies on a bare `.tox-fullscreen { height: 100% }` from the vendored skin, which this rule
+     * would otherwise beat -- leaving a fixed, full-width editor short of the viewport with the
+     * page showing through underneath.
+     */
+    :root[data-editor="wide"] .tox.tox-tinymce:not(.tox-fullscreen) {
+        height: calc(100vh - 420px) !important;
+        min-height: 620px;
+    }
+}
+
+/* The save bar. Fixed, so "Запази" is reachable from anywhere in a long article. */
+.savebar {
+    position: fixed;
+    left: var(--sidebar-w);
+    right: 0;
+    bottom: 0;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 24px;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: saturate(150%) blur(10px);
+    box-shadow: var(--shadow-pop);
+}
+
+@supports not (backdrop-filter: blur(4px)) {
+    .savebar { background: var(--surface); }
+}
+
+.savebar .status { font-size: 12.5px; color: var(--text-muted); margin-right: auto; }
+
+.savebar .status.dirty { color: var(--warn); font-weight: 600; }
+
+.savebar kbd {
+    padding: 1px 5px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-xs);
+    background: var(--surface-2);
+    font-family: var(--font);
+    font-size: 11px;
+}
+
+@media (max-width: 1000px) {
+    .savebar { left: 0; padding: 10px 14px; }
+    .savebar .status { display: none; }
+}
+
+/* -- the multi-select picker ---------------------------------------------- */
+
+/*
+ * Progressive enhancement over a <select multiple>. The native control keeps its id and its
+ * th:field binding and is merely hidden once the picker is built, so with scripting off the
+ * operator gets the plain list -- and, crucially, the form still posts the same parameter.
+ */
+.picker {
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    overflow: hidden;
+}
+
+.picker-search { position: relative; display: flex; align-items: center; border-bottom: 1px solid var(--border); }
+
+.picker-search svg.i { position: absolute; left: 10px; width: 15px; height: 15px; color: var(--text-muted); }
+
+.picker-search input {
+    border: none;
+    border-radius: 0;
+    padding: 8px 10px 8px 32px;
+    font-size: 13px;
+    background: transparent;
+}
+
+.picker-search input:focus { box-shadow: none; }
+
+.picker-list { max-height: 200px; overflow-y: auto; padding: 4px; }
+
+.picker-list label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: var(--r-xs);
+    font-size: 13px;
+    cursor: pointer;
+    line-height: 1.35;
+}
+
+.picker-list label:hover { background: var(--surface-2); }
+
+.picker-list label.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+.picker-list input { width: auto; margin: 0; accent-color: var(--accent); flex: none; }
+
+.picker-list .id { color: var(--text-muted); font-variant-numeric: tabular-nums; font-weight: 400; font-size: 12px; }
+
+.picker-list .none { padding: 10px; text-align: center; color: var(--text-muted); font-size: 12.5px; }
+
+.picker-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.picker-foot .btn { padding: 2px 8px; font-size: 12px; }
+
+.picker-foot .count { margin-right: auto; }
+
+/* -- the expanded panels --------------------------------------------------- */
+
+/*
+ * «Уголеми» lays a panel over the whole window. mgmt.js moves it to <body> for as long as it is
+ * open and leaves its slot behind holding the card's height open -- see makeOverlay there for why
+ * a z-index alone cannot do this: `.editor-rail` is `position: sticky` and therefore a stacking
+ * context, so a panel left inside it paints under the scrim however high its z-index is. The
+ * <select> that carries the th:field binding never moves.
+ *
+ * Two panels use it: the author/category pickers and the editor's image library. The geometry is
+ * shared and named element by element rather than written as a bare `.is-full`, so the class
+ * cannot start meaning "fixed, inset 24px" for anything a later screen happens to put it on.
+ */
+
+.picker-scrim {
+    position: fixed;
+    inset: 0;
+    /* Above the sidebar (30), the nav scrim (25), the topbar (20) and the savebar (15) -- at any
+       lower value the sidebar draws on top of an overlay that claims to cover the window. */
+    z-index: 40;
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
+    backdrop-filter: blur(2px);
+}
+
+.picker.is-full,
+#image-library.is-full {
+    position: fixed;
+    inset: 24px;
+    /* margin-inline: auto centres an over-constrained fixed box. */
+    margin-inline: auto;
+    z-index: 41;
+    display: flex;
+    flex-direction: column;
+    /* -md, not the savebar's -pop: that one throws its shadow upwards, which is right for a bar
+       stuck to the bottom edge and wrong for a panel floating in the middle of the window. */
+    box-shadow: var(--shadow-md);
+}
+
+/* A picker stretched the full width of a wide screen would put the checkbox a screen away from
+   the name it ticks. */
+.picker.is-full { max-width: 760px; }
+
+/*
+ * Wider than the picker, because this one lays its rows out as a grid of thumbnails and seeing
+ * more than one column of them is the whole reason to expand it.
+ *
+ * `margin-bottom: 0` is not cosmetic: .card carries 18px, and on a fixed box with all four insets
+ * set the margin is taken out of the used height, so the panel would stop 18px short of the
+ * bottom inset. overflow: hidden keeps the rounded corners over the scrolling body.
+ */
+#image-library.is-full {
+    max-width: 1180px;
+    margin-bottom: 0;
+    overflow: hidden;
+}
+
+/*
+ * The body is the scroll container, not the panel: the toolbar has to stay reachable while the
+ * grid scrolls, and so do the note and «Покажи още» under it. min-height: 0 is what lets the list
+ * actually shrink -- a flex item's default min-height is its content, so without it the grid
+ * pushes the panel past the viewport and the footer controls go off the bottom of the screen.
+ */
+#image-library.is-full > .card-body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/*
+ * Every child keeps its own height; the list below takes what is left.
+ *
+ * Stated as a blanket rule rather than element by element because the trap is not hypothetical:
+ * `.search` is `flex: 1 1 260px`, which is right on the list screens' horizontal filter bars and
+ * grows the search box to 192px tall in this column. Measured in the browser. The note and
+ * «Покажи още» would shrink instead, which is the same failure from the other end.
+ */
+#image-library.is-full > .card-body > * { flex: none; }
+
+/*
+ * Overriding the 46vh cap is the point of the state, exactly as overriding the picker's 200px is:
+ * leave it and the full-window panel frames a 46vh scroll box with empty space under it. A grid
+ * here and a single column in the rail -- the rail is ~300px wide and a second column in it would
+ * be two postage stamps.
+ */
+#image-library.is-full .library-list {
+    max-height: none;
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    align-content: start;
+}
+
+/*
+ * The list is what the operator came here for, so it takes every pixel the panel is not using.
+ * Overriding the 200px cap is the whole point of the state: leave it and the overlay frames a
+ * 200px scroll box in the middle of a full-height panel.
+ */
+.picker.is-full .picker-list { max-height: none; flex: 1 1 auto; padding: 6px; }
+
+.picker.is-full .picker-list label { padding: 7px 10px; font-size: 13.5px; }
+
+.picker.is-full .picker-search input { padding: 12px 12px 12px 34px; font-size: 14px; }
+
+/* Rendered on every picker and shown only here. A class and never [hidden], because it declares
+   a `display` of its own -- see the guard block at the foot of this file. */
+.picker-head { display: none; }
+
+.picker.is-full .picker-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+}
+
+.picker-head h3 { margin: 0; margin-right: auto; font-size: 14px; font-weight: 650; }
+
+@media (max-width: 700px) {
+    .picker.is-full,
+    #image-library.is-full { inset: 8px; }
+}
+
+/* -- the author ordering card ---------------------------------------------- */
+
+/*
+ * The selected authors, in the order the public byline prints them. Built entirely by mgmt.js
+ * from the <option> elements of #authorIds -- nothing below is rendered by the template, which is
+ * why none of it needs an entry in the [hidden] guard at the foot of this file: the rows are
+ * rebuilt on every change rather than hidden, and the one element that IS toggled
+ * (#author-order-empty) is a bare <p class="muted"> with no display of its own.
+ */
+.order-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.order-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+}
+
+/* The lead author is a different fact from "the third one", so it is labelled and not numbered. */
+.order-row:first-child { border-color: var(--accent); background: var(--accent-soft); }
+
+.order-pos {
+    flex: none;
+    min-width: 42px;
+    font-size: 11.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.order-row:first-child .order-pos { color: var(--accent); }
+
+.order-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13.5px;
+}
+
+.order-actions { flex: none; display: flex; gap: 4px; }
+
+/* A × drawn as text, because the sprite has no symbol for it and one glyph is not worth one. */
+.order-remove { font-size: 15px; line-height: 1; }
+
+/*
+ * The arrows at the ends of the list are `disabled`, and nothing else in this file styles that --
+ * so without this they look exactly like the live ones and the first row's ↑ is a control that
+ * answers a click with nothing. The same class of thing as the article gallery's arrows before
+ * site.js built them.
+ *
+ * Scoped to this card rather than written as a bare `.btn:disabled`: the picker's «Изчисти» and
+ * anything else the console disables would change appearance across every screen, which is a
+ * wider edit than the one being made here.
+ */
+.order-actions .btn:disabled { opacity: .35; cursor: default; box-shadow: none; }
+
+.order-actions .btn:disabled:hover { background: var(--surface); border-color: var(--border); }
+
+/* -- the embedded-video field ---------------------------------------------- */
+
+/*
+ * Two views of one control, layered over the #embedded textarea the way .picker is layered over a
+ * <select multiple>.
+ *
+ * The mode switch is a segmented control of its own; this stylesheet has no tab pattern to reuse.
+ * Two buttons rather than one toggle, deliberately: a single toggle has to choose between naming
+ * the state it is in and the state it would move to, and here that is the difference between
+ * „this field holds HTML" and „this field holds a video".
+ *
+ * aria-pressed is the styling hook, not a class, so the painted state and the announced state
+ * cannot drift -- the same argument .image-card.is-hidden makes for its two eye icons.
+ */
+.segmented {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+}
+
+.segmented .btn { border-radius: var(--r-xs); border-color: transparent; background: transparent; }
+
+.segmented .btn[aria-pressed="true"] {
+    background: var(--surface);
+    color: var(--text);
+    border-color: var(--border);
+    box-shadow: var(--shadow-xs);
+}
+
+.embed-visual > * + * { margin-top: 8px; }
+
+/* The leading icon sits inside the control, as it does in .picker-search. */
+.embed-input { position: relative; display: flex; align-items: center; }
+
+.embed-input svg.i { position: absolute; left: 11px; width: 15px; height: 15px; color: var(--text-muted); }
+
+.embed-input input { padding-left: 34px; }
+
+.embed-status { margin: 0; font-size: 12px; min-height: 1.2em; color: var(--text-muted); }
+
+.embed-status.failed { color: var(--danger); }
+
+/* Stated, not implied by an empty-looking pane. */
+.embed-note {
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--warn-line);
+    border-radius: var(--r-sm);
+    background: var(--warn-soft);
+    color: var(--warn);
+    font-size: 12.5px;
+}
+
+/*
+ * Capped at 420px: this is confirmation that the right video was pasted, not a place to watch it.
+ * aspect-ratio rather than the public site's padding hack -- .video-container has stored bodies'
+ * older markup to stay compatible with and this stylesheet has none.
+ */
+.embed-preview {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    aspect-ratio: 16 / 9;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    overflow: hidden;
+}
+
+.embed-preview:empty { display: none; }
+
+/* hqdefault is 4:3 with letterbox bars; cover crops them rather than framing them. */
+.embed-preview img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+.embed-preview iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+.embed-play {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: rgba(0, 0, 0, .34);
+    color: #fff;
+    cursor: pointer;
+    transition: background .12s var(--ease);
+}
+
+.embed-play svg.i { width: 46px; height: 46px; stroke-width: 1.4; }
+
+.embed-play:hover { background: rgba(0, 0, 0, .2); }
+
+.embed-play:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* Where the thumbnail lands when it cannot be fetched or the id is unknown. */
+.embed-unknown { padding: 14px; font-size: 12.5px; color: var(--text-muted); }
+
+.embed-unknown p { margin: 0 0 6px; }
+
+.embed-unknown code { font-family: var(--mono); font-size: 12px; color: var(--text); }
+
+/* -- images ---------------------------------------------------------------- */
+
+/* 200px wide at the least: the card carries a path field and two rows of controls. */
+.images { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+
+.image-card {
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    overflow: hidden;
+    background: var(--surface-2);
+    position: relative;
+}
+
+.image-card img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; display: block; }
+
+.image-card .meta { padding: 6px 8px; display: flex; align-items: center; gap: 6px; }
+
+.image-card .name {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+/* The card being dragged to a new position. */
+.image-card.dragging { opacity: .45; }
+
+.image-card.drop-target { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/*
+ * Badges over the thumbnail. Always visible, never hover-only: this console is used on tablets,
+ * where there is no hover, and "which one is the cover" is not a detail worth hiding.
+ */
+.image-badge {
+    position: absolute;
+    top: 6px;
+    z-index: 2;
+    padding: 2px 7px;
+    border-radius: var(--r-pill);
+    font-size: 10.5px;
+    font-weight: 650;
+    letter-spacing: .02em;
+    box-shadow: var(--shadow-xs);
+}
+
+.image-badge.cover { left: 6px; background: var(--accent); color: var(--accent-contrast); }
+
+.image-badge.hidden-badge { right: 6px; background: var(--surface); color: var(--text-muted); border: 1px solid var(--border-strong); }
+
+/* The hidden badge belongs to hidden cards only; .is-hidden is what turns it on. */
+.image-card .image-badge.hidden-badge { display: none; }
+
+.image-card.is-hidden .image-badge.hidden-badge { display: block; }
+
+/* Dimmed, not removed. A hidden image is still attached and still insertable into the body. */
+.image-card.is-hidden img { opacity: .42; filter: saturate(.5); }
+
+.image-card .image-actions {
+    display: flex;
+    gap: 4px;
+    padding: 0 8px 6px;
+}
+
+/* One icon per state, swapped by .is-hidden -- no JS needed to keep the two in step. */
+.image-card .on-hidden { display: none; }
+
+.image-card.is-hidden .on-shown { display: none; }
+
+.image-card.is-hidden .on-hidden { display: inline-block; }
+
+/*
+ * The copyable path. A real <input readonly> rather than text plus a copy button, because
+ * navigator.clipboard is undefined on a plaintext origin -- which is exactly how the local stack
+ * is reached -- and selecting the field has to work by itself there.
+ */
+.path-row { display: flex; align-items: center; gap: 4px; padding: 0 8px 8px; min-width: 0; }
+
+.path-row .path {
+    flex: 1;
+    min-width: 0;
+    padding: 3px 7px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-xs);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    text-overflow: ellipsis;
+}
+
+.path-row .path:focus { color: var(--text); }
+
+.path-row .btn.copied { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+
+/* Table cells hold the same row, without the card's padding. */
+td .path-row { padding: 0; }
+
+td .path-row .path { max-width: 320px; }
+
+.arrange-status { margin: 10px 0 0; font-size: 12px; min-height: 1.2em; }
+
+.arrange-status.failed { color: var(--danger); }
+
+/* -- one image, in full ---------------------------------------------------- */
+
+/*
+ * The detail screen's preview. Unconstrained height on purpose: the library holds everything
+ * from 600x400 uploads to whatever older or imported pictures come in, and a fixed aspect ratio
+ * here would crop the very thing the screen exists to show.
+ */
+.image-preview {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+}
+
+/*
+ * Labelled facts. A <dl>, not a two-column table: these are labels for values rather than rows
+ * of a data set, and a grid collapses on a narrow rail without needing a scrollport of its own.
+ */
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 14px; margin: 0; font-size: 13px; }
+
+.kv dt { color: var(--text-muted); }
+
+/* Filenames and MIME types have no spaces to break at, and the rail is 340px wide. */
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+
+/* A qualifier under a value -- deliberately not .cell-sub, which is nowrap for table cells. */
+.kv .note { display: block; margin-top: 2px; font-size: 12px; color: var(--text-muted); }
+
+/* -- the editor's image library -------------------------------------------- */
+
+/*
+ * Capped and scrollable. The rail is position: sticky, and a panel taller than the viewport
+ * defeats that entirely -- the whole point of putting the library here is that it stays beside
+ * the editor while the operator drags a picture into the body.
+ */
+.library-list {
+    max-height: 46vh;
+    overflow-y: auto;
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.library-item {
+    display: grid;
+    grid-template-columns: 62px minmax(0, 1fr);
+    gap: 8px;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+}
+
+.library-item.dragging { opacity: .45; }
+
+.library-item > img {
+    width: 62px;
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+    border-radius: var(--r-xs);
+    border: 1px solid var(--border);
+    cursor: grab;
+}
+
+.library-item .lib-body { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+
+.library-item .lib-name {
+    font-size: 12px;
+    font-weight: 550;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.library-item .lib-use { font-size: 11px; color: var(--text-muted); }
+
+.library-item .lib-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+
+.library-item .lib-actions .btn { padding: 2px 8px; font-size: 11.5px; }
+
+.library-item .path-row { padding: 0; }
+
+.library-item .path-row .path { font-size: 10.5px; }
+
+/*
+ * The ordering toolbar, above the list in both states. The segmented control is the embedded-video
+ * field's, reused rather than re-styled; the expand button is pushed to the far end, which is where
+ * the picker's own «Уголеми» sits in its foot.
+ */
+.library-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.library-tools .segmented .btn { padding: 2px 8px; font-size: 11.5px; }
+
+.library-tools .segmented svg.i { width: 13px; height: 13px; }
+
+.library-tools > .btn { margin-left: auto; padding: 2px 8px; font-size: 12px; }
+
+.library-note { font-size: 12px; color: var(--text-muted); margin: 8px 0 0; }
+
+.library-note.failed { color: var(--danger); }
+
+/* Drop zone. The <input type=file> stays inside it and keeps working when clicked. */
+.dropzone {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    transition: border-color .12s var(--ease), background .12s var(--ease);
+}
+
+.dropzone.over { border-color: var(--accent); background: var(--accent-soft); }
+
+.dropzone .dz-icon { color: var(--text-muted); }
+
+.dropzone .dz-icon svg.i { width: 26px; height: 26px; }
+
+.dropzone .dz-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.dropzone .dz-title { font-size: 13.5px; font-weight: 600; }
+
+.dropzone input[type=file] { font-size: 12.5px; color: var(--text-muted); max-width: 100%; }
+
+/* The unstyled default reads as a leftover from another century next to the rest of this. */
+.dropzone input[type=file]::file-selector-button {
+    margin-right: 10px;
+    padding: 5px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 550;
+    cursor: pointer;
+}
+
+.dropzone input[type=file]::file-selector-button:hover { background: var(--surface-3); }
+
+/*
+ * Swapping one frame's picture, in the row that frame occupies.
+ *
+ * A real <input type=file> rather than a label wrapping a hidden one, because the button beside it
+ * submits through form= and the pair therefore works with scripting off -- the rule every control
+ * in this console keeps. The native input is as wide as its filename, so it is clipped rather than
+ * allowed to stretch the actions column past the table.
+ */
+.slide-swap { display: inline-flex; align-items: center; gap: 6px; max-width: 190px; }
+
+.slide-swap input[type=file] {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    min-width: 0;
+    max-width: 140px;
+}
+
+.slide-swap input[type=file]::file-selector-button {
+    margin-right: 6px;
+    padding: 3px 8px;
+    font: inherit;
+    color: var(--text);
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-xs);
+    cursor: pointer;
+}
+
+/*
+ * The thumbnail as the replace target, once mgmt.js has wired it (.is-swappable).
+ *
+ * Only then: with scripting off the thumbnail is a picture and .slide-swap beside the arrows is
+ * the control, so nothing here may promise a click that does nothing. The overlay is drawn over
+ * the image rather than beside it, because the actions column is already the table's widest.
+ */
+.slide-thumb { position: relative; display: inline-block; border-radius: var(--r-xs); }
+
+.slide-thumb.is-swappable { cursor: pointer; }
+
+.slide-thumb.is-swappable::after {
+    content: "Смени";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(0, 0, 0, .55);
+    border-radius: var(--r-xs);
+    opacity: 0;
+    transition: opacity .12s;
+}
+
+.slide-thumb.is-swappable:hover::after,
+.slide-thumb.is-swappable:focus-visible::after,
+.slide-thumb.over::after { opacity: 1; }
+
+.slide-thumb.over::after { content: "Пуснете тук"; background: rgba(46, 125, 70, .8); }
+
+.slide-thumb.busy::after { content: "Качване…"; opacity: 1; }
+
+.slide-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.dropzone .dz-preview { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
+
+.dropzone .dz-preview img {
+    width: 60px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: var(--r-xs);
+    border: 1px solid var(--border);
+}
+
+/* ================================================================== sign-in */
+
+.login-page {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background:
+        radial-gradient(1000px 500px at 50% -10%, var(--accent-soft), transparent 70%),
+        var(--bg);
+}
+
+.login-card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-md);
+    padding: 32px 30px;
+}
+
+.login-card .brand-mark { width: 42px; height: 42px; border-radius: 12px; margin-bottom: 16px; }
+
+.login-card .brand-mark svg.i { width: 24px; height: 24px; }
+
+.login-card h1 { font-size: 20px; margin: 0 0 4px; }
+
+.login-card p.sub { margin: 0 0 24px; color: var(--text-muted); font-size: 13px; }
+
+.login-card .btn { width: 100%; height: 42px; margin-top: 4px; }
+
+/*
+ * The «Запомни ме» row. .checkline carries the whole look already; this only supplies the gap
+ * the .field rule above it has and the checkline, being nobody's last child here, does not.
+ */
+.login-card .checkline { margin-bottom: 16px; }
+
+.login-foot { margin-top: 20px; text-align: center; font-size: 12.5px; color: var(--text-muted); }
+
+/* ================================================================ jobs screen */
+
+/*
+ * The job log.
+ *
+ * Its own scroll container with a bounded height, because a PDF range over a hundred articles
+ * writes tens of thousands of lines and the poll appends to the end of it. `pre-wrap` rather than
+ * `pre`: a job logs long addresses and error messages, and a horizontal scrollbar on the page is
+ * the one thing the layout must never grow.
+ *
+ * Not rendered hidden and never toggled, so nothing here belongs in the [hidden] guard list
+ * below -- the element is server-rendered with the stored log and mgmt.js only appends to its
+ * text. That is what makes the screen work with scripting off.
+ */
+#job-log {
+    max-height: 60vh;
+    overflow: auto;
+    margin: 0;
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.log-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+    min-height: 28px;
+}
+
+/* ========================================================= monitoring screen */
+
+/*
+ * The headline figures.
+ *
+ * `auto-fit` with a floor rather than a fixed column count: five tiles wrap to two rows on a
+ * laptop and to one column on a phone without a media query, and the row stays balanced if a
+ * sixth is ever added.
+ */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    box-shadow: var(--shadow-sm);
+}
+
+.stat-label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em;
+              color: var(--text-muted); font-weight: 650; }
+/* tabular-nums so a polling number does not shift the tiles beside it on every update. */
+.stat-value { font-size: 28px; font-weight: 700; line-height: 1.2;
+              font-variant-numeric: tabular-nums; }
+.stat-note { font-size: 12px; color: var(--text-muted); }
+.stat-note.err { color: var(--danger); }
+/* The dashboard's change against the 24 h before. Colour only marks the direction; the sign says it too. */
+.stat-note.up { color: var(--ok); }
+.stat-note.down { color: var(--danger); }
+
+/* The one tile that updates by itself, so it says which one that is. */
+.stat-live { border-color: var(--accent-line); background: var(--accent-soft); }
+.stat-live .stat-value { color: var(--accent); }
+.stat-live .stat-label { color: var(--accent); }
+
+/*
+ * The chart.
+ *
+ * Every colour is a token, so the light/dark toggle carries the chart with it and there is no
+ * palette to keep in step with anything. The geometry is not here at all -- MgmtChart computes
+ * every coordinate server-side, which is what lets the chart render with scripting off.
+ */
+.chart-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 10px; }
+.chart-key { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px;
+             color: var(--text-soft); }
+.chart-key b { font-variant-numeric: tabular-nums; color: var(--text); }
+.chart-swatch { width: 10px; height: 10px; border-radius: 3px; flex: none;
+                background: var(--text-muted); }
+
+.chart-svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+.chart-grid line { stroke: var(--border); stroke-width: 1; }
+.chart-axis text { fill: var(--text-muted); font-size: 11px;
+                   font-variant-numeric: tabular-nums; }
+
+.chart-lines polyline { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.chart-areas path { stroke: none; }
+.chart-dots circle { stroke: var(--surface); stroke-width: 1.5; }
+
+/* One class per series key, set by MgmtChart.Input. Five series across the two monitoring charts,
+   five more for /mgmt/crawlers below. A key with no rule here draws nothing: the polyline rule
+   above sets no stroke. */
+.chart-key.views .chart-swatch,
+.chart-dots circle.views              { background: var(--accent); fill: var(--accent); }
+.chart-lines polyline.views           { stroke: var(--accent); }
+.chart-areas path.views               { fill: var(--accent); opacity: .12; }
+
+.chart-key.visitors .chart-swatch,
+.chart-dots circle.visitors           { background: var(--ok); fill: var(--ok); }
+.chart-lines polyline.visitors        { stroke: var(--ok); }
+.chart-areas path.visitors            { fill: var(--ok); opacity: .12; }
+
+.chart-key.impressions .chart-swatch,
+.chart-dots circle.impressions        { background: var(--warn); fill: var(--warn); }
+.chart-lines polyline.impressions     { stroke: var(--warn); }
+.chart-areas path.impressions         { fill: var(--warn); opacity: .12; }
+
+.chart-key.clicks .chart-swatch,
+.chart-dots circle.clicks             { background: var(--danger); fill: var(--danger); }
+.chart-lines polyline.clicks          { stroke: var(--danger); }
+.chart-areas path.clicks              { fill: var(--danger); opacity: .12; }
+
+/* Viewable shares the accent with views: the two never sit on the same chart, and on the banner
+   chart it is the one colour not already taken by served (warn) and clicked (danger). */
+.chart-key.viewable .chart-swatch,
+.chart-dots circle.viewable           { background: var(--accent); fill: var(--accent); }
+.chart-lines polyline.viewable        { stroke: var(--accent); }
+.chart-areas path.viewable            { fill: var(--accent); opacity: .12; }
+
+/* /mgmt/crawlers: one line per crawler category, keyed by CrawlerCategory.getChartKey(). Search
+   keeps the console's green, SEO the amber; the other three need colours none of the five series
+   above uses, hence --series-blue and --series-violet, and «Други» the muted grey it is. */
+.chart-key.crawl-search .chart-swatch,
+.chart-dots circle.crawl-search       { background: var(--accent); fill: var(--accent); }
+.chart-lines polyline.crawl-search    { stroke: var(--accent); }
+.chart-areas path.crawl-search        { fill: var(--accent); opacity: .12; }
+
+.chart-key.crawl-ai .chart-swatch,
+.chart-dots circle.crawl-ai           { background: var(--series-violet); fill: var(--series-violet); }
+.chart-lines polyline.crawl-ai        { stroke: var(--series-violet); }
+.chart-areas path.crawl-ai            { fill: var(--series-violet); opacity: .12; }
+
+.chart-key.crawl-seo .chart-swatch,
+.chart-dots circle.crawl-seo          { background: var(--warn); fill: var(--warn); }
+.chart-lines polyline.crawl-seo       { stroke: var(--warn); }
+.chart-areas path.crawl-seo           { fill: var(--warn); opacity: .12; }
+
+.chart-key.crawl-social .chart-swatch,
+.chart-dots circle.crawl-social       { background: var(--series-blue); fill: var(--series-blue); }
+.chart-lines polyline.crawl-social    { stroke: var(--series-blue); }
+.chart-areas path.crawl-social        { fill: var(--series-blue); opacity: .12; }
+
+.chart-key.crawl-other .chart-swatch,
+.chart-dots circle.crawl-other        { background: var(--text-muted); fill: var(--text-muted); }
+.chart-lines polyline.crawl-other     { stroke: var(--text-muted); }
+.chart-areas path.crawl-other         { fill: var(--text-muted); opacity: .10; }
+
+/* The «Роботи» screen's own bits: a warning flash that is not an error, coloured tiles, status
+   codes, and paths and addresses that must not blow the table out. */
+.flash.warn { background: var(--warn-soft); color: var(--warn); border-color: var(--warn-line); }
+.stat-danger .stat-value { color: var(--danger); }
+.stat-warn .stat-value { color: var(--warn); }
+.crawl-err { color: var(--danger); }
+.crawl-warn { color: var(--warn); }
+/* The limit is on the inner block, not the cell: an auto-layout table ignores a td's max-width
+   and would grow to the longest nowrap path. */
+.crawl-path { font-family: var(--mono); font-size: 12.5px; }
+.crawl-path a, .crawl-path span {
+    display: block; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.crawl-ip, .crawl-time { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+.crawl-method { font-size: 11.5px; margin-left: 4px; }
+.crawl-verify, td.nowrap { white-space: nowrap; }
+.crawl-verify .badge + .badge { margin-left: 4px; }
+.crawl-filters { gap: 8px; }
+.crawl-filters .search { flex: 1 1 220px; }
+.crawl-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+.crawl-check input { width: auto; margin: 0; accent-color: var(--accent); }
+
+/*
+ * The hover targets: transparent, full plot height, one per bucket, drawn last so they take the
+ * pointer. `fill: transparent` and not `fill: none` -- none is not a hit target, so the <title>
+ * inside would never show and the chart would lose its tooltips silently.
+ */
+.chart-bands rect { fill: transparent; }
+.chart-bands rect:hover { fill: var(--text); opacity: .06; }
+
+/* =================================================================== utility */
+
+.stack > * + * { margin-top: 14px; }
+
+.hidden { display: none !important; }
+
+/*
+ * The `hidden` attribute needs help to beat the rules above.
+ *
+ * An author declaration of `display` wins over the UA's `[hidden] { display: none }` whatever
+ * its specificity, so `.btn { display: inline-flex }` alone is enough to put a control that
+ * mgmt.js has not enabled yet on screen for an operator with scripting off -- which is the whole
+ * point of rendering it hidden. Not defensive: without these rules #editor-wide and
+ * #editor-fullscreen are visible and dead without JS, and the author/category picker's own search
+ * filter (`row.hidden = !match`) hides nothing at all, because `.picker-list label` declares
+ * display:flex.
+ *
+ * Stated as attribute selectors rather than as a blanket `[hidden] { display: none !important }`:
+ * that would be the second !important in this file, and it would also reach inside TinyMCE's
+ * vendored skin, which renders in this document.
+ *
+ * This list is load-bearing -- anything rendered `hidden` that is *also* styled with `display`
+ * belongs in it. Deliberately absent: #embedded and .field-hint, whose rules set width, padding
+ * and border but no display, so `hidden` works on them unaided. .embed-visual is listed even
+ * though it declares no display today, because hiding it *is* the video field's mode mechanism
+ * and a later `display: grid` on it would break that silently.
+ */
+.btn[hidden],
+.segmented[hidden],
+.embed-visual[hidden],
+.slide-swap[hidden],
+.empty[hidden],
+.picker-list label[hidden] { display: none; }
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@media print {
+    .sidebar, .topbar, .savebar, .nav-scrim { display: none !important; }
+    .main { margin-left: 0; }
+}
+
+/* ---------- /mgmt/social: the add form inside each link card ---------------------------- */
+
+/* A <details>, so «Нов бутон» opens the form in place with scripting off as well -- not a link to
+   a screen of its own, since leaving the page with an unsaved profile raises the browser's
+   leave-page prompt. The summary is styled as the console's ghost button; display:inline-flex
+   already drops the disclosure triangle in every engine but WebKit, hence the second rule. */
+.social-add { padding: 10px 16px 14px; border-top: 1px solid var(--border); }
+.social-add > summary { list-style: none; cursor: pointer; width: max-content; }
+.social-add > summary::-webkit-details-marker { display: none; }
+.social-add[open] > summary { margin-bottom: 12px; }
+.social-add-form .actions { gap: 12px; align-items: center; }
+[data-social-card][aria-busy="true"] { opacity: .6; pointer-events: none; }
+/* After the card's right-aligned .hint, not a second .hint: two auto margins split the space and
+   pull the hint into the middle of the heading. */
+/* The article's cover beside the name of a link that points at one. */
+.social-link-name { display: flex; align-items: center; gap: 12px; }
+.social-link-name > .thumb, .social-link-name > .thumb-empty { flex: none; }
+
+.social-status { font-weight: 550; font-size: 12.5px; color: var(--ok); }
+.social-status:empty { display: none; }
+.social-status.err { color: var(--danger); }
+
+/* ---------------------------------------------------------------- design (MgmtDesignController) */
+
+.region-list { list-style: none; margin: 0; padding: 8px 16px; display: flex; flex-direction: column; gap: 8px; }
+.section-card {
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    padding: 10px 12px;
+}
+.section-card--flagged { border-style: dashed; opacity: .75; }
+.section-card.is-dragging { opacity: .4; }
+.section-card.is-drop-target { box-shadow: 0 -3px 0 var(--accent); }
+.section-card__head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.section-card__grip { cursor: grab; color: var(--text-muted); user-select: none; letter-spacing: -2px; }
+.section-card__summary { font-size: 13px; }
+.section-card__note { margin: 6px 0 0; font-size: 13px; }
+.section-card details { margin-top: 8px; }
+.section-card summary { cursor: pointer; font-size: 13px; color: var(--text-muted); }
+.section-form { padding-top: 10px; }
+.select-sm { width: auto; padding: 4px 8px; font-size: 13px; }
+textarea.code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; }
+
+.token-grid { display: grid; grid-template-columns: max-content 1fr 1fr; gap: 6px 12px; align-items: center; margin: 10px 0; }
+.token-row { display: contents; }
+.token-row__name { font-size: 13px; }
+.colour-input { max-width: 140px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+.preset-swatches { display: inline-flex; gap: 4px; margin-top: 4px; }
+.swatch { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--border); display: inline-block; }
+
+.menu-item__head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 16px; }
+.menu-item details { padding: 0 16px 12px; }
+.menu-children { padding: 0 16px 12px 40px; }
+.menu-item--child { border-top: 1px solid var(--border); }
+.menu-item--child .menu-item__head { padding: 10px 0; }
+.menu-item--child details { padding: 0 0 10px; }
+.menu-add { padding-top: 8px; }
+
+
+/*
+ * The design preview (design-preview.html): page types and widths as chip links, then the
+ * website in a frame. The frame is the website's own origin; nothing here styles inside it.
+ * Its height follows the window, less the chrome above it, and never drops below a usable page.
+ */
+.preview-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 16px;
+    margin: 12px 0;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips .chip { margin: 0; padding: 3px 10px; font-size: 13px; }
+a.chip.active { border-color: var(--accent-line); color: var(--accent); background: var(--accent-soft); }
+.preview-stage {
+    display: flex;
+    justify-content: center;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+}
+.preview-frame {
+    width: 100%;
+    height: max(520px, calc(100vh - 260px));
+    border: 1px solid var(--border);
+    background: #fff;
+}
+.preview-stage--tablet .preview-frame { width: 820px; max-width: 100%; }
+.preview-stage--phone .preview-frame { width: 390px; max-width: 100%; }
+
+/*
+ * The editor's AI helpers (mgmt.js): a suggest button under a field, with its note beside it,
+ * and the writing-help dialog's preview, which TinyMCE renders in this document -- server-cleaned
+ * markup (HtmlSafety), shown before anything is inserted.
+ */
+.field-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+}
+.ai-preview {
+    max-height: 320px;
+    overflow: auto;
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+}
+.ai-preview > :first-child { margin-top: 0; }
+.ai-preview > :last-child { margin-bottom: 0; }
+
+/* A heading inside a card's body, below the card's own (the image screen's alt text). */
+.subhead {
+    margin: 18px 0 10px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text);
+}

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<!--/*
+  One image, in full.
+
+  The library list answers "which images are there"; this screen answers the two questions it
+  cannot. Where is this picture used -- by name, with a link, rather than as a count the operator
+  then has to go and resolve by hand -- and is the file actually there. The second one has no
+  other reader in the console: ImageService.deleteImage already logs "file was already absent;
+  removing the orphaned DB record", so a record without a file is a state that occurs, and
+  without this screen its only symptom is a broken <img> on the public site.
+
+  Editing is deliberately narrow: the caption and the alt text, nothing else. See
+  MgmtImageService.saveDescription.
+*/-->
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{articles.c.image})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('images')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{articles.image.heading(${image.id})})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <!--/* Back to the page and the search the operator left, not to page one of an
+                       unfiltered library -- at 96 rows a page those are different screens. The
+                       ordering rides along for the same reason and it is not decoration: the same
+                       page number of a differently ordered list is a different set of rows. */-->
+                <a class="btn btn-ghost"
+                   th:href="@{/mgmt/images(q=${q},article=${article},usage=${usage},size=${size},sort=${sort},dir=${dir},page=${page})}">
+                    &larr; <th:block th:text="#{articles.c.toList}">Back to the list</th:block>
+                </a>
+                <a class="btn btn-ghost push" th:href="${path}" target="_blank" rel="noopener"
+                   th:if="${file.present()}">
+                    <svg class="i"><use href="#i-external"></use></svg> <th:block th:text="#{articles.image.openFile}">Open the file</th:block>
+                </a>
+            </div>
+
+            <div class="editor-grid">
+                <div class="editor-main">
+
+                    <div class="card">
+                        <h2>
+                            <svg class="i"><use href="#i-image"></use></svg>
+                            <th:block th:text="#{articles.c.preview}">Preview</th:block>
+                            <span class="hint" th:text="${image.filename}">photo.jpg</span>
+                        </h2>
+                        <div class="card-body">
+                            <!--/* The <img> points at the public URL, so a picture that renders
+                                   here is a picture the site can serve. When the file is missing
+                                   the browser's broken-image icon would be the only clue, which is
+                                   why the empty state below replaces it outright. */-->
+                            <img class="image-preview" th:if="${file.present()}"
+                                 th:src="@{${path}}" th:alt="${image.filename}">
+
+                            <div class="empty" th:unless="${file.present()}" style="margin:0">
+                                <svg class="i"><use href="#i-alert"></use></svg>
+                                <span th:text="#{articles.image.missing}">The file is missing from the disk.</span>
+                            </div>
+
+                            <div class="path-row" style="padding:12px 0 0">
+                                <input class="path" type="text" readonly
+                                       th:value="${path}" th:title="${path}"
+                                       th:aria-label="#{articles.c.imagePath}">
+                                <button class="btn btn-icon btn-sm" type="button" data-copy th:title="#{articles.c.copyPath}">
+                                    <svg class="i"><use href="#i-copy"></use></svg>
+                                    <span class="sr-only" th:text="#{articles.c.copyPath}">Copy path</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!--/*
+                      The caption, and only the caption. filename is what locates the file on disk
+                      and is a unique index, so it is displayed and never bound -- Spring Data
+                      save() writes every field a form carries.
+                    */-->
+                    <div class="card">
+                        <h2><svg class="i"><use href="#i-file-text"></use></svg> <th:block th:text="#{articles.c.description}">Description</th:block></h2>
+                        <form method="post" th:action="@{/mgmt/images/{id}(id=${image.id})}">
+                            <div class="card-body">
+                                <div class="field">
+                                    <label for="caption">
+                                        <th:block th:text="#{articles.c.text}">Text</th:block>
+                                        <span class="help" th:text="#{articles.image.caption.help}">— shown under the image</span>
+                                    </label>
+                                    <input type="text" id="caption" name="caption" th:value="${image.caption}">
+                                </div>
+                                <p class="muted" style="margin:0" th:text="#{articles.image.caption.note}">
+                                    An empty field means no caption.
+                                </p>
+                                <!--/* The alt text, per language (ImageMedia.alts): what the image shows, for a
+                                       reader who cannot see it. Blank in a language, the next one stands in,
+                                       then the caption. The suggest buttons have no name and render hidden. */-->
+                                <h3 class="subhead" th:text="#{articles.image.alt}">Alt text</h3>
+                                <div class="field" th:each="a : ${alts}">
+                                    <label th:for="'alt-' + ${a.code()}" th:text="${a.name() ?: a.code()} + ' (' + ${a.code()} + ')'">English (en)</label>
+                                    <input type="text" th:id="'alt-' + ${a.code()}" th:name="'alt_' + ${a.code()}" th:value="${a.value()}" maxlength="300">
+                                    <div class="field-actions" th:if="${aiAvailable}">
+                                        <button type="button" class="btn btn-sm btn-ghost" hidden data-ai-alt
+                                                th:data-image="${image.id}" th:data-lang="${a.code()}">
+                                            <svg class="i"><use href="#i-insert"></use></svg> <th:block th:text="#{ai.suggest.alt}">Suggest</th:block>
+                                        </button>
+                                        <span class="library-note" data-ai-note></span>
+                                    </div>
+                                </div>
+                                <span class="hint" th:text="#{articles.image.alt.help}">For readers who cannot see the image.</span>
+                            </div>
+                            <div class="card-foot">
+                                <button class="btn btn-primary" type="submit">
+                                    <svg class="i"><use href="#i-save"></use></svg> <th:block th:text="#{articles.c.save}">Save</th:block>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card" id="usage">
+                        <h2>
+                            <svg class="i"><use href="#i-file-text"></use></svg>
+                            <th:block th:text="#{articles.image.usedIn}">Used in</th:block>
+                            <span class="hint" th:text="#{articles.image.usedIn.count(${#lists.size(usages)})}">articles: 0</span>
+                        </h2>
+
+                        <div class="table-wrap" th:if="${!#lists.isEmpty(usages)}">
+                            <table>
+                                <thead>
+                                <tr>
+                                    <th class="num shrink">№</th>
+                                    <th th:text="#{articles.c.title}">Title</th>
+                                    <th class="shrink" th:text="#{articles.c.date}">Date</th>
+                                    <th class="shrink" th:text="#{articles.c.status}">Status</th>
+                                    <th class="shrink"><span class="sr-only" th:text="#{articles.c.actions}">Actions</span></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="u : ${usages}"
+                                    th:attr="data-href=@{/mgmt/articles/{id}(id=${u.id()})}">
+                                    <td class="num muted" th:text="${u.id()}">1</td>
+                                    <td class="title-cell">
+                                        <a th:href="@{/mgmt/articles/{id}(id=${u.id()})}"
+                                           th:text="${#strings.isEmpty(u.title())} ? #{articles.image.untitled} : ${u.title()}">Title</a>
+                                    </td>
+                                    <td class="muted"
+                                        th:text="${u.date() != null} ? ${#temporals.format(u.date(), 'dd.MM.yyyy')} : '—'">01.01.2020</td>
+                                    <td>
+                                        <span class="badge" th:if="${u.status() != null}"
+                                              th:classappend="${u.status().name().toLowerCase()}"
+                                              th:text="${mgmtText.label(u.status())}">PUBLISHED</span>
+                                    </td>
+                                    <td>
+                                        <div class="row-actions">
+                                            <a class="btn btn-ghost btn-icon btn-sm" th:title="#{articles.c.viewOnSite}"
+                                               th:href="@{/mgmt/articles/{id}/preview(id=${u.id()})}" target="_blank" rel="noopener">
+                                                <svg class="i"><use href="#i-eye"></use></svg>
+                                                <span class="sr-only" th:text="#{articles.c.viewOnSite}">View on the site</span>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="empty" th:if="${#lists.isEmpty(usages)}">
+                            <svg class="i"><use href="#i-inbox"></use></svg>
+                            <span th:text="#{articles.image.unused}">Not used in any article.</span>
+                        </div>
+
+                        <div class="card-foot" th:if="${!#lists.isEmpty(usages)}">
+                            <p class="muted" style="margin:0" th:text="#{articles.image.usage.note}">
+                                The image is attached and removed in the article editor.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="card danger">
+                        <h2>
+                            <svg class="i"><use href="#i-trash"></use></svg>
+                            <th:block th:text="#{articles.c.deletion}">Delete</th:block>
+                            <span class="hint" th:text="#{articles.c.usedBy(${#lists.size(usages)})}"></span>
+                        </h2>
+                        <div class="card-body">
+                            <p class="muted" style="margin-top:0" th:if="${#lists.isEmpty(usages)}"
+                               th:text="#{articles.image.delete.unused}">The record and the file are deleted permanently.</p>
+                            <!--/* The button is offered even when it will be refused, exactly as on
+                                   the list: a hidden button cannot explain itself, and the refusal
+                                   names the number of articles. ImageService.deleteImage re-checks
+                                   the same count -- that is the guard that counts. */-->
+                            <p class="muted" style="margin-top:0" th:unless="${#lists.isEmpty(usages)}"
+                               th:text="#{articles.image.delete.refused}">Deleting will be refused.</p>
+                            <form method="post" th:action="@{/mgmt/images/{id}/delete(id=${image.id})}"
+                                  th:data-confirm="#{articles.images.delete.confirm}">
+                                <!--/* Sends a refusal back here rather than to the list: this is the
+                                       screen that names the articles it has to be detached from. */-->
+                                <input type="hidden" name="from" value="detail">
+                                <button class="btn btn-danger" type="submit">
+                                    <svg class="i"><use href="#i-trash"></use></svg> <th:block th:text="#{articles.images.delete}">Delete the image</th:block>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="editor-rail">
+                    <div class="card">
+                        <h2><svg class="i"><use href="#i-tag"></use></svg> <th:block th:text="#{articles.image.data}">Details</th:block></h2>
+                        <div class="card-body">
+                            <dl class="kv">
+                                <dt th:text="#{articles.image.number}">Number</dt>
+                                <dd th:text="${image.id}">1</dd>
+
+                                <dt th:text="#{articles.images.col.file}">File</dt>
+                                <dd th:text="${image.filename}">photo.jpg</dd>
+
+                                <dt th:text="#{articles.image.type}">Type</dt>
+                                <dd th:text="${#strings.isEmpty(image.content)} ? '—' : ${image.content}">image/jpeg</dd>
+
+                                <dt th:text="#{articles.image.source}">Source</dt>
+                                <dd th:text="${#strings.isEmpty(image.source)} ? '—' : ${image.source}">—</dd>
+
+                                <dt th:text="#{articles.image.uploaded}">Uploaded</dt>
+                                <dd th:text="${image.createdOn != null}
+                                             ? ${#temporals.format(image.createdOn, 'dd.MM.yyyy HH:mm')} : '—'">—</dd>
+
+                                <dt th:text="#{articles.image.modified}">Modified</dt>
+                                <dd th:text="${image.lastModifiedOn != null}
+                                             ? ${#temporals.format(image.lastModifiedOn, 'dd.MM.yyyy HH:mm')} : '—'">—</dd>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <!--/*
+                      What is on disk, as opposed to what the document claims. The two can disagree
+                      in both directions and nothing else in the console shows either side of it.
+                    */-->
+                    <div class="card">
+                        <h2><svg class="i"><use href="#i-upload"></use></svg> <th:block th:text="#{articles.image.disk}">File on disk</th:block></h2>
+                        <div class="card-body">
+                            <dl class="kv" th:if="${file.present()}">
+                                <dt th:text="#{articles.image.size}">Size</dt>
+                                <dd>
+                                    <span th:text="|${#numbers.formatDecimal(file.bytes() / 1024.0, 1, 'WHITESPACE', 1, 'POINT')} KB|">0 KB</span>
+                                    <!--/* Gated on the byte check being on, for the reason the
+                                           dimension note below is gated on its own flag: with
+                                           app.image.file-size-check.enabled off there IS no
+                                           current upload limit for this to be over, and the note
+                                           would report the setting as a fault on every heavy
+                                           file in the library. */-->
+                                    <span class="note"
+                                          th:if="${imageRules.fileSizeCheck()
+                                                   and file.bytes() > imageRules.maxKilobytes() * 1024}"
+                                          th:text="#{articles.image.overLimit(${imageRules.maxKilobytes()})}"></span>
+                                </dd>
+
+                                <dt th:text="#{articles.image.dimensions}">Dimensions</dt>
+                                <dd th:if="${file.width() != null}">
+                                    <span th:text="|${file.width()} × ${file.height()}|">600 × 400</span>
+                                    <!--/* Not an error: the check runs on upload only, so an image
+                                           stored before the rule applied, or while it was off,
+                                           keeps its size. Worth naming, because these are the
+                                           images whose thumbnails will be cropped.
+
+                                           Gated on the check being on as well: with it off, a
+                                           differently sized image is exactly what the console
+                                           accepts, and calling it non-standard would report the
+                                           setting as a fault on every row it touches. */-->
+                                    <span class="note"
+                                          th:if="${imageRules.dimensionCheck()
+                                                   and (file.width() != imageRules.width() or file.height() != imageRules.height())}"
+                                          th:text="#{articles.image.nonStandard(${imageRules.width()}, ${imageRules.height()})}"></span>
+                                </dd>
+                                <dd th:if="${file.width() == null}" class="muted"
+                                    th:text="#{articles.image.unknownFormat}">unrecognised format</dd>
+
+                                <dt th:text="#{articles.image.fileModified}">Modified</dt>
+                                <dd th:text="${file.modifiedOn() != null}
+                                             ? ${#temporals.format(file.modifiedOn(), 'dd.MM.yyyy HH:mm')} : '—'">—</dd>
+                            </dl>
+
+                            <p class="muted" style="margin:0" th:unless="${file.present()}"
+                               th:text="#{articles.image.noFile}">There is no file of this name.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

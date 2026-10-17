@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<!--/*
+  The members card, shared by an organisation's screen and a website's members screen.
+
+  `base` is what its forms' addresses start with: /mgmt/organisations/<id>, or /mgmt inside a website. Every change goes to
+  pacod-id as the signed-in person (PortalMembers), so the role lists offer only roles they may give
+  there -- pacod-id would refuse the rest anyway.
+
+  Inherited roles (held at the organisation, or the platform) are shown and not changed here: they
+  belong to the scope that holds them. Nothing in these forms names anything but a principal, a
+  role, an e-mail address or an invitation.
+*/-->
+<body>
+
+<div class="card" th:fragment="card(base)" id="members-card">
+    <h2><svg class="i"><use href="#i-users"></use></svg> <span th:text="#{portal.members.heading}">Members</span></h2>
+
+    <div class="card-body" th:if="${members.error != null}">
+        <div class="flash err" style="margin:0">
+            <svg class="i"><use href="#i-alert"></use></svg>
+            <span class="flash-text" th:text="${members.error}">pacod-id cannot be reached.</span>
+        </div>
+    </div>
+
+    <div class="card-body" th:if="${inviteLink != null}">
+        <div class="field">
+            <label for="invite-link" th:text="#{portal.members.link.label}">Invitation link</label>
+            <input type="text" id="invite-link" readonly th:value="${inviteLink}">
+            <span class="hint" th:text="#{portal.members.link.hint}">Pass it on yourself; it works once.</span>
+        </div>
+    </div>
+
+    <th:block th:if="${members.available and members.error == null}">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th th:text="#{portal.members.col.person}">Person</th>
+                    <th th:text="#{portal.members.col.roles}">Roles</th>
+                    <th class="shrink" th:if="${members.canManage}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="m : ${members.members}">
+                    <td class="title-cell">
+                        <span th:text="${m.displayName()}">Alex Morgan</span>
+                        <span class="badge" th:if="${m.principal == members.self}" th:text="#{portal.members.you}">you</span>
+                        <span class="cell-sub" th:if="${m.email != null and m.email != m.displayName()}" th:text="${m.email}">alex@example.com</span>
+                        <span class="cell-sub" th:if="${m.kind == 'service'}" th:text="#{portal.members.service}">service account</span>
+                    </td>
+                    <td>
+                        <th:block th:each="r, it : ${m.roles}">
+                            <span class="chip" th:text="${roleLabels.of(r.role)}">Editor</span>
+                            <span class="muted" th:if="${r.inherited}" th:text="#{portal.members.inherited}">(inherited)</span><br th:unless="${it.last}">
+                        </th:block>
+                    </td>
+                    <td th:if="${members.canManage}">
+                        <div class="actions" th:if="${!members.roles.isEmpty()}">
+                            <form method="post" class="inline-form" th:action="@{${base} + '/members/role'}">
+                                <input type="hidden" name="principal" th:value="${m.principal}">
+                                <label class="sr-only" th:for="'role-' + ${m.principal}" th:text="#{portal.members.col.roles}">Role</label>
+                                <select name="role" th:id="'role-' + ${m.principal}">
+                                    <option th:each="o : ${members.roles}" th:value="${o.role}" th:text="${o.label}"
+                                            th:selected="${o.role == m.directRole()}">Editor</option>
+                                </select>
+                                <button class="btn btn-sm" type="submit" th:text="${m.directRole() == null} ? #{portal.members.give} : #{portal.members.change}">Change</button>
+                            </form>
+                            <form method="post" class="inline-form" th:if="${m.directRole() != null}"
+                                  th:action="@{${base} + '/members/remove'}" th:data-confirm="#{portal.members.remove.confirm}">
+                                <input type="hidden" name="principal" th:value="${m.principal}">
+                                <button class="btn btn-sm btn-danger" type="submit" th:text="#{portal.members.remove}">Remove</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="empty" th:if="${members.members.isEmpty()}">
+            <svg class="i"><use href="#i-users"></use></svg>
+            <span th:text="#{portal.members.empty}">Nobody holds a role here yet.</span>
+        </div>
+
+        <th:block th:if="${members.canManage and !members.invitations.isEmpty()}">
+            <div class="card-body"><h3 style="margin:0" th:text="#{portal.members.invitations}">Open invitations</h3></div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th th:text="#{portal.members.col.email}">E-mail</th>
+                        <th th:text="#{portal.members.col.role}">Role</th>
+                        <th class="shrink" th:text="#{portal.members.col.expires}">Expires</th>
+                        <th class="shrink"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="i : ${members.invitations}">
+                        <td>
+                            <span th:text="${i.email}">sam@example.com</span>
+                            <span class="badge off" th:if="${i.expired}" th:text="#{portal.members.expired}">expired</span>
+                        </td>
+                        <td><span class="chip" th:text="${roleLabels.of(i.role)}">Editor</span></td>
+                        <td class="muted" th:text="${i.expiresAt}">2026-10-23</td>
+                        <td>
+                            <form method="post" class="inline-form" th:action="@{${base} + '/members/invitations/revoke'}">
+                                <input type="hidden" name="invitation" th:value="${i.id}">
+                                <button class="btn btn-sm btn-ghost" type="submit" th:text="#{portal.members.revoke}">Withdraw</button>
+                            </form>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </th:block>
+    </th:block>
+
+    <div class="card-foot" th:if="${members.available and members.canManage and !members.roles.isEmpty()}">
+        <form method="post" class="stack" th:action="@{${base} + '/members/invite'}" style="width:100%">
+            <div class="grid-2">
+                <div class="field">
+                    <label for="invite-email" th:text="#{portal.members.invite.email}">E-mail address</label>
+                    <input type="email" id="invite-email" name="email" required maxlength="254" autocomplete="off">
+                </div>
+                <div class="field">
+                    <label for="invite-role" th:text="#{portal.members.col.role}">Role</label>
+                    <select id="invite-role" name="role">
+                        <option th:each="o : ${members.roles}" th:value="${o.role}" th:text="${o.label}"
+                                th:selected="${o.role == 'cms.editor'}">Editor</option>
+                    </select>
+                </div>
+            </div>
+            <div class="checkline">
+                <input type="checkbox" id="invite-link-only" name="asLink" value="true">
+                <div>
+                    <label for="invite-link-only" th:text="#{portal.members.invite.asLink}">Give me a link instead of sending an e-mail</label>
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary" type="submit">
+                    <svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{portal.members.invite.submit}">Invite</span>
+                </button>
+                <span class="hint" th:text="#{portal.members.invite.hint}">The person signs in or creates an account, and holds the role from then on.</span>
+            </div>
+        </form>
+    </div>
+</div>
+
+</body>
+</html>

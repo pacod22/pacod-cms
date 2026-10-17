@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{articles.c.authors})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('authors')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{articles.c.authors})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <!--/* A GET form, like the article filter: every result is a bookmarkable URL. */-->
+                <form class="toolbar" method="get" th:action="@{/mgmt/authors}" style="flex:1 1 420px; margin:0">
+                    <div class="search">
+                        <svg class="i"><use href="#i-search"></use></svg>
+                        <!--/* id="search-input" is what mgmt.js debounces, auto-submits and binds "/" to. */-->
+                        <input type="search" id="search-input" name="q" th:value="${q}"
+                               th:placeholder="#{articles.authors.search.placeholder}"
+                               th:aria-label="#{articles.authors.search.aria}">
+                        <kbd>/</kbd>
+                    </div>
+
+                    <!--/*
+                      A GET form replaces the whole query string, so without these the first
+                      keystroke in the search box would silently throw the operator's column
+                      ordering away. Same reason the image library carries "size" as a hidden
+                      field, and the same reason "Изчисти" below clears only the term.
+                    */-->
+                    <input type="hidden" name="sort" th:value="${sort}">
+                    <input type="hidden" name="dir" th:value="${dir}">
+
+                    <button class="btn" type="submit" th:text="#{articles.c.search}">Search</button>
+                    <a class="btn btn-ghost" th:href="@{/mgmt/authors(sort=${sort}, dir=${dir})}"
+                       th:if="${!#strings.isEmpty(q)}" th:text="#{articles.c.clear}">Clear</a>
+                </form>
+
+                <a class="btn btn-primary push" th:href="@{/mgmt/authors/new}">
+                    <svg class="i"><use href="#i-plus"></use></svg> <th:block th:text="#{articles.authors.new}">New author</th:block>
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <!--/*
+                          Every header is a real <a> carrying the current search term, so a click
+                          reorders the list on the server and the result is a URL that can be
+                          bookmarked, shared and reloaded. Dropping "q" here would clear the
+                          filter on the first click and answer 200 with the whole list.
+
+                          "flip" is the direction the *active* column's link must ask for; an
+                          inactive column always starts ascending, which is why it cannot simply
+                          be the negation of the current direction everywhere.
+                        */-->
+                        <thead>
+                        <tr th:with="flip=${dir == 'desc' ? 'asc' : 'desc'}">
+                            <th class="num shrink"
+                                th:attr="aria-sort=${sort == 'id' ? (dir == 'desc' ? 'descending' : 'ascending') : null}">
+                                <a th:href="@{/mgmt/authors(q=${q}, sort='id', dir=${sort == 'id' ? flip : 'asc'})}"
+                                   th:title="#{articles.c.sortById}">
+                                    <span>№</span>
+                                    <svg class="i sort-mark" th:if="${sort == 'id'}">
+                                        <use th:href="${dir == 'desc' ? '#i-arrow-down' : '#i-arrow-up'}"></use>
+                                    </svg>
+                                </a>
+                            </th>
+                            <th th:attr="aria-sort=${sort == 'name' ? (dir == 'desc' ? 'descending' : 'ascending') : null}">
+                                <a th:href="@{/mgmt/authors(q=${q}, sort='name', dir=${sort == 'name' ? flip : 'asc'})}"
+                                   th:title="#{articles.c.sortByName}">
+                                    <span th:text="#{articles.authors.col.author}">Author</span>
+                                    <svg class="i sort-mark" th:if="${sort == 'name'}">
+                                        <use th:href="${dir == 'desc' ? '#i-arrow-down' : '#i-arrow-up'}"></use>
+                                    </svg>
+                                </a>
+                            </th>
+                            <th th:attr="aria-sort=${sort == 'description' ? (dir == 'desc' ? 'descending' : 'ascending') : null}">
+                                <a th:href="@{/mgmt/authors(q=${q}, sort='description', dir=${sort == 'description' ? flip : 'asc'})}"
+                                   th:title="#{articles.authors.sortByDescription}">
+                                    <span th:text="#{articles.c.description}">Description</span>
+                                    <svg class="i sort-mark" th:if="${sort == 'description'}">
+                                        <use th:href="${dir == 'desc' ? '#i-arrow-down' : '#i-arrow-up'}"></use>
+                                    </svg>
+                                </a>
+                            </th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="a : ${authors}" th:attr="data-href=@{/mgmt/authors/{id}(id=${a.id})}">
+                            <td class="num muted" th:text="${a.id}">1</td>
+                            <td class="title-cell">
+                                <span class="named">
+                                    <span class="ava" th:text="${#strings.substring(a.fullname() + ' ', 0, 1)}">A</span>
+                                    <span>
+                                        <a th:href="@{/mgmt/authors/{id}(id=${a.id})}" th:text="${a.fullname()}">First Last</a>
+                                        <span class="cell-sub" th:if="${!#strings.isEmpty(a.title)}" th:text="${a.title}">Prof.</span>
+                                    </span>
+                                </span>
+                            </td>
+                            <td class="muted" th:text="${#strings.abbreviate(a.description != null ? a.description : '', 110)}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!--/*
+                  "There are none" and "none match" are different facts. The service treats a
+                  blank term as no filter at all, so an empty list with a blank q really is an
+                  empty collection.
+                */-->
+                <div class="empty" th:if="${authors.isEmpty()}">
+                    <svg class="i"><use href="#i-users"></use></svg>
+                    <span th:text="${#strings.isEmpty(q)}
+                                   ? #{articles.authors.empty}
+                                   : #{articles.authors.noMatch}">No authors yet.</span>
+                    <a class="btn btn-sm" th:href="@{/mgmt/authors/new}" th:if="${#strings.isEmpty(q)}" th:text="#{articles.authors.addFirst}">Add the first one</a>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

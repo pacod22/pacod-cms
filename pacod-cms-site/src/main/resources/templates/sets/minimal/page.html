@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  [minimal] One column: this is editorial's template with the aside removed -- see
+  design/sets/minimal.yaml. Keep the two in step when the page's own content changes.
+
+  A standing page: GET /p/{slug}, bare or under a language prefix (/{lang}/p/{slug}).
+
+  ${page} is a PageService.Rendered -- the document, the language actually rendered, and the two
+  flags that say whether the reader is looking at a fallback. It is NOT the Page document, on
+  purpose: which language won is a per-request decision and the template must not re-derive it.
+
+  The body is th:utext. It is stored HTML, written by an editor through TinyMCE in the studio,
+  and it is the same trust boundary the article bodies already have -- Article.text is rendered
+  the same way by fragments/article-view. It carries the .article-body class for exactly that
+  reason: standing pages hold hand-written HTML too, with tables and inline styles, and site.css
+  puts its guards for such markup there (inline widths, <font>, <style> blocks, Word markup,
+  tables).
+*/-->
+<head th:replace="~{fragments/head :: head(
+        lang=${lang},
+        pageTitle=${page.title + ' | ' + site.name(lang)},
+        pageDesc=${#strings.isEmpty(page.description) ? page.title : page.description},
+        ogUrl=${site.url('/p/' + page.page.slug)},
+        ogImagePath=null,
+        ogImageType=null)}"></head>
+
+<body>
+<th:block th:replace="~{fragments/scripts :: gtmNoscript}"></th:block>
+
+<th:block th:replace="~{fragments/navbar :: navbar(${lang})}"></th:block>
+
+<div class="shell">
+    <th:block th:replace="~{fragments/ad-sidebar :: topBanners(${topBanners})}"></th:block>
+</div>
+
+<div class="shell shell--narrow">
+    <main class="column">
+        <!--/* The main region: this page's own content where its primary section stands, the
+               layout's other sections around it (PageComposer; sections.html). */-->
+        <th:block th:each="s : ${regions.get('main')}">
+            <th:block th:if="${s.primary}">
+
+                <div class="page-head">
+                    <h1 class="page-head__title" th:utext="${page.title}"></h1>
+                </div>
+
+                <!--/*
+                  The two notices are mutually exclusive and say different things.
+
+                  `legalNotice` is the stronger one and wins: for the terms of use and the privacy policy
+                  the original-language text is what governs, and a reader on another language needs to be told
+                  that, not merely that a translation is missing. Showing both would be two banners with
+                  overlapping meaning, which is how a reader learns to skip both -- so PageService decides
+                  which one applies and the template only renders it.
+                */-->
+                <p class="page-notice" th:if="${page.notice != null}"
+                   th:classappend="${page.legalNotice} ? 'page-notice--legal' : ''"
+                   th:text="${page.notice}"></p>
+
+                <div class="article-body" th:utext="${page.body}"></div>
+
+                <!--/*
+                  Only the languages this page is actually written in.
+
+                  Listing every configured language would offer the reader a link to the page they are
+                  already on -- the fallback would return the same body under a different ?lang. The
+                  current language is rendered as plain text rather than a link, for the same reason.
+                */-->
+                <nav class="page-langs" th:if="${page.page.writtenIn().size() > 1}"
+                     th:aria-label="#{page.languages}">
+                    <!--/*
+                      Driven by the configured language list, filtered to the ones this page is written
+                      in. Two lists intersected rather than one: `writtenIn()` is codes off the document
+                      (which is what makes the count above honest, including for a language no longer
+                      offered), and ${languages} is what carries the native names to show them under.
+                    */-->
+                    <th:block th:each="l : ${languages}" th:if="${page.page.hasBody(l.code)}">
+                        <span class="page-langs__current" th:if="${l.code == lang}" th:text="${l.nativeName}"></span>
+                        <a class="page-langs__item" th:unless="${l.code == lang}"
+                           th:href="@{/p/{slug}(slug=${page.page.slug}, lang=${l.code})}"
+                           th:hreflang="${l.code}" th:text="${l.nativeName}"></a>
+                    </th:block>
+                </nav>
+            </th:block>
+            <th:block th:unless="${s.primary}">
+                <th:block th:replace="~{sections :: ${s.fragment}(s=${s}, lang=${lang})}"></th:block>
+            </th:block>
+        </th:block>
+    </main>
+
+    <!--/* No aside in this set: the sidebar bookings follow the content, in a row. */-->
+    <div class="column-partners">
+        <th:block th:replace="~{fragments/ad-sidebar :: adSidebar(${sidebarBanners})}"></th:block>
+    </div>
+</div>
+
+
+<th:block th:replace="~{fragments/footer :: footer(${lang})}"></th:block>
+<th:block th:replace="~{fragments/scripts :: siteScripts}"></th:block>
+</body>
+</html>

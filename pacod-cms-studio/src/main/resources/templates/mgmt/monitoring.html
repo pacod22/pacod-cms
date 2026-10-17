@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{ops.mon.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('monitoring')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{ops.mon.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <!--/*
+              A GET form, like every other filter in the console: each window is a bookmarkable
+              URL. data-autosubmit is what mgmt.js binds to the change event; without scripting the
+              «Покажи» button is still there and still works.
+
+              The hidden `banner` field is what keeps the advertising filter across a change of
+              range. A GET form replaces the whole query string, so without it picking «7 дни»
+              while looking at one booking would silently widen the chart back to all of them --
+              the trap the image library's hidden `size` field already documents.
+            */-->
+            <div class="toolbar">
+                <form class="toolbar" method="get" th:action="@{/mgmt/monitoring}" style="flex:1 1 320px; margin:0">
+                    <label class="pick">
+                        <select name="range" data-autosubmit th:aria-label="#{ops.mon.range.aria}">
+                            <option th:each="r : ${ranges}" th:value="${r.key}" th:text="${mgmtText.label(r)}"
+                                    th:selected="${r.key == range.key}">24 hours</option>
+                        </select>
+                    </label>
+                    <input type="hidden" name="banner" th:if="${selectedBanner != null}"
+                           th:value="${selectedBanner.id}"/>
+                    <button class="btn" type="submit" th:text="#{ops.common.show}">Show</button>
+                </form>
+
+                <a class="btn btn-ghost push" th:href="@{/}" target="_blank" rel="noopener">
+                    <svg class="i"><use href="#i-external"></use></svg> <th:block th:text="#{ops.mon.viewSite}">View the site</th:block>
+                </a>
+            </div>
+
+            <!--/*
+              The live number is server-rendered here and refreshed by mgmt.js. With scripting off
+              it is simply the value as of page load, which is the same contract every other
+              enhancement in this console keeps.
+
+              «Няма данни» rather than 0 when the query failed: zero readers is a plausible answer,
+              so degrading to it would look like a quiet Tuesday instead of a broken screen.
+            */-->
+            <div class="stat-grid">
+                <div class="stat stat-live">
+                    <span class="stat-label" th:text="#{ops.mon.live}">Active right now</span>
+                    <span class="stat-value" id="live-count"
+                          th:text="${live.available} ? ${live.active} : '—'">0</span>
+                    <span class="stat-note" th:if="${live.available}"
+                          th:text="#{ops.mon.live.note(${live.windowMinutes})}">readers</span>
+                    <span class="stat-note err" th:unless="${live.available}" th:text="#{ops.mon.live.unavailable}">no connection to the database</span>
+                </div>
+
+                <div class="stat">
+                    <span class="stat-label" th:text="#{ops.mon.views}">Views in the period</span>
+                    <span class="stat-value" th:text="${totals.views}">0</span>
+                    <span class="stat-note" th:text="${mgmtText.label(range)}">period</span>
+                </div>
+
+                <div class="stat">
+                    <span class="stat-label" th:text="#{ops.mon.peak}">Visitors, peak</span>
+                    <span class="stat-value" th:text="${totals.peakVisitors}">0</span>
+                    <!--/* A sum would double-count anyone who came back; see SiteMetric.visitors. */-->
+                    <span class="stat-note" th:text="#{ops.mon.peak.note}">the busiest interval</span>
+                </div>
+
+                <!--/*
+                  Both advertising tiles read the per-booking report, never the bucket scalars, so
+                  the clicks on one divided by the impressions on the other is the CTR printed
+                  under them. The chart below draws the site-wide scalars, which attribute nothing
+                  to a booking and so skip the per-booking createdOn guard -- which is why the two
+                  can differ. See MgmtMonitoringService.
+                */-->
+                <div class="stat">
+                    <span class="stat-label" th:text="#{ops.mon.impressions}">Impressions</span>
+                    <span class="stat-value" th:text="${bannerReport.impressions}">0</span>
+                    <span class="stat-note" th:if="${bannerReport.viewability != null}"
+                          th:text="#{ops.mon.viewableNote(${bannerReport.viewable}, ${#numbers.formatDecimal(bannerReport.viewability, 1, 1)})}">viewable</span>
+                    <span class="stat-note" th:unless="${bannerReport.viewability != null}"
+                          th:text="${mgmtText.label(range)}">period</span>
+                </div>
+
+                <div class="stat">
+                    <span class="stat-label" th:text="#{ops.mon.clicks}">Clicks</span>
+                    <span class="stat-value" th:text="${bannerReport.clicks}">0</span>
+                    <span class="stat-note" th:if="${bannerReport.clickThroughRate != null}"><th:block
+                          th:text="|CTR ${#numbers.formatDecimal(bannerReport.clickThroughRate, 1, 2)} %|">CTR</th:block><th:block
+                          th:if="${bannerReport.viewableClickThroughRate != null}"
+                          th:text="| · vCTR ${#numbers.formatDecimal(bannerReport.viewableClickThroughRate, 1, 2)} %|"></th:block></span>
+                    <span class="stat-note" th:unless="${bannerReport.clickThroughRate != null}" th:text="#{ops.mon.noImpressions}">no impressions</span>
+                    <!--/* Only when it applied: a booking served off-origin reports no clicks at all. */-->
+                    <span class="stat-note" th:if="${bannerReport.partial and bannerReport.clickThroughRate != null}"
+                          th:text="#{ops.mon.trackedOnly}">over the tracked ads</span>
+                </div>
+            </div>
+
+            <!--/*
+              Every number here is people: the site keeps crawlers and other automated clients out
+              of views, readers, banner impressions and clicks and Article.counter, and counts them
+              on /mgmt/crawlers instead.
+            */-->
+            <p class="result-line">
+                <svg class="i"><use href="#i-bot"></use></svg>
+                <span th:text="#{ops.mon.crawlers.note}">Crawlers are not counted here.</span>
+                <a th:href="@{/mgmt/crawlers(range=${range.key})}" th:text="#{ops.mon.crawlers.link}">See «Crawlers»</a>
+            </p>
+
+            <div th:replace="~{mgmt/chart :: chart(${trafficChart}, #{ops.mon.chart.traffic}, ${mgmtText.label(range)})}"></div>
+
+            <!--/*
+              The target of every row link in the advertising table below, so narrowing to one
+              booking lands on the chart that changed rather than at the top of the screen.
+            */-->
+            <div id="banner-chart">
+                <div th:replace="~{mgmt/chart :: chart(${bannerChart},
+                        ${selectedBanner != null ? mgmtText.msg('ops.mon.chart.banner', selectedBanner.id, selectedBanner.name) : mgmtText.msg('ops.mon.banners')},
+                        ${mgmtText.label(range)})}"></div>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-file-text"></use></svg> <th:block th:text="#{ops.mon.byPage}">By page</th:block>
+                        <span class="hint" th:text="${mgmtText.label(range)}">period</span>
+                    </h2>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th th:text="#{ops.mon.col.page}">Page</th>
+                                <th class="num shrink" th:text="#{ops.mon.col.views}">Views</th>
+                                <th class="num shrink" th:text="#{ops.mon.col.share}">Share</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="p : ${pageTraffic}">
+                                <td th:text="${p.page != null} ? ${mgmtText.label(p.page)} : ${p.label}">Article</td>
+                                <td class="num" th:text="${p.views}">0</td>
+                                <td class="num muted"
+                                    th:text="${p.share != null} ? |${#numbers.formatDecimal(p.share, 1, 1)} %| : '—'">—</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-inbox"></use></svg> <th:block th:text="#{ops.mon.content}">Content</th:block>
+                        <!--/*
+                          Every article, as the article list counts them, so this number and that
+                          one cannot read as disagreeing.
+                        */-->
+                        <span class="hint" th:text="#{ops.mon.content.hint}">total in the system</span>
+                    </h2>
+                    <div class="table-wrap">
+                        <table>
+                            <tbody>
+                            <tr th:attr="data-href=@{/mgmt/articles}">
+                                <td><a th:href="@{/mgmt/articles}" th:text="#{ops.mon.content.articles}">Articles</a></td>
+                                <td class="num" th:text="${content.articles}">0</td>
+                            </tr>
+                            <tr th:attr="data-href=@{/mgmt/authors}">
+                                <td><a th:href="@{/mgmt/authors}" th:text="#{ops.mon.content.authors}">Authors</a></td>
+                                <td class="num" th:text="${content.authors}">0</td>
+                            </tr>
+                            <tr th:attr="data-href=@{/mgmt/categories}">
+                                <td><a th:href="@{/mgmt/categories}" th:text="#{ops.mon.content.categories}">Categories</a></td>
+                                <td class="num" th:text="${content.categories}">0</td>
+                            </tr>
+                            <tr th:attr="data-href=@{/mgmt/images}">
+                                <td><a th:href="@{/mgmt/images}" th:text="#{ops.mon.content.images}">Images</a></td>
+                                <td class="num" th:text="${content.images}">0</td>
+                            </tr>
+                            <tr th:attr="data-href=@{/mgmt/banners}">
+                                <td><a th:href="@{/mgmt/banners}" th:text="#{ops.mon.banners}">Advertising</a></td>
+                                <td class="num" th:text="${content.banners}">0</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>
+                    <svg class="i"><use href="#i-eye"></use></svg> <th:block th:text="#{ops.mon.top}">Most read articles</th:block>
+                    <!--/*
+                      Article.counter is all-time and includes reads served by the API application.
+                      It is NOT the window above, and saying so is the whole reason this hint
+                      exists -- two different quantities under one word is the confusion this
+                      screen is built to avoid.
+                    */-->
+                    <span class="hint" th:text="#{ops.mon.top.hint}">total views, all time</span>
+                </h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th class="num shrink">№</th>
+                            <th th:text="#{ops.mon.col.title}">Title</th>
+                            <th class="num shrink" th:text="#{ops.mon.col.views}">Views</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="a : ${topArticles}" th:attr="data-href=@{/mgmt/articles/{id}(id=${a.id})}">
+                            <td class="num muted" th:text="${a.id}">1</td>
+                            <td class="title-cell">
+                                <a th:href="@{/mgmt/articles/{id}(id=${a.id})}" th:text="${a.title}">Title</a>
+                            </td>
+                            <td class="num" th:text="${a.counter}">0</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="empty" th:if="${topArticles.isEmpty()}">
+                    <svg class="i"><use href="#i-file-text"></use></svg>
+                    <span th:text="#{ops.mon.top.empty}">No articles with recorded views.</span>
+                </div>
+            </div>
+
+            <!--/*
+              Every booking over the selected window, never all-time.
+              «Импресии» is a booking selected for a rendered page; «Видими» is what the reader's
+              browser reported as at least half on screen for a second. CTR is clicks per served,
+              vCTR clicks per viewable.
+
+              An HTML5 booking is click-tracked: site.js listens inside the same-origin frame.
+              The one that is not -- an HTML5 source off-origin -- gets an em dash, not a zero,
+              because a zero would read as "nobody clicked" about a measurement nobody took.
+
+              The name and the row narrow the chart above to that booking; the icon opens the
+              booking itself. The row link carries `range`, or narrowing would reset the window.
+            */-->
+            <div class="card">
+                <h2>
+                    <svg class="i"><use href="#i-megaphone"></use></svg> <th:block th:text="#{ops.mon.banners}">Advertising</th:block>
+                    <span class="hint" th:text="${mgmtText.label(range)}">period</span>
+                    <a class="btn btn-sm btn-ghost" th:if="${selectedBanner != null}"
+                       th:href="@{/mgmt/monitoring#banner-chart(range=${range.key})}" th:text="#{ops.mon.all}">All</a>
+                </h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th class="num shrink">№</th>
+                            <th th:text="#{ops.mon.col.name}">Name</th>
+                            <th class="shrink" th:text="#{ops.mon.col.type}">Type</th>
+                            <th class="shrink" th:text="#{ops.mon.col.status}">Status</th>
+                            <th class="num shrink" th:title="#{ops.mon.col.served.title}" th:text="#{ops.mon.col.served}">Served</th>
+                            <th class="num shrink" th:title="#{ops.mon.col.viewable.title}" th:text="#{ops.mon.col.viewable}">Viewable</th>
+                            <th class="num shrink" th:title="#{ops.mon.col.viewability.title}" th:text="#{ops.mon.col.viewability}">Viewability</th>
+                            <th class="num shrink" th:text="#{ops.mon.clicks}">Clicks</th>
+                            <th class="num shrink" th:title="#{ops.mon.col.ctr.title}">CTR</th>
+                            <th class="num shrink" th:title="#{ops.mon.col.vctr.title}">vCTR</th>
+                            <th class="shrink"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="b : ${bannerReport.rows}"
+                            th:classappend="${selectedBanner != null and selectedBanner.id == b.id} ? 'row-selected'"
+                            th:attr="data-href=@{/mgmt/monitoring#banner-chart(range=${range.key},banner=${b.id})}">
+                            <td class="num muted" th:text="${b.id}">1</td>
+                            <td class="title-cell">
+                                <a th:href="@{/mgmt/monitoring#banner-chart(range=${range.key},banner=${b.id})}"
+                                   th:text="${b.name}">Name</a>
+                            </td>
+                            <td class="muted shrink" th:text="${b.type != null} ? ${mgmtText.label(b.type)} : '—'">Image</td>
+                            <td>
+                                <span class="badge" th:classappend="${b.active} ? 'published' : 'off'"
+                                      th:text="${b.active} ? #{ops.mon.active} : #{ops.mon.paused}">Active</span>
+                            </td>
+                            <td class="num" th:text="${b.impressions}">0</td>
+                            <td class="num" th:text="${b.viewable}">0</td>
+                            <td class="num muted shrink"
+                                th:text="${b.viewability != null}
+                                         ? |${#numbers.formatDecimal(b.viewability, 1, 1)} %|
+                                         : '—'">—</td>
+                            <td class="num" th:text="${b.clickTracked} ? ${b.clicks} : '—'">0</td>
+                            <td class="num muted shrink"
+                                th:text="${b.clickThroughRate != null}
+                                         ? |${#numbers.formatDecimal(b.clickThroughRate, 1, 2)} %|
+                                         : '—'">—</td>
+                            <td class="num muted shrink"
+                                th:text="${b.viewableClickThroughRate != null}
+                                         ? |${#numbers.formatDecimal(b.viewableClickThroughRate, 1, 2)} %|
+                                         : '—'">—</td>
+                            <td>
+                                <div class="row-actions">
+                                    <a class="btn btn-ghost btn-icon btn-sm" th:title="#{ops.mon.toBanner}"
+                                       th:href="@{/mgmt/banners/{id}(id=${b.id})}">
+                                        <svg class="i"><use href="#i-megaphone"></use></svg>
+                                        <span class="sr-only" th:text="#{ops.mon.toBanner}">Open the ad</span>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="empty" th:if="${bannerReport.rows.isEmpty()}">
+                    <svg class="i"><use href="#i-megaphone"></use></svg>
+                    <span th:text="#{ops.mon.banners.empty}">No ads have been set up.</span>
+                    <a class="btn btn-sm" th:href="@{/mgmt/banners/new}" th:text="#{ops.mon.banners.addFirst}">Add the first one</a>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

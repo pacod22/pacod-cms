@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  /mgmt/social/stats -- what /social did over a window: views, readers and clicks, by network and
+  by link. Same buckets, same ranges and same chart fragment as /mgmt/monitoring.
+
+  Every filter is a GET parameter, so every view of the numbers is a bookmarkable URL, and each one
+  is carried by every other control: the range form carries `source` and `link` as hidden fields,
+  and every row link carries `range` -- a GET form replaces the whole query string, and losing a
+  filter on the next click is the trap the monitoring screen's hidden `banner` field documents.
+
+  The series starts when the site first counted /social. On a fresh database the chart says so
+  rather than drawing a flat line, and nothing here is back-filled.
+*/-->
+<head th:replace="~{mgmt/fragments :: head(#{pages.stats.title})}"></head>
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('social-stats')}"></th:block>
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{pages.stats.title})}"></header>
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <form class="toolbar" method="get" th:action="@{/mgmt/social/stats}" style="flex:1 1 320px; margin:0">
+                    <label class="pick">
+                        <select name="range" data-autosubmit th:aria-label="#{pages.stats.range.aria}">
+                            <option th:each="r : ${ranges}" th:value="${r.key}" th:text="${mgmtText.label(r)}"
+                                    th:selected="${r.key == range.key}">24 hours</option>
+                        </select>
+                    </label>
+                    <input type="hidden" name="source" th:if="${report.sourceFilter != null}"
+                           th:value="${report.sourceFilter.name()}"/>
+                    <input type="hidden" name="link" th:if="${report.linkFilter != null}"
+                           th:value="${report.linkFilter}"/>
+                    <button class="btn" type="submit" th:text="#{pages.action.show}">Show</button>
+                </form>
+                <a class="btn btn-ghost push" th:href="@{/mgmt/social}">
+                    <svg class="i"><use href="#i-share"></use></svg> <span th:text="#{pages.stats.toPage}">To the page</span>
+                </a>
+            </div>
+
+            <div class="card" th:if="${report.sourceFilter != null or report.linkFilter != null}">
+                <div class="card-body">
+                    <div class="chart-legend" style="margin:0">
+                        <span class="muted" th:text="#{pages.stats.filter}">Filter:</span>
+                        <a class="btn btn-sm btn-primary" th:if="${report.sourceFilter != null}"
+                           th:href="@{/mgmt/social/stats(range=${range.key}, link=${report.linkFilter})}"
+                           th:title="#{pages.stats.filter.remove}">
+                            <span th:text="#{pages.stats.filter.source(${mgmtText.label(report.sourceFilter)})}">Source</span> ×
+                        </a>
+                        <a class="btn btn-sm btn-primary" th:if="${report.linkFilter != null}"
+                           th:href="@{/mgmt/social/stats(range=${range.key}, source=${report.sourceFilter != null ? report.sourceFilter.name() : null})}"
+                           th:title="#{pages.stats.filter.remove}">
+                            <span th:text="#{pages.stats.filter.link(${report.linkFilterLabel})}">Link</span> ×
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-grid">
+                <div class="stat">
+                    <span class="stat-label" th:text="#{pages.stats.views}">Views</span>
+                    <span class="stat-value" th:text="${report.totals.views}">0</span>
+                    <span class="stat-note" th:text="${report.sourceFilter != null} ? #{pages.stats.fromSource(${mgmtText.label(report.sourceFilter)})} : ${mgmtText.label(range)}">period</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label" th:text="#{pages.stats.peakVisitors}">Visitors, peak</span>
+                    <span class="stat-value" th:text="${report.totals.peakVisitors}">0</span>
+                    <span class="stat-note" th:text="${range.hourly} ? #{pages.stats.busiestHour} : #{pages.stats.busiestDay}">interval</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label" th:text="#{pages.stats.clicks}">Clicks</span>
+                    <span class="stat-value" th:text="${report.totals.clicks}">0</span>
+                    <span class="stat-note" th:if="${report.totals.clickThroughRate != null}"
+                          th:text="|CTR ${#numbers.formatDecimal(report.totals.clickThroughRate, 1, 1)} %|">CTR</span>
+                    <span class="stat-note" th:unless="${report.totals.clickThroughRate != null}" th:text="#{pages.stats.noViews}">no views</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label" th:text="#{pages.stats.topSource}">Top source</span>
+                    <span class="stat-value" style="font-size:22px"
+                          th:text="${report.totals.topSource != null} ? ${mgmtText.label(report.totals.topSource)} : '—'">—</span>
+                    <span class="stat-note" th:text="#{pages.stats.byViews}">by views</span>
+                </div>
+            </div>
+
+            <th:block th:with="chartTitle=${report.linkFilter != null} ? #{pages.stats.chart.link(${report.linkFilterLabel})} : #{pages.social.title},
+                               rangeLabel=${mgmtText.label(range)}">
+                <div th:replace="~{mgmt/chart :: chart(${report.chart}, ${chartTitle}, ${rangeLabel})}"></div>
+            </th:block>
+
+            <div class="grid-2">
+                <!--/* By network. Views are attributed when /social renders -- ?src= first, then the
+                       in-app browser, then the referrer; see SocialSourceClassifier. A row links to
+                       the whole screen narrowed to that network. */-->
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-share"></use></svg> <span th:text="#{pages.stats.bySource}">By source</span>
+                        <span class="hint" th:text="${mgmtText.label(range)}">period</span>
+                    </h2>
+                    <div class="table-wrap" th:unless="${report.sources.isEmpty()}">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th th:text="#{pages.stats.col.source}">Source</th>
+                                <th class="num shrink" th:text="#{pages.stats.views}">Views</th>
+                                <th class="num shrink" th:text="#{pages.stats.col.share}">Share</th>
+                                <th class="num shrink" th:text="#{pages.stats.clicks}">Clicks</th>
+                                <th class="num shrink" th:title="#{pages.stats.col.ctr.source.title}">CTR</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="s : ${report.sources}"
+                                th:classappend="${report.sourceFilter == s.source} ? 'row-selected'"
+                                th:attr="data-href=@{/mgmt/social/stats(range=${range.key}, source=${s.source.name()}, link=${report.linkFilter})}">
+                                <td><a th:href="@{/mgmt/social/stats(range=${range.key}, source=${s.source.name()}, link=${report.linkFilter})}"
+                                       th:text="${mgmtText.label(s.source)}">Instagram</a></td>
+                                <td class="num" th:text="${s.views}">0</td>
+                                <td class="num muted"
+                                    th:text="${s.viewShare != null} ? |${#numbers.formatDecimal(s.viewShare, 1, 1)} %| : '—'">—</td>
+                                <td class="num" th:text="${s.clicks}">0</td>
+                                <td class="num muted"
+                                    th:text="${s.clickThroughRate != null} ? |${#numbers.formatDecimal(s.clickThroughRate, 1, 1)} %| : '—'">—</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="empty" th:if="${report.sources.isEmpty()}">
+                        <svg class="i"><use href="#i-share"></use></svg>
+                        <span th:text="#{pages.stats.noVisits}">No visits in this period.</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-file-text"></use></svg> <span th:text="#{pages.stats.articles}">Clicked articles</span>
+                        <span class="hint" th:text="#{pages.stats.articles.hint}">from the block and from links</span>
+                    </h2>
+                    <!--/* Which article was clicked, however it was reached: a latest-articles tile, or a
+                           link on the page that opens it -- the two counted apart and summed. */-->
+                    <div class="table-wrap" th:unless="${report.articles.isEmpty()}">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th class="num shrink" th:text="#{pages.stats.col.no}">No.</th>
+                                <th th:text="#{pages.field.title}">Title</th>
+                                <th class="num shrink" th:title="#{pages.stats.col.fromBlock.title}" th:text="#{pages.stats.col.fromBlock}">From block</th>
+                                <th class="num shrink" th:title="#{pages.stats.col.fromLink.title}" th:text="#{pages.stats.col.fromLink}">From link</th>
+                                <th class="num shrink" th:text="#{pages.stats.col.total}">Total</th>
+                                <th class="num shrink">CTR</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="a : ${report.articles}" th:attr="data-href=@{/mgmt/articles/{id}(id=${a.id})}">
+                                <td class="num muted" th:text="${a.id}">1</td>
+                                <td class="title-cell"><a th:href="@{/mgmt/articles/{id}(id=${a.id})}" th:text="${a.title}">Title</a></td>
+                                <td class="num" th:text="${a.fromBlock}" th:classappend="${a.fromBlock == 0} ? 'muted'">0</td>
+                                <td class="num" th:text="${a.fromLinks}" th:classappend="${a.fromLinks == 0} ? 'muted'">0</td>
+                                <td class="num" th:text="${a.clicks}">0</td>
+                                <td class="num muted"
+                                    th:text="${a.clickThroughRate != null} ? |${#numbers.formatDecimal(a.clickThroughRate, 1, 1)} %| : '—'">—</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="empty" th:if="${report.articles.isEmpty()}">
+                        <svg class="i"><use href="#i-file-text"></use></svg>
+                        <span th:text="#{pages.stats.noArticleClicks}">No article clicks in this period.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!--/* By link. CTR is clicks per 100 views of the page. «От началото» is the sum of
+                   every day bucket -- they never expire -- and a dash when that read failed, never
+                   a zero that would claim nobody ever clicked. */-->
+            <div class="card">
+                <h2>
+                    <svg class="i"><use href="#i-link"></use></svg> <span th:text="#{pages.stats.byLink}">By link</span>
+                    <span class="hint" th:text="${report.sourceFilter != null} ? |${mgmtText.label(range)} · ${mgmtText.label(report.sourceFilter)}| : ${mgmtText.label(range)}">period</span>
+                </h2>
+                <div class="table-wrap" th:unless="${report.links.isEmpty()}">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{pages.stats.col.link}">Link</th>
+                            <th class="shrink" th:text="#{pages.socialLink.placement}">Placement</th>
+                            <th class="shrink" th:text="#{pages.field.status}">Status</th>
+                            <th class="num shrink" th:text="#{pages.stats.clicks}">Clicks</th>
+                            <th class="num shrink" th:title="#{pages.stats.col.ctr.link.title}">CTR</th>
+                            <th class="num shrink" th:title="#{pages.stats.col.share.title}" th:text="#{pages.stats.col.share}">Share</th>
+                            <th class="num shrink" th:title="#{pages.stats.col.allTime.title}" th:text="#{pages.stats.col.allTime}">All time</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="l : ${report.links}"
+                            th:classappend="${report.linkFilter == l.id} ? 'row-selected'"
+                            th:attr="data-href=@{/mgmt/social/stats(range=${range.key}, link=${l.id}, source=${report.sourceFilter != null ? report.sourceFilter.name() : null})}">
+                            <td class="title-cell">
+                                <a th:href="@{/mgmt/social/stats(range=${range.key}, link=${l.id}, source=${report.sourceFilter != null ? report.sourceFilter.name() : null})}"
+                                   th:text="${l.label}">Subscribe</a>
+                                <span class="muted" th:if="${l.deleted}" th:text="|(${l.id})|"></span>
+                                <!--/* A span, not a link: .title-cell styles every <a> in it as the row's title. */-->
+                                <span class="muted" style="font-size:12px" th:if="${l.articleId != null}"
+                                      th:text="#{pages.stats.articleRef(${l.articleId})}">· article 33</span>
+                                <div class="muted" style="font-size:12px;overflow-wrap:anywhere" th:if="${l.url != null}" th:text="${l.url}"></div>
+                            </td>
+                            <td class="muted" th:text="${l.placement != null} ? ${mgmtText.label(l.placement)} : '—'">Link</td>
+                            <td>
+                                <span class="badge published" th:if="${l.live}" th:text="#{pages.social.badge.visible}">visible</span>
+                                <span class="badge off" th:if="${l.deleted}" th:text="#{pages.stats.badge.deleted}">deleted</span>
+                                <span class="badge draft" th:if="${!l.live and !l.deleted}" th:text="#{pages.stats.badge.hidden}">hidden</span>
+                            </td>
+                            <td class="num" th:text="${l.clicks}">0</td>
+                            <td class="num muted"
+                                th:text="${l.clickThroughRate != null} ? |${#numbers.formatDecimal(l.clickThroughRate, 1, 1)} %| : '—'">—</td>
+                            <td class="num muted"
+                                th:text="${l.clickShare != null} ? |${#numbers.formatDecimal(l.clickShare, 1, 1)} %| : '—'">—</td>
+                            <td class="num" th:text="${l.allTime != null} ? ${l.allTime} : '—'">0</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${report.links.isEmpty()}">
+                    <svg class="i"><use href="#i-link"></use></svg>
+                    <span th:text="#{pages.stats.noLinks}">The page has no links.</span>
+                </div>
+            </div>
+
+            <!--/* Link × network: which link each audience clicks. Unfiltered by source on purpose --
+                   this is where the networks are compared. */-->
+            <div class="card">
+                <h2>
+                    <svg class="i"><use href="#i-activity"></use></svg> <span th:text="#{pages.stats.matrix}">Link × source</span>
+                    <span class="hint" th:text="#{pages.stats.matrix.hint(${mgmtText.label(range)})}">clicks</span>
+                </h2>
+                <div class="table-wrap" th:unless="${report.matrix.isEmpty()}">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{pages.stats.col.link}">Link</th>
+                            <th class="num shrink" th:each="s : ${report.matrix.sources}" th:text="${mgmtText.label(s)}">Instagram</th>
+                            <th class="num shrink" th:text="#{pages.stats.col.total}">Total</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <!--/* Links first, then one row per article clicked in the latest-articles block --
+                               never the block as one lump, which would say how much it was used and
+                               not what anybody read. */-->
+                        <tr th:each="row : ${report.matrix.rows}">
+                            <td class="title-cell">
+                                <span th:text="${row.label}">Subscribe</span>
+                                <span class="muted" style="font-size:12px" th:if="${row.articleId != null}"
+                                      th:text="${row.linkId == null} ? #{pages.stats.matrix.latestRef(${row.articleId})} : #{pages.stats.articleRef(${row.articleId})}">· 33</span>
+                            </td>
+                            <td class="num" th:each="cell : ${row.cells}" th:text="${cell}"
+                                th:classappend="${cell == 0} ? 'muted'">0</td>
+                            <td class="num" th:text="${row.total}">0</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${report.matrix.isEmpty()}">
+                    <svg class="i"><use href="#i-activity"></use></svg>
+                    <span th:text="#{pages.stats.noClicks}">No clicks in this period.</span>
+                </div>
+            </div>
+
+            <p class="muted" style="font-size:12.5px" th:text="#{pages.stats.footnote}">
+                Bots and link previews are not counted.
+            </p>
+        </main>
+    </div>
+</div>
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

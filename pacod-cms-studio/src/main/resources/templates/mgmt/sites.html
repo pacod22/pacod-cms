@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{chrome.sites.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('sites')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{chrome.sites.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <p class="result-line" style="margin:0" th:text="#{chrome.sites.intro}">Pick a website to edit.</p>
+                <span class="spacer" style="margin-left:auto"></span>
+                <a class="btn btn-primary" th:if="${canCreateSite}" th:href="${studioRoot} + '/mgmt/sites/new'">
+                    <svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{portal.site.new.title}">New website</span>
+                </a>
+                <a class="btn" th:if="${!canCreateSite and canCreateOrganisation}" th:href="${studioRoot} + '/mgmt/organisations'">
+                    <svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{portal.orgs.new.heading}">New organisation</span>
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{chrome.sites.col.site}">Website</th>
+                            <th th:text="#{portal.site.field.organisation}">Organisation</th>
+                            <th th:text="#{chrome.sites.col.hosts}">Addresses</th>
+                            <th class="shrink" th:text="#{chrome.sites.col.language}">Language</th>
+                            <th class="shrink" th:text="#{chrome.sites.col.status}">Status</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <!--/* Absolute studio addresses, built by the view: a website's screens are under
+                               /sites/<id>/, which @{} on this un-prefixed page would not add. */-->
+                        <tr th:each="s : ${sites}" th:attr="data-href=@{${s.screen('/mgmt/dashboard')}}">
+                            <td class="title-cell">
+                                <a th:href="@{${s.screen('/mgmt/dashboard')}}" th:text="${s.name}">Demo</a>
+                                <span class="cell-sub" th:text="${s.id}">demo</span>
+                            </td>
+                            <td class="muted" th:text="${organisationNames.getOrDefault(s.organisationId, s.organisationId)}">Acme</td>
+                            <td>
+                                <th:block th:each="h, it : ${s.hosts}">
+                                    <a th:href="${s.publicUrl != null and it.first} ? ${s.publicUrl} : null"
+                                       th:target="${it.first} ? '_blank' : null" rel="noopener"
+                                       th:text="${h}">demo.localhost</a><span th:unless="${it.last}">, </span>
+                                </th:block>
+                                <span class="muted" th:if="${s.hosts.isEmpty()}">—</span>
+                            </td>
+                            <td class="muted" th:text="${s.defaultLanguage}">en</td>
+                            <td>
+                                <span class="badge" th:if="${s.status != null}" th:classappend="${s.status.name() == 'ACTIVE'} ? 'published' : 'off'"
+                                      th:text="${mgmtText.label(s.status)}">active</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="empty" th:if="${sites.isEmpty()}">
+                    <svg class="i"><use href="#i-layout"></use></svg>
+                    <span th:text="#{chrome.sites.empty}">No websites yet.</span>
+                    <span th:if="${canCreateOrganisation and !canCreateSite}" th:text="#{portal.sites.emptyCreate}">Create an organisation to start one.</span>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

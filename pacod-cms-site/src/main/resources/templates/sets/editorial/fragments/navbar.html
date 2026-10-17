@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*
+  Masthead plus main navigation, shared by all public templates.
+
+  The website's name, logo and tagline come from ${site} (SiteSettings), and the navigation from
+  the `main` Menu document: every link is built by SiteChrome from a kind and a reference -- a
+  category id, a page slug -- so adding a category to the menu is a studio edit, not a template
+  edit. Labels are data, translated per language on the menu item itself.
+
+  The mega-menus open on :hover / :focus-within -- no JavaScript. Below 860px the whole bar
+  collapses behind #nav-toggle, which site.js drives.
+*/-->
+<th:block th:fragment="navbar(lang)">
+
+    <header class="site-header">
+        <div class="shell masthead">
+            <!--/* Two images, not one, because night mode is a CLASS on <html> set by the
+                   snippet in fragments/head.html -- not prefers-color-scheme -- so <picture>
+                   with a media query cannot see it. site.css display:none's the inactive one.
+                   The dark copy carries alt="" and aria-hidden: only one of the pair should
+                   ever name the website.
+
+                   With no logo configured the name is set as text, so a new website is never
+                   a broken <img>. */-->
+            <a class="masthead__logo" href="/" th:href="@{/(lang=${lang})}">
+                <th:block th:if="${site != null and site.logoLight() != null}">
+                    <img class="masthead__logo-light" th:src="${site.logoLight()}"
+                         th:alt="${site.name(lang)}"/>
+                    <img class="masthead__logo-dark" th:src="${site.logoDark()}"
+                         alt="" aria-hidden="true"/>
+                </th:block>
+                <span class="masthead__wordmark" th:unless="${site != null and site.logoLight() != null}"
+                      th:text="${site?.name(lang)}">Website</span>
+            </a>
+
+            <div class="masthead__side">
+                <div class="masthead__tagline" th:if="${site?.tagline(lang) != null}"
+                     th:text="${site.tagline(lang)}">Tagline</div>
+
+                <div class="masthead__tools">
+                    <!--/* `q` is the parameter SearchController reads, and Google's script reads too
+                           (its queryParameterName defaults to it): the name is the contract. */-->
+                    <form class="site-search" id="site-search-form" action="/search" method="get"
+                          role="search">
+                        <!--/* A real submit, and it must stay the FIRST submit button in the form:
+                               the first one is the form's default, so Enter goes to /search and
+                               never to Google. */-->
+                        <button class="site-search__icon" type="submit"
+                                th:title="#{nav.search}" th:aria-label="#{nav.search}">⌕</button>
+                        <label class="visually-hidden" for="site-search-input" th:text="#{nav.search}">Search</label>
+                        <!--/* Echoes the query on the results page; `q` is in the model only on the
+                               two search screens, and Thymeleaf drops a null attribute elsewhere. */-->
+                        <input class="site-search__input" id="site-search-input" type="search" name="q"
+                               th:value="${q}" th:placeholder="#{nav.search.placeholder}"/>
+                        <!--/* The language the current page resolved to, so the results come back
+                               in the language the reader is already reading. */-->
+                        <input type="hidden" name="lang" th:value="${lang}"/>
+                    </form>
+
+                    <!--/* Submits the SAME box to the Google screen, from outside the form through
+                           `form=`, with `formaction` overriding the target for this button only.
+                           Rendered only for a website with a Programmable Search engine. */-->
+                    <button class="tool-button" type="submit" th:if="${site?.googleCseCx() != null}"
+                            form="site-search-form" formaction="/search-google"
+                            th:title="#{nav.search.google}" th:aria-label="#{nav.search.google}">G</button>
+
+                    <!--/* Links back to this page in each language the website offers, built on
+                           the server: they work with scripting off, and they keep the query
+                           string -- a search keeps its term. Opens on :hover / :focus-within. */-->
+                    <th:block th:with="langLinks=${site != null ? site.languageLinks(lang) : {}}">
+                    <div class="lang-menu" th:unless="${langLinks.size() < 2}">
+                        <button class="lang-select" type="button" aria-haspopup="true"
+                                th:aria-label="#{nav.language}">
+                            <span th:text="${lang != null ? #strings.toUpperCase(lang) : ''}">EN</span>
+                        </button>
+                        <div class="lang-menu__list">
+                            <a class="lang-menu__item" th:each="l : ${langLinks}" th:href="${l.href()}"
+                               th:hreflang="${l.code()}" th:lang="${l.code()}" th:text="${l.name()}"
+                               th:attr="aria-current=${l.current() ? 'true' : null}">English</a>
+                        </div>
+                    </div>
+                    </th:block>
+
+                    <!--/* Labels and the glyph are set by site.js from these two attributes, so the
+                           two themes cannot drift apart in the markup. */-->
+                    <button class="tool-button" type="button" id="theme-toggle"
+                            th:data-title-day="#{theme.toNight}"
+                            th:data-title-night="#{theme.toDay}">☀</button>
+                </div>
+            </div>
+        </div>
+
+        <nav class="site-nav" id="site-nav">
+            <div class="shell site-nav__inner">
+                <button class="nav-toggle" type="button" id="nav-toggle" aria-expanded="false"
+                        aria-controls="site-nav-items" th:text="#{nav.menu}">Menu</button>
+
+                <div class="site-nav__items" id="site-nav-items">
+                    <!--/* A group renders as a button opening its panel; a leaf as a link. --cols
+                           sets the panel's grid, from the item or one column per eight links. */-->
+                    <div class="nav-item" th:each="entry : ${site != null ? site.menu('main', lang) : {}}">
+                        <a class="nav-item__label" th:unless="${entry.group()}" th:href="${entry.href()}"
+                           th:text="${entry.label()}"
+                           th:target="${entry.external() ? '_blank' : null}" th:rel="${entry.external() ? 'noopener' : null}">Link</a>
+                        <th:block th:if="${entry.group()}">
+                            <button class="nav-item__label" type="button" th:text="${entry.label()}">Group</button>
+                            <div class="nav-menu" th:style="${'--cols:' + entry.panelColumns()}">
+                                <a class="nav-menu__link" th:each="child : ${entry.children()}"
+                                   th:href="${child.href()}" th:text="${child.label()}"
+                                   th:target="${child.external() ? '_blank' : null}" th:rel="${child.external() ? 'noopener' : null}">Link</a>
+                            </div>
+                        </th:block>
+                    </div>
+
+                    <span class="nav-spacer"></span>
+                </div>
+            </div>
+        </nav>
+    </header>
+</th:block>
+</body>
+</html>

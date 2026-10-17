@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  Creating a page asks for two things and nothing else.
+
+  The slug IS the document id, so it is chosen once here and is not editable afterwards -- an
+  "edit" of it would write a second page rather than rename one. The text comes next, on the edit
+  screen, in the original language first because every other language falls back to it.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{pages.list.new})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('pages')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{pages.list.new})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <form class="form-page" method="post" th:action="@{/mgmt/pages}">
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{pages.list.new}">New page</span></h2>
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="slug" th:text="#{pages.field.address}">Address</label>
+                            <input type="text" id="slug" name="slug" required
+                                   placeholder="about" pattern="[a-zA-Z0-9-]+">
+                            <span class="hint" th:utext="#{pages.new.slug.hint}">/p/address</span>
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit" th:text="#{pages.action.create}">Create</button>
+                        <a class="btn btn-ghost" th:href="@{/mgmt/pages}" th:text="#{pages.action.cancel}">Cancel</a>
+                    </div>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

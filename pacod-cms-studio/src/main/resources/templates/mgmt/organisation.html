@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  One organisation: its name, its websites, its members, deleting it.
+
+  Absolute addresses (${studioRoot} + …): an organisation belongs to no website, and this screen
+  can be reached from inside one, where @{} would file every link under that website's prefix.
+  th:action still adds the CSRF field, whatever the expression.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(${organisation.name})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('organisations')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(${organisation.name})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <a class="btn btn-ghost" th:href="${studioRoot} + '/mgmt/organisations'">
+                    <svg class="i"><use href="#i-arrow-up"></use></svg> <span th:text="#{portal.orgs.all}">All organisations</span>
+                </a>
+            </div>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-layout"></use></svg> <span th:text="#{portal.org.websites}">Websites</span></h2>
+                <div class="table-wrap" th:if="${!sites.isEmpty()}">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{chrome.sites.col.site}">Website</th>
+                            <th th:text="#{chrome.sites.col.hosts}">Addresses</th>
+                            <th class="shrink" th:text="#{chrome.sites.col.status}">Status</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="s : ${sites}">
+                            <td class="title-cell">
+                                <a th:href="${studioRoot} + ${s.screen('/mgmt/dashboard')}" th:text="${s.name}">Demo</a>
+                                <span class="cell-sub" th:text="${s.id}">demo</span>
+                            </td>
+                            <td>
+                                <th:block th:each="h, it : ${s.hosts}"><span th:text="${h}">demo.localhost</span><span th:unless="${it.last}">, </span></th:block>
+                                <span class="muted" th:if="${s.hosts.isEmpty()}">—</span>
+                            </td>
+                            <td>
+                                <span class="badge" th:if="${s.status != null}"
+                                      th:classappend="${s.status.name() == 'ACTIVE'} ? 'published' : 'off'"
+                                      th:text="${mgmtText.label(s.status)}">active</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${sites.isEmpty()}">
+                    <svg class="i"><use href="#i-layout"></use></svg>
+                    <span th:text="#{portal.org.noWebsites}">No websites yet.</span>
+                </div>
+                <div class="card-foot" th:if="${canCreateSite}">
+                    <a class="btn btn-primary" th:href="${studioRoot} + '/mgmt/sites/new?org=' + ${organisation.id}">
+                        <svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{portal.site.new.title}">New website</span>
+                    </a>
+                </div>
+            </div>
+
+            <div th:replace="~{mgmt/members :: card(${membersBase})}"></div>
+
+            <div class="card" th:if="${canManage}">
+                <h2><svg class="i"><use href="#i-settings"></use></svg> <span th:text="#{portal.org.settings}">Settings</span></h2>
+                <form method="post" th:action="${studioRoot} + '/mgmt/organisations/' + ${organisation.id}">
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="org-name" th:text="#{portal.orgs.new.name}">Name</label>
+                            <input type="text" id="org-name" name="name" required maxlength="100" th:value="${organisation.name}">
+                        </div>
+                        <dl class="kv">
+                            <dt th:text="#{portal.org.id}">Id</dt>
+                            <dd><code th:text="${organisation.id}">org_…</code></dd>
+                            <dt th:text="#{portal.org.ai}">AI features</dt>
+                            <dd th:text="${organisation.organisation.aiEnabled} ? #{portal.org.ai.on} : #{portal.org.ai.off}">off</dd>
+                        </dl>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{portal.action.save}">Save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card danger" th:if="${canManage}">
+                <h2><svg class="i"><use href="#i-trash"></use></svg> <span th:text="#{portal.org.delete.heading}">Delete the organisation</span></h2>
+                <div class="card-body">
+                    <p class="muted" style="margin:0" th:if="${organisation.websites > 0}"
+                       th:text="#{portal.org.delete.blocked}">Delete its websites first.</p>
+                    <p class="muted" style="margin:0" th:if="${organisation.websites == 0}"
+                       th:text="#{portal.org.delete.hint}">Its members lose their roles here.</p>
+                </div>
+                <div class="card-foot" th:if="${organisation.websites == 0}">
+                    <form method="post" th:data-confirm="#{portal.org.delete.confirm}"
+                          th:action="${studioRoot} + '/mgmt/organisations/' + ${organisation.id} + '/delete'">
+                        <button class="btn btn-danger" type="submit" th:text="#{portal.org.delete.button}">Delete organisation</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

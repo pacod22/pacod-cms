@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{banners.list.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('banners')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{banners.list.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <!--/* A GET form, like the other list screens: every result is a bookmarkable URL. */-->
+                <form class="toolbar" method="get" th:action="@{/mgmt/banners}" style="flex:1 1 420px; margin:0">
+                    <div class="search">
+                        <svg class="i"><use href="#i-search"></use></svg>
+                        <!--/* id="search-input" is what mgmt.js debounces, auto-submits and binds "/" to. */-->
+                        <input type="search" id="search-input" name="q" th:value="${q}"
+                               th:placeholder="#{banners.list.search.placeholder}"
+                               th:aria-label="#{banners.list.search.aria}">
+                        <kbd>/</kbd>
+                    </div>
+
+                    <button class="btn" type="submit" th:text="#{banners.list.search}">Search</button>
+                    <a class="btn btn-ghost" th:href="@{/mgmt/banners}" th:if="${!#strings.isEmpty(q)}" th:text="#{banners.list.clear}">Clear</a>
+                </form>
+
+                <!--/*
+                  «Макети» са папките, които HTML5 рекламите отварят. Отделен екран, защото макетът
+                  надживява рекламата: кампанията свършва, папката остава и следващата реклама сочи
+                  към същата.
+                */-->
+                <a class="btn btn-ghost push" th:href="@{/mgmt/banners/layouts}">
+                    <svg class="i"><use href="#i-layout"></use></svg> <th:block th:text="#{banners.list.layouts}">Layouts</th:block>
+                </a>
+                <a class="btn btn-primary" th:href="@{/mgmt/banners/new}">
+                    <svg class="i"><use href="#i-plus"></use></svg> <th:block th:text="#{banners.list.new}">New banner</th:block>
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th class="num shrink" th:text="#{banners.list.col.number}">No.</th>
+                            <th th:text="#{banners.list.col.name}">Name</th>
+                            <th class="shrink" th:text="#{banners.list.col.type}">Type</th>
+                            <th class="shrink" th:text="#{banners.list.col.placement}">Placement</th>
+                            <th class="num shrink" th:text="#{banners.list.col.order}">Order</th>
+                            <th th:text="#{banners.list.col.pages}">Pages</th>
+                            <th th:text="#{banners.list.col.period}">Period</th>
+                            <th class="num shrink" th:text="#{banners.list.col.impressions}">Impressions</th>
+                            <th class="num shrink" th:text="#{banners.list.col.clicks}">Clicks</th>
+                            <th class="shrink" th:text="#{banners.list.col.status}">Status</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="b : ${banners}" th:attr="data-href=@{/mgmt/banners/{id}(id=${b.id})}">
+                            <td class="num muted" th:text="${b.id}">1</td>
+                            <td class="title-cell">
+                                <a th:href="@{/mgmt/banners/{id}(id=${b.id})}" th:text="${b.name}">Name</a>
+                                <span class="cell-sub" th:text="${b.source}">/resources/banners/…</span>
+                            </td>
+                            <td class="muted" th:text="${mgmtText.label(b.type)}">Image</td>
+                            <td class="muted" th:text="${mgmtText.label(b.placement)}">Sidebar</td>
+                            <td class="num muted" th:text="${b.sortOrder}">10</td>
+                            <!--/* An empty page list means every page -- see Banner.coversPage. */-->
+                            <td class="muted" th:text="${b.pages == null or b.pages.isEmpty()}
+                                                       ? #{banners.list.everywhere}
+                                                       : ${#strings.listJoin(b.pages, ', ')}">Everywhere</td>
+                            <td class="muted">
+                                <span th:if="${b.activeFrom == null and b.activeTo == null}" th:text="#{banners.list.unlimited}">open-ended</span>
+                                <span th:unless="${b.activeFrom == null and b.activeTo == null}"
+                                      th:text="(${b.activeFrom != null} ? ${#temporals.format(b.activeFrom, 'dd.MM.yyyy')} : '…')
+                                             + ' – '
+                                             + (${b.activeTo != null} ? ${#temporals.format(b.activeTo, 'dd.MM.yyyy')} : '…')">
+                                </span>
+                            </td>
+                            <td class="num muted" th:text="${b.impressions}">0</td>
+                            <!--/* All-time. No screen divides these two scalars: they carry no
+                                   dates and need not have started counting together, so the rates
+                                   are per period, on «Статистика». An off-origin HTML5 booking
+                                   cannot be listened in at all and gets a dash rather than a zero
+                                   that would read as "nobody clicked". */-->
+                            <td class="num muted" th:text="${b.clickTracked} ? ${b.clicks} : '—'">0</td>
+                            <!--/*
+                              Deliberately not b.runsOn(...): that also asks whether the banner covers a
+                              given page, and there is no page here. The status column answers "is this
+                              booking live at all", which is the flag and the window; the page filter is
+                              already its own column.
+                            */-->
+                            <td>
+                                <span class="badge published" th:if="${b.active and b.withinWindow(now)}" th:text="#{banners.list.status.active}">active</span>
+                                <span class="badge off" th:unless="${b.active}" th:text="#{banners.list.status.off}">off</span>
+                                <span class="badge draft" th:if="${b.active and !b.withinWindow(now)}"
+                                      th:text="${b.activeFrom != null and now.isBefore(b.activeFrom)}
+                                               ? #{banners.list.status.upcoming} : #{banners.list.status.expired}">expired</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!--/* As on the other list screens: the service treats a blank term as no filter. */-->
+                <div class="empty" th:if="${banners.isEmpty()}">
+                    <svg class="i"><use href="#i-megaphone"></use></svg>
+                    <span th:text="${#strings.isEmpty(q)}
+                                   ? #{banners.list.empty}
+                                   : #{banners.list.noMatch}">No banners yet.</span>
+                    <a class="btn btn-sm" th:href="@{/mgmt/banners/new}" th:if="${#strings.isEmpty(q)}" th:text="#{banners.list.addFirst}">Add the first</a>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

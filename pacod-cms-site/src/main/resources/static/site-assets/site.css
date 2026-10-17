@@ -1,0 +1,1621 @@
+/* =====================================================================================
+   pacod-cms -- the public site's design system.
+
+   Class-based throughout: every hover state is a real CSS rule, and the colours, type and
+   spacing are custom properties on :root (and .night), so a theme is a set of values for them.
+   The properties a website's theme can set are named by core's ThemeToken (--bg, --accent,
+   --font-display ...): every template set's stylesheet uses those names, which is what lets a
+   theme survive a switch of sets. /theme.css, linked after this file, overrides them.
+
+   Served from the jar at /site-assets/, NOT /assets/ -- see WebSiteAssetsConfiguration.
+
+   Two parts of it exist for content rather than for the design:
+
+     * .video-container carries the responsive-iframe rule; widgets.html and article-view.html
+       inject raw YouTube iframes into it.
+     * .article-body carries guards for imported bodies full of <font>, inline widths,
+       <style> blocks and tables. Without them such a body blows the measure out horizontally.
+       Content written in the studio will not show this.
+
+   Icons are inline SVG or plain characters -- no icon font is loaded.
+   ===================================================================================== */
+
+/* ---------- tokens ------------------------------------------------------------------ */
+
+:root {
+    --bg: #F4F0E6;
+    --surface: #FBF9F3;
+    --line: #DED7C6;
+    --ink: #1E1C17;
+    --ink2: #26241E;
+    --muted: #4A4536;
+    --muted2: #6B6455;
+    --faint: #8A8271;
+    --accent: #2C4A32;
+    --greenDark: #243D29;
+    --greenText: #2C4A32;
+    --highlight: #9A5433;
+    --ph1: #EAE4D4;
+    --ph2: #F2EDE0;
+    --tint: #EDF1E7;
+    --hover: #EFEADC;
+    --panel: #1E1C17;
+    --onPanel: #F4F0E6;
+    --onPanelMuted: #CFC8B6;
+    --onPanelFaint: #9E9686;
+    --onPanelLine: #4A463C;
+    --panelAccent: #A8C39A;
+
+    --font-display: 'Lora', Georgia, 'Times New Roman', serif;
+    --font-text: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-label: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+    /* The label system starts at 11px, not 9: uppercase Cyrillic at 9px is not legible on a
+       real screen, so the floor is raised here and the scale keeps the same rhythm. */
+    --mono-xs: 11px;
+    --mono-sm: 12px;
+
+    --shell: 1280px;
+    --gutter: 32px;
+
+    color-scheme: light;
+}
+
+.night {
+    --bg: #12110B;
+    --surface: #1B1913;
+    --line: #332F26;
+    --ink: #EFEADB;
+    --ink2: #E3DDCC;
+    --muted: #C0B9A5;
+    --muted2: #9C9583;
+    --faint: #7F7867;
+    --accent: #26382A;
+    --greenDark: #33503A;
+    --greenText: #93BE8B;
+    --highlight: #CE9061;
+    --ph1: #211F19;
+    --ph2: #27241E;
+    --tint: #1A2118;
+    --hover: #25231C;
+    --panel: #0C0B06;
+
+    color-scheme: dark;
+}
+
+/* ---------- reset ------------------------------------------------------------------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+}
+
+body {
+    color: var(--ink);
+    font-family: var(--font-text);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+}
+
+a { color: var(--greenText); text-decoration: none; }
+a:hover { color: var(--highlight); }
+
+img { max-width: 100%; }
+
+button { font: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; }
+
+h1, h2, h3, h4 { margin: 0; }
+p { margin: 0; }
+ul { margin: 0; padding: 0; list-style: none; }
+
+::selection { background: #DCE4D3; }
+.night ::selection { background: #33503A; }
+
+:focus-visible { outline: 2px solid var(--greenText); outline-offset: 2px; }
+
+.visually-hidden {
+    position: absolute;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ---------- shell ------------------------------------------------------------------- */
+
+.shell {
+    max-width: var(--shell);
+    margin: 0 auto;
+    padding-left: var(--gutter);
+    padding-right: var(--gutter);
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 40px;
+    align-items: start;
+    padding-top: 26px;
+    margin-bottom: 1rem;
+}
+
+.layout__main { min-width: 0; }
+
+.layout__aside {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* ---------- masthead ---------------------------------------------------------------- */
+
+.site-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+}
+
+.masthead {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding-top: 18px;
+    padding-bottom: 18px;
+}
+
+/* The logo ships in two inks, one for the light masthead and one for night mode, both from the
+   website's settings. The link reads as interactive through the image's own hover opacity. */
+.masthead__logo {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    padding: 10px 18px;
+}
+
+.masthead__logo:hover img { opacity: .78; }
+
+.masthead__logo img {
+    display: block;
+    /* A logo is drawn to this height whatever its proportions; the width follows. */
+    height: 56px;
+    width: auto;
+    max-width: 320px;
+}
+
+/* A website without a logo is named in type, in the display face. */
+.masthead__wordmark {
+    font: 600 28px/1.1 var(--font-display);
+    letter-spacing: -.01em;
+    color: var(--ink);
+}
+
+.masthead__logo:hover .masthead__wordmark { opacity: .78; }
+
+/* Night mode is a class on <html>, so this is a display swap rather than a media query.
+   display:none and not visibility/opacity: both images are in the DOM, and anything that
+   leaves the inactive one in flow adds its full ~280px to the masthead.
+
+   Each selector names the parent as well as the image, and that is load-bearing rather than
+   decorative: `.masthead__logo img` above is (0,1,1) and a bare `.masthead__logo-dark` is
+   (0,1,0), so display:block wins on specificity whatever the source order and BOTH logos
+   render side by side. Keep two classes in every selector here. */
+.masthead__logo .masthead__logo-dark { display: none; }
+html.night .masthead__logo .masthead__logo-light { display: none; }
+html.night .masthead__logo .masthead__logo-dark { display: block; }
+
+.masthead__side {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.masthead__tagline {
+    font: 400 var(--mono-xs)/1.3 var(--font-label);
+    letter-spacing: .09em;
+    color: var(--faint);
+    text-transform: uppercase;
+    text-align: right;
+}
+
+.masthead__tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+    width: 100%;
+}
+
+.site-search {
+    flex: 1 1 140px;
+    min-width: 0;
+    max-width: 360px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    padding: 9px 12px;
+}
+
+/*
+ * A <button type="submit">, so the browser default chrome has to come off: a button carries a
+ * border, a background, padding and a centred font, and without these it renders as a grey pill
+ * inside the search strip. `cursor: pointer` because it is a control, and looks like one.
+ */
+.site-search__icon {
+    flex-shrink: 0;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    color: var(--faint);
+    font-size: 13px;
+    line-height: 1;
+}
+
+.site-search__icon:hover { color: var(--ink); }
+
+.site-search__input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    outline: none;
+    font-size: 13px;
+    color: var(--ink);
+}
+
+.site-search__input::placeholder { color: var(--faint); }
+
+.tool-button,
+.lang-select {
+    flex-shrink: 0;
+    height: 36px;
+    background: var(--bg);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    padding: 0 10px;
+    font: 400 var(--mono-sm)/1 var(--font-label);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tool-button { width: 36px; padding: 0; font-size: 15px; }
+
+.tool-button:hover,
+.lang-select:hover {
+    border-color: var(--greenText);
+    color: var(--greenText);
+}
+
+/* The language menu is a real menu of links, not a <select>: each entry is the page's own
+   address in that language, so switching works with scripting off. */
+.lang-menu { position: relative; flex-shrink: 0; }
+
+.lang-menu__list {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 80;
+    display: none;
+    width: 190px;
+    max-height: 360px;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: 0 14px 32px rgba(30, 28, 23, .16);
+}
+
+.lang-menu:hover .lang-menu__list,
+.lang-menu:focus-within .lang-menu__list { display: block; }
+
+.lang-menu__item {
+    display: block;
+    padding: 8px 14px;
+    font: 400 13px/1.35 var(--font-text);
+    color: var(--muted);
+}
+
+.lang-menu__item:hover { background: var(--hover); color: var(--highlight); }
+
+/* ---------- navigation -------------------------------------------------------------- */
+
+.site-nav {
+    border-top: 1px solid var(--line);
+    background: var(--accent);
+    position: relative;
+    z-index: 50;
+}
+
+.site-nav__inner {
+    display: flex;
+    align-items: stretch;
+}
+
+/* display:contents so the nav items are direct flex children of .site-nav__inner on desktop
+   while still having a wrapper the mobile breakpoint can hide as one unit. */
+.site-nav__items { display: contents; }
+
+.nav-toggle {
+    display: none;
+    background: transparent;
+    border: 0;
+    padding: 14px 20px;
+    color: var(--onPanel);
+    font: 500 14px/1 var(--font-text);
+}
+
+.nav-item { position: relative; display: flex; }
+
+.nav-item__label {
+    display: flex;
+    align-items: center;
+    background: transparent;
+    border: 0;
+    padding: 14px 20px;
+    font: 500 14px/1 var(--font-text);
+    color: var(--onPanel);
+    letter-spacing: .01em;
+    white-space: nowrap;
+}
+
+.nav-item__label:hover { color: var(--onPanel); }
+
+.nav-item:hover > .nav-item__label,
+.nav-item:focus-within > .nav-item__label { background: var(--greenDark); }
+
+/* Hover/focus driven, so no JavaScript is involved on the desktop breakpoint. */
+.nav-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    display: none;
+    grid-template-columns: repeat(var(--cols, 1), minmax(170px, auto));
+    gap: 2px 26px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-top: 0;
+    box-shadow: 0 14px 32px rgba(30, 28, 23, .16);
+    padding: 18px 22px;
+    z-index: 60;
+}
+
+.nav-item:hover > .nav-menu,
+.nav-item:focus-within > .nav-menu { display: grid; }
+
+.nav-menu__link {
+    padding: 7px 0;
+    font: 400 13px/1.35 var(--font-text);
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.nav-menu__link:hover { color: var(--highlight); }
+
+.nav-spacer { flex: 1; }
+
+/* ---------- section headings -------------------------------------------------------- */
+
+.section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 8px;
+    margin-bottom: 22px;
+}
+
+.section-head__title {
+    font: 600 15px/1 var(--font-text);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink);
+}
+
+.section-head__link {
+    margin-left: auto;
+    font: 400 var(--mono-xs)/1 var(--font-label);
+    letter-spacing: .06em;
+    color: var(--greenText);
+    text-transform: uppercase;
+}
+
+.section-head__link:hover { color: var(--highlight); }
+
+.section { padding-top: 48px; }
+/* A layout's first section in a column starts at the column's top. */
+.layout__main > .section:first-child, .layout__aside > .section:first-child { padding-top: 0; }
+.region-wide { padding-bottom: 48px; }
+
+/* Sections a layout places (templates/sets/editorial/sections.html). */
+.callout {
+    margin-top: 48px;
+    padding: 28px 32px;
+    background: var(--tint);
+    border: 1px solid var(--line);
+}
+.callout__title { margin: 0 0 8px; font-family: var(--font-display); font-size: 24px; color: var(--ink); }
+.callout__text { margin: 0 0 18px; color: var(--muted); }
+.callout__button {
+    display: inline-block;
+    padding: 10px 18px;
+    background: var(--accent);
+    color: #fff;
+    font-family: var(--font-text);
+    font-weight: 600;
+    text-decoration: none;
+}
+.callout__button:hover { background: var(--highlight); color: #fff; }
+.section-search__form { display: flex; gap: 8px; }
+.section-search__input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+}
+.section-search__button {
+    padding: 10px 16px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+.section-search__button:hover { background: var(--highlight); border-color: var(--highlight); }
+.section-follow__list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.section-follow__list a { color: var(--ink); font-family: var(--font-text); font-weight: 600; text-decoration: none; }
+.section-follow__list a:hover { color: var(--highlight); }
+
+/* Bare, centred column: the printable article view has no shell around it. */
+.page-narrow { max-width: 820px; padding-top: 40px; padding-bottom: 60px; }
+.measure-full { max-width: none; }
+
+/* ---------- advertising ------------------------------------------------------------- */
+
+/*
+ * THE CLASS NAMES ARE `partner-card` / `partner-row` AND MUST NEVER BE `ad-box` / `ad-row`.
+ *
+ * Under those names every reader running a blocker sees nothing. EasyList -- the default list in
+ * uBlock Origin, AdBlock Plus, AdGuard and Brave Shields -- carries two GENERIC cosmetic filters,
+ * `##` meaning every domain, no site-specific rule required:
+ *
+ *     ##.ad-box:not(#ad-banner):not(:empty)
+ *     ##.ad-row
+ *
+ * Both match those names verbatim, so every box on every page would be hidden with
+ * `display: none !important` from an injected stylesheet. The failure is invisible from the
+ * server: the markup renders, every booking resolves, every creative returns 200, and curl sees
+ * a page that is completely correct. It is also invisible to the render tests, which assert on
+ * the emitted HTML -- the same blind spot `make smoke` prints a Location header to avoid.
+ *
+ * Before renaming these for any reason, grep the current easylist.txt for the replacement. The
+ * paths are a separate question and were checked: no network rule matches /resources/banners/
+ * or /b/{id}, and neither can be renamed anyway -- Banner.source stores whole public paths in
+ * MongoDB and the site routes on the prefixes.
+ *
+ * This is a treadmill, not a cure: EasyList adds site-specific rules once a publisher renames.
+ */
+
+/*
+ * The number of leaderboard bookings is data, not markup, so the columns cannot be a fixed
+ * `1fr 1fr`: one booking would leave half the row empty and three would wrap into a
+ * ragged second line. `grid-auto-flow: column` gives exactly as many equal columns as there are
+ * boxes. minmax(0, 1fr) rather than 1fr because a grid item's default min-width is `auto`, which
+ * an iframe's intrinsic width would push the track past.
+ */
+.partner-row {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 18px;
+    padding-top: 18px;
+}
+
+.partner-card {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    padding: 9px;
+}
+
+.partner-card__label {
+    font: 400 var(--mono-xs)/1 var(--font-label);
+    letter-spacing: .14em;
+    color: var(--faint);
+    margin-bottom: 8px;
+}
+
+.partner-card__frame {
+    position: relative;
+    display: block;
+    width: 100%;
+    overflow: hidden;
+}
+
+.partner-card__frame iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.partner-card__frame img { display: block; width: 100%; height: auto; }
+
+/* An HTML5 booking in the studio's draft preview: its box and name, not its frame (ad-sidebar). */
+.partner-card__stand-in {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    border: 1px dashed var(--line);
+    color: var(--muted);
+    font: 500 12px/1.4 var(--font-label);
+    text-align: center;
+}
+
+/* Optional line of copy under an image creative. Muted so it reads as part of the ad box rather
+   than as editorial text next to it. */
+.partner-card__caption {
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--muted);
+}
+
+.partner-card__frame--top { height: 90px; }
+.partner-card__frame--square { height: 250px; }
+.partner-card__frame--tall { height: 600px; }
+.partner-card__frame--auto { height: auto; }
+
+/* ---------- hero -------------------------------------------------------------------- */
+
+.lead { display: block; margin-bottom: 34px; }
+
+.lead__media {
+    display: block;
+    position: relative;
+    border: 1px solid var(--line);
+    background: repeating-linear-gradient(135deg, var(--ph1) 0 8px, var(--ph2) 8px 16px);
+    overflow: hidden;
+}
+
+.lead__media img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.lead__meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 16px 0 10px;
+    font: 400 var(--mono-xs)/1 var(--font-label);
+    letter-spacing: .08em;
+}
+
+.kicker {
+    background: var(--accent);
+    color: var(--onPanel);
+    padding: 4px 7px;
+    text-transform: uppercase;
+}
+
+a.kicker:hover { background: var(--greenDark); color: var(--onPanel); }
+
+.meta-note { color: var(--faint); }
+
+.lead__title {
+    font: 600 24px/1.15 var(--font-display);
+    letter-spacing: -.01em;
+    text-wrap: pretty;
+    /* max-width: 24ch;*/
+    color: var(--ink);
+}
+
+.lead__title a { color: inherit; }
+.lead__title a:hover { color: var(--highlight); }
+
+.lead__dek {
+    margin-top: 14px;
+    font: 400 17px/1.6 var(--font-display);
+    color: var(--muted);
+    max-width: 62ch;
+    text-wrap: pretty;
+}
+
+/* ---------- cards ------------------------------------------------------------------- */
+
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 28px;
+}
+
+.card-grid--four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+.card { display: flex; flex-direction: column; min-width: 0; }
+
+.card__media {
+    display: block;
+    border: 1px solid var(--line);
+    background: repeating-linear-gradient(135deg, var(--ph1) 0 8px, var(--ph2) 8px 16px);
+    overflow: hidden;
+}
+
+.card__media img { display: block; width: 100%; height: auto; }
+
+.card__meta {
+    display: flex;
+    gap: 9px;
+    flex-wrap: wrap;
+    margin: 12px 0 8px;
+    font: 400 var(--mono-xs)/1 var(--font-label);
+    letter-spacing: .08em;
+    color: var(--highlight);
+}
+
+.card__title {
+    font: 600 20px/1.22 var(--font-display);
+    text-wrap: pretty;
+    color: var(--ink);
+}
+
+.card__title a { color: inherit; }
+.card__title a:hover { color: var(--highlight); }
+
+.card__byline {
+    margin-top: 8px;
+    font: 400 13px/1.55 var(--font-text);
+    color: var(--muted2);
+}
+
+.card__title--compact { font-size: 16px; line-height: 1.28; }
+
+/* ---------- list rows --------------------------------------------------------------- */
+
+.list-row {
+    display: grid;
+    grid-template-columns: 160px minmax(0, 1fr);
+    gap: 22px;
+    align-items: start;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--line);
+    transition: background-color .12s ease;
+}
+
+.list-row:hover { background: var(--hover); }
+
+.list-row__thumb {
+    display: block;
+    border: 1px solid var(--line);
+    background: repeating-linear-gradient(135deg, var(--ph1) 0 8px, var(--ph2) 8px 16px);
+    overflow: hidden;
+}
+
+.list-row__thumb img { display: block; width: 100%; height: auto; }
+
+/* The placeholder an imageless article gets, so the text column does not jump. */
+.list-row__thumb--empty { aspect-ratio: 4 / 3; }
+
+.list-row__body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+.list-row__meta {
+    font: 400 var(--mono-xs)/1.5 var(--font-label);
+    letter-spacing: .08em;
+    color: var(--highlight);
+}
+
+.list-row__title { font: 600 23px/1.22 var(--font-display); color: var(--ink); text-wrap: pretty; }
+.list-row__title a { color: inherit; }
+.list-row__title a:hover { color: var(--highlight); }
+
+.list-row__author { font: 400 12px/1.5 var(--font-text); color: var(--muted2); }
+
+/* ---------- stacked widget lists (verticals, most read) ----------------------------- */
+
+.stack { display: flex; flex-direction: column; }
+
+.stack__item {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.stack__item:first-child { padding-top: 0; }
+
+.stack__media {
+    display: block;
+    border: 1px solid var(--line);
+    background: repeating-linear-gradient(135deg, var(--ph1) 0 8px, var(--ph2) 8px 16px);
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.stack__media img { display: block; width: 100%; height: auto; }
+
+.stack__title { font: 600 17px/1.28 var(--font-display); color: var(--ink); text-wrap: pretty; }
+.stack__title a { color: inherit; }
+.stack__title a:hover { color: var(--highlight); }
+
+.stack__meta { font: 400 var(--mono-xs)/1.4 var(--font-label); color: var(--faint); }
+
+/* Most read: a bordered panel with a counter instead of thumbnails. */
+.ranked { border: 1px solid var(--line); background: var(--surface); }
+
+.ranked__item {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 12px;
+    align-items: baseline;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+}
+
+.ranked__item:last-child { border-bottom: 0; }
+.ranked__item:hover { background: var(--hover); }
+
+.ranked__no {
+    font: 600 18px/1 var(--font-display);
+    color: var(--greenText);
+}
+
+.ranked__title { font: 600 15px/1.3 var(--font-display); color: var(--ink); text-wrap: pretty; }
+.ranked__title a { color: inherit; }
+.ranked__title a:hover { color: var(--highlight); }
+
+.ranked__meta { font: 400 var(--mono-xs)/1.4 var(--font-label); color: var(--faint); margin-top: 5px; }
+
+/* ---------- buttons, chips, pager --------------------------------------------------- */
+
+.button-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    background: transparent;
+    border: 1px solid var(--line);
+    padding: 12px 18px;
+    font: 500 13px/1 var(--font-text);
+    color: var(--greenText);
+}
+
+.button-ghost:hover { background: var(--hover); border-color: var(--greenText); color: var(--greenText); }
+
+.button-ghost--block { width: 100%; margin-top: 18px; padding: 13px; }
+
+.button-ghost--small {
+    padding: 8px 11px;
+    font: 400 var(--mono-xs)/1 var(--font-label);
+    letter-spacing: .05em;
+    color: var(--muted);
+    text-transform: uppercase;
+}
+
+.button-ghost--small:hover { border-color: var(--greenText); color: var(--greenText); }
+
+/* Keyword tags. The site has no tag filtering, so only the resting style exists here. */
+.chip {
+    display: inline-block;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    padding: 8px 13px;
+    font: 400 var(--mono-sm)/1 var(--font-label);
+    letter-spacing: .04em;
+}
+
+.chip:hover { border-color: var(--greenText); color: var(--greenText); }
+
+.pager {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 26px;
+}
+
+.pager__item {
+    background: transparent;
+    border: 1px solid var(--line);
+    padding: 10px 14px;
+    font: 400 var(--mono-sm)/1 var(--font-label);
+    color: var(--muted);
+}
+
+.pager__item:hover { border-color: var(--greenText); color: var(--greenText); }
+
+.pager__item--current {
+    background: var(--panel);
+    border-color: var(--panel);
+    color: var(--onPanel);
+}
+
+.pager__item--current:hover { color: var(--onPanel); }
+
+.pager__count {
+    font: 400 var(--mono-sm)/1 var(--font-label);
+    color: var(--faint);
+    margin-left: auto;
+}
+
+/* ---------- page headers (list) ----------------------------------------------------- */
+
+.page-head {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 20px;
+    margin-bottom: 22px;
+}
+
+.page-head__kicker {
+    font: 400 var(--mono-xs)/1 var(--font-label);
+    letter-spacing: .1em;
+    color: var(--faint);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+
+.page-head__title {
+    font: 600 44px/1.06 var(--font-display);
+    letter-spacing: -.02em;
+    color: var(--ink);
+    text-wrap: pretty;
+}
+
+/* ---------- article ----------------------------------------------------------------- */
+
+.breadcrumb {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    font: 400 var(--mono-xs)/1.5 var(--font-label);
+    letter-spacing: .06em;
+    color: var(--faint);
+    margin-bottom: 20px;
+    text-transform: uppercase;
+}
+
+.breadcrumb a { color: var(--faint); }
+.breadcrumb a:hover { color: var(--highlight); }
+
+.article-title {
+    font: 600 24px/1.1 var(--font-display);
+    letter-spacing: -.015em;
+    text-wrap: pretty;
+    /* max-width: 26ch; */
+    color: var(--ink);
+}
+
+.article-dek {
+    margin-top: 18px;
+    font: 400 19px/1.55 var(--font-display);
+    color: var(--muted);
+    max-width: 62ch;
+    text-wrap: pretty;
+}
+
+.byline {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+    padding: 16px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+}
+
+.byline__who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.byline__name { font: 500 14px/1.4 var(--font-text); color: var(--ink); }
+.byline__meta { font: 400 var(--mono-xs)/1.4 var(--font-label); color: var(--faint); }
+.byline__actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-left: auto; }
+
+.figure { margin: 28px 0; }
+
+.figure__frame {
+    border: 1px solid var(--line);
+    background: repeating-linear-gradient(135deg, var(--ph1) 0 8px, var(--ph2) 8px 16px);
+    overflow: hidden;
+}
+
+.figure__frame img { display: block; width: 100%; height: auto; }
+
+.figure__caption {
+    margin-top: 10px;
+    font: 400 var(--mono-sm)/1.5 var(--font-label);
+    color: var(--faint);
+}
+
+/* The article's images: a scroll-snapped strip, no JavaScript.
+
+   grid-auto-columns is 92%, not 100%, so the next image visibly peeks. Without the controls
+   below a reader has no other cue that the strip scrolls -- and those controls are injected
+   by site.js, so this state is exactly what no JavaScript gets. A single image simply sits
+   at 92% and the strip never scrolls. */
+.gallery {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 92%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    background: var(--ph1);
+}
+
+.gallery__item { margin: 0; scroll-snap-align: start; }
+.gallery__item img { display: block; width: 100%; height: auto; }
+
+/* A gallery item's caption, where one is rendered. */
+.gallery__item figcaption { padding-top: 8px; }
+
+/* ---------- carousel ---------------------------------------------------------------- */
+
+/* The controls over the strip above. site.js builds this whole subtree at runtime and adds
+   .is-carousel; none of it is in the template, and none of it hides a slide -- see the
+   initGallery comment in site.js for why both of those are deliberate.
+
+   Structure, so the offsets below make sense:
+
+       .carousel > .carousel__frame > .gallery + the two arrows
+                 > .carousel__dots
+
+   The arrows are centred on the frame, not on .carousel, because the dots row sits inside
+   .carousel and would push a top:50% off the image by half its height. */
+.carousel__frame { position: relative; }
+
+/* With arrows and dots present the 92 % peek has done its job -- the controls are now the
+   cue that the strip scrolls -- so a slide fills the frame.
+
+   The side padding has to go with it. Padding is inside the scrollport, so a 100 % column
+   leaves exactly that much of the next slide showing through on either side: a 10px dark
+   sliver down the edge of every image. Top and bottom keep theirs.
+
+   The scrollbar goes too, and only here: it was the strip's one visible affordance, and the
+   arrows and dots have replaced it. Nothing it did is lost -- swipe, drag, trackpad and the
+   arrow keys all still scroll, and all of them still move the controls. */
+.gallery.is-carousel {
+    grid-auto-columns: 100%;
+    padding-left: 0;
+    padding-right: 0;
+    scrollbar-width: none;
+}
+
+.gallery.is-carousel::-webkit-scrollbar { display: none; }
+
+.carousel__nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 38px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font: 400 22px/1 var(--font-text);
+    cursor: pointer;
+    transition: color .15s, border-color .15s;
+}
+
+.carousel__nav:hover { border-color: var(--greenText); color: var(--greenText); }
+.carousel__nav--prev { left: 14px; }
+.carousel__nav--next { right: 14px; }
+
+/* At the ends, not hidden: an arrow that vanishes shifts the layout under the pointer. */
+.carousel__nav[disabled] { opacity: .3; cursor: default; }
+.carousel__nav[disabled]:hover { border-color: var(--line); color: var(--muted); }
+
+.carousel__dots {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    margin-top: 10px;
+    min-height: 22px;
+}
+
+/* The mark is 9px but the button is 22px: a 9px tap target is not one. */
+.carousel__dot {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+
+.carousel__dot::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    border: 1px solid var(--faint);
+    transition: background .15s, border-color .15s;
+}
+
+.carousel__dot:hover::before { border-color: var(--greenText); }
+.carousel__dot[aria-current="true"]::before { background: var(--panel); border-color: var(--panel); }
+
+/* Shown instead of the dots once there are more images than dots can carry. */
+.carousel__count { font: 400 var(--mono-sm)/1 var(--font-label); color: var(--faint); }
+
+.article-body {
+    margin-top: 28px;
+    max-width: 68ch;
+    font: 400 18px/1.72 var(--font-display);
+    color: var(--ink2);
+    overflow-wrap: break-word;
+}
+
+.article-body p { margin: 0 0 22px; }
+.article-body h1, .article-body h2, .article-body h3, .article-body h4 {
+    font-family: var(--font-display);
+    line-height: 1.24;
+    margin: 32px 0 14px;
+    color: var(--ink);
+}
+.article-body h1 { font-size: 30px; }
+.article-body h2 { font-size: 26px; }
+.article-body h3 { font-size: 22px; }
+.article-body h4 { font-size: 19px; }
+.article-body ul, .article-body ol { margin: 0 0 22px; padding-left: 1.4em; list-style: revert; }
+.article-body li { margin-bottom: 8px; }
+.article-body a { color: var(--greenText); text-decoration: underline; text-underline-offset: 2px; }
+.article-body a:hover { color: var(--highlight); }
+
+.article-body blockquote {
+    margin: 30px 0;
+    padding: 22px 26px;
+    background: var(--tint);
+    border-left: 3px solid var(--greenText);
+    font: 500 21px/1.45 var(--font-display);
+    color: var(--ink);
+}
+
+/* --- guards for older markup. Do not remove: article bodies and standing pages may hold
+       hand-written or imported HTML with inline widths, <font>, <style> blocks, Word markup
+       and tables. --- */
+.article-body img,
+.article-body video,
+.article-body iframe,
+.article-body embed,
+.article-body object {
+    max-width: 100%;
+    height: auto;
+}
+
+.article-body table {
+    max-width: 100%;
+    display: block;
+    overflow-x: auto;
+    border-collapse: collapse;
+}
+
+.article-body td, .article-body th { padding: 6px 10px; border: 1px solid var(--line); }
+.article-body pre { overflow-x: auto; }
+
+/* Such bodies often hardcode near-black text, which is unreadable on the night surface.
+   The inline colour wins over a plain rule, so this is scoped and marked important --
+   the one place in this file where that is justified. */
+.night .article-body [style*="color"],
+.night .article-body font[color] { color: var(--ink2) !important; }
+
+.night .article-body [style*="background"] { background-color: transparent !important; }
+
+.tags-block { margin-top: 34px; padding-top: 20px; border-top: 2px solid var(--ink); }
+
+.tags-block__title {
+    font: 600 15px/1 var(--font-text);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+}
+
+.tags { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---------- video ------------------------------------------------------------------- */
+
+/* The raw YouTube iframes injected by th:utext are made responsive here. The iframe carries
+   its own width/height attributes, so both are reset. */
+.video-container {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    overflow: hidden;
+}
+
+.video-container iframe,
+.video-container object,
+.video-container embed,
+.video-container video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.video-panel {
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 40px 0 44px;
+    margin-top: 48px;
+}
+
+/* ---------- footer ------------------------------------------------------------------ */
+
+.site-footer {
+    margin-top: 56px;
+    background: var(--panel);
+    color: var(--onPanelMuted);
+}
+
+.site-footer__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.4fr;
+    gap: 40px;
+    padding: 44px 0 30px;
+}
+
+.site-footer__label {
+    display: block;
+    font: 400 var(--mono-xs)/1 var(--font-label);
+    letter-spacing: .12em;
+    color: var(--panelAccent);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+}
+
+.site-footer__col { display: flex; flex-direction: column; gap: 11px; }
+.site-footer__text { font: 400 14px/1.75 var(--font-text); color: var(--onPanelMuted); }
+.site-footer__col a { color: var(--onPanelMuted); font: 400 13px/1.4 var(--font-text); }
+.site-footer__col a:hover { color: var(--onPanel); }
+
+.site-footer__social { display: flex; gap: 8px; margin-top: 2px; flex-wrap: wrap; }
+
+.site-footer__social a {
+    border: 1px solid var(--onPanelLine);
+    padding: 7px 11px;
+    font: 400 var(--mono-xs)/1 var(--font-label);
+    letter-spacing: .05em;
+    color: var(--onPanelMuted);
+}
+
+.site-footer__social a:hover { color: var(--onPanel); border-color: var(--onPanelMuted); }
+
+.site-footer__bottom { border-top: 1px solid var(--onPanelLine); }
+
+.site-footer__bottom-inner {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 16px 0;
+    font: 400 var(--mono-xs)/1.5 var(--font-label);
+    letter-spacing: .05em;
+    color: var(--onPanelFaint);
+}
+
+.site-footer__bottom-inner a { color: var(--onPanelFaint); }
+.site-footer__bottom-inner a:hover { color: var(--onPanel); }
+
+/* ---------- misc -------------------------------------------------------------------- */
+
+.empty-note {
+    padding: 40px 0;
+    font: 400 15px/1.6 var(--font-text);
+    color: var(--faint);
+}
+
+/* ---------- the search page --------------------------------------------------------- */
+
+/*
+ * The form on /search, deliberately NOT a reuse of .site-search in the navbar. That one is a
+ * borderless input inside a bordered strip with no submit control -- it is submitted by Enter
+ * alone, which is right for a compact toolbar and wrong for the page whose whole purpose is
+ * this form. This one carries a visible button, because a search page that can only be
+ * submitted by a key press is the same class of thing as an arrow that needs a script.
+ */
+.search-form {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 30px;
+}
+
+.search-form__input {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    padding: 12px 14px;
+    font: 400 15px/1.4 var(--font-text);
+    color: var(--ink);
+    outline: none;
+}
+
+.search-form__input:focus { border-color: var(--ink); }
+.search-form__input::placeholder { color: var(--faint); }
+
+.search-form__button {
+    flex-shrink: 0;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--bg);
+    padding: 12px 22px;
+    font: 400 13px/1.4 var(--font-text);
+    letter-spacing: .04em;
+    cursor: pointer;
+}
+
+.search-form__button:hover { opacity: .85; }
+
+/*
+ * Google injects its own markup into .gcse-* and ships its own stylesheet with it. Only the
+ * measure is constrained here -- restyling the widget's internals means chasing whatever Google
+ * renders this month, which is the coupling `top/banner.css` is vendored with its bug intact to
+ * avoid.
+ */
+.gcse-searchbox,
+.gcse-searchresults { max-width: 100%; }
+
+.banner-inline { margin: 26px 0; text-align: center; }
+.banner-inline.mobile { display: none; }
+
+/* ---------- responsive -------------------------------------------------------------- */
+
+@media (max-width: 1080px) {
+    :root { --gutter: 24px; }
+
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    .layout__aside { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .card-grid--four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .site-footer__grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 860px) {
+    :root { --gutter: 18px; }
+
+    .masthead { flex-direction: column; align-items: flex-start; gap: 14px; }
+    .masthead__side { align-items: stretch; }
+    .masthead__tagline { text-align: left; }
+    .masthead__tools { flex-wrap: wrap; }
+    .site-search { max-width: none; }
+
+    .nav-toggle { display: block; }
+    .site-nav__inner { flex-wrap: wrap; }
+    .site-nav__items { display: none; width: 100%; flex-direction: column; }
+    .site-nav.is-open .site-nav__items { display: flex; }
+    .site-nav__items .nav-item { display: block; width: 100%; }
+    .site-nav__items .nav-item__label { width: 100%; text-align: left; }
+    .nav-spacer { display: none; }
+
+    .nav-menu {
+        position: static;
+        display: grid;
+        grid-template-columns: 1fr;
+        border: 0;
+        border-top: 1px solid var(--onPanelLine);
+        box-shadow: none;
+        background: var(--greenDark);
+        padding: 6px 20px 14px;
+    }
+
+    .nav-menu__link { color: var(--onPanelMuted); white-space: normal; }
+    .nav-menu__link:hover { color: var(--onPanel); }
+
+    /* Stack them. `grid-template-columns: 1fr` does not do this -- the row sizes itself with
+       grid-auto-flow, so the flow direction is what has to change. */
+    .partner-row { grid-auto-flow: row; }
+    .card-grid, .card-grid--four, .card-grid--two { grid-template-columns: 1fr; }
+
+    .list-row { grid-template-columns: 110px minmax(0, 1fr); gap: 16px; }
+
+    .lead__title { font-size: 20px; max-width: none; word-break: break-word }
+    .article-title { font-size: 30px; max-width: none; }
+    .page-head__title { font-size: 32px; }
+    .article-body { font-size: 17px; }
+
+    .site-footer__grid { grid-template-columns: 1fr; gap: 28px; }
+
+    /* The arrows sit over the image, and the image is now the width of the phone. */
+    .carousel__nav { width: 32px; height: 40px; font-size: 19px; }
+    .carousel__nav--prev { left: 8px; }
+    .carousel__nav--next { right: 8px; }
+
+    .banner-inline.desktop { display: none; }
+    .banner-inline.mobile { display: block; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* ---------------------------------------------------------------- standing pages */
+
+/*
+ * The notices on a page shown in a language it was not written in.
+ *
+ * Two variants, never both at once -- PageService picks which applies, because a reader shown two
+ * overlapping banners learns to skip both. The legal one is warmer-toned because it states which
+ * text governs, rather than apologising for a missing translation. It uses --highlight, the palette's
+ * one warm accent, so it stays inside the design system instead of introducing a fifth colour.
+ */
+.page-notice {
+    margin: 0 0 1.25rem;
+    padding: .7rem .9rem;
+    border-left: 3px solid var(--line);
+    background: var(--tint);
+    border-radius: 4px;
+    font-size: .92rem;
+    line-height: 1.5;
+    color: var(--muted);
+    font-family: var(--font-text);
+}
+
+.page-notice--legal {
+    border-left-color: var(--highlight);
+    background: var(--ph2);
+    color: var(--ink2);
+}
+
+/* The page's own language switcher: only the languages it is actually written in. */
+.page-langs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem .9rem;
+    align-items: center;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+    font-family: var(--font-text);
+    font-size: .9rem;
+}
+
+.page-langs__item { color: var(--greenText); text-decoration: none; }
+.page-langs__item:hover { text-decoration: underline; }
+.page-langs__current { font-weight: 600; color: var(--ink); }
+
+/* ---------- error page ---------------------------------------------------------------
+ *
+ * error.html is one column, so it cannot use .layout: that grid reserves a 320px aside, and an
+ * error page carries no ad column -- nobody bought a booking on one. The padding-top is what
+ * .layout gives every other page below the masthead, restated here rather than inherited.
+ */
+.error-page {
+    padding-top: 26px;
+    padding-bottom: 3.5rem;
+    max-width: 42rem;
+}
+
+.error-page__text {
+    font-family: var(--font-text);
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--muted);
+    margin: 0 0 .9rem;
+}
+
+.error-page__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.4rem;
+    margin: 1.6rem 0 0;
+    font-family: var(--font-text);
+    font-size: .95rem;
+}
+
+.error-page__actions a { color: var(--greenText); text-decoration: none; }
+.error-page__actions a:hover { text-decoration: underline; }
+
+/* ---------- link page (/social) ----------------------------------------------------- */
+
+/*
+ * The link-in-bio page social.html renders. One narrow column, sized for the in-app browser a
+ * reader arrives in from Instagram or TikTok, on the same tokens as the rest of the site -- so
+ * .night carries it with no rules of its own beyond the logo swap.
+ *
+ * Every class starts with linkpage. Not social-, share- or follow-: Fanboy's Social list hides
+ * generic names like .bio-social on every domain, and a reader running it would get an empty
+ * page. Checked against EasyList, EasyPrivacy and both Fanboy lists; check again before renaming.
+ */
+.linkpage-body {
+    min-height: 100vh;
+    background:
+        radial-gradient(120% 60% at 50% 0%, var(--tint) 0%, transparent 70%),
+        var(--bg);
+}
+
+.linkpage-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.linkpage {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: max(40px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
+.linkpage__profile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+}
+
+.linkpage__avatar {
+    width: 104px;
+    height: 104px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--surface);
+    box-shadow: 0 0 0 1px var(--line);
+    background: var(--ph1);
+}
+
+.linkpage__brand { display: block; margin-bottom: 4px; }
+.linkpage__brand img { display: block; width: min(280px, 78vw); height: auto; }
+.linkpage__brand .linkpage__brand-dark { display: none; }
+html.night .linkpage__brand .linkpage__brand-light { display: none; }
+html.night .linkpage__brand .linkpage__brand-dark { display: block; }
+
+.linkpage__name {
+    margin: 4px 0 0;
+    font: 600 1.6rem/1.2 var(--font-display);
+    color: var(--ink);
+}
+
+.linkpage__bio {
+    margin: 0;
+    max-width: 30rem;
+    font: 400 .98rem/1.55 var(--font-text);
+    color: var(--muted);
+    white-space: pre-line;
+}
+
+.linkpage__icons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.linkpage__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    color: var(--greenText);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    transition: background-color .15s, border-color .15s, transform .15s;
+}
+
+.linkpage__icon svg { width: 22px; height: 22px; }
+.linkpage__icon:hover { background: var(--hover); border-color: var(--greenText); transform: translateY(-1px); }
+
+.linkpage__links { display: flex; flex-direction: column; gap: 12px; }
+
+.linkpage__link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 58px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    text-decoration: none;
+    font: 500 1rem/1.3 var(--font-text);
+    transition: background-color .15s, border-color .15s, transform .15s;
+}
+
+.linkpage__link:hover { background: var(--hover); border-color: var(--greenText); transform: translateY(-1px); }
+.linkpage__link:active, .linkpage__icon:active { transform: none; }
+
+.linkpage__link-icon { flex: none; width: 24px; height: 24px; color: var(--greenText); }
+.linkpage__link-text { flex: 1; text-align: center; overflow-wrap: anywhere; }
+.linkpage__link-arrow { flex: none; width: 18px; height: 18px; color: var(--faint); }
+/* With no icon the text would sit off-centre against the arrow; a matching gap balances it. */
+.linkpage__link:not(:has(.linkpage__link-icon, .linkpage__link-thumb))::before { content: ""; flex: none; width: 18px; }
+
+/* An article link: its cover at the left, the title beside it reading like a card, not a label --
+   the same card the latest-articles block draws below it: same padding and gap here, and the
+   cover sized by the .linkpage__thumb rule further down, which both share. */
+.linkpage__link--thumb { padding: 8px 16px 8px 8px; gap: 14px; }
+.linkpage__link--thumb .linkpage__link-text { text-align: left; }
+
+.linkpage__section { display: flex; flex-direction: column; gap: 10px; }
+
+.linkpage__heading {
+    margin: 0 0 2px;
+    font: 500 var(--mono-sm)/1.3 var(--font-label);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--faint);
+    text-align: center;
+}
+
+.linkpage__article {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    text-decoration: none;
+    transition: background-color .15s, border-color .15s;
+}
+
+.linkpage__article:hover { background: var(--hover); border-color: var(--greenText); }
+
+/* One rule for both covers on the page -- a latest-articles tile and a link to an article -- so the
+   two cannot drift to different sizes. */
+.linkpage__thumb,
+.linkpage__link-thumb {
+    flex: none;
+    width: 96px;
+    height: 64px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: var(--ph1);
+}
+
+.linkpage__thumb--empty { display: inline-flex; align-items: center; justify-content: center; color: var(--faint); }
+.linkpage__thumb--empty svg { width: 26px; height: 26px; }
+
+.linkpage__article-title { font: 500 .98rem/1.35 var(--font-display); }
+
+.linkpage__langs {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 14px;
+    font: 400 var(--mono-sm)/1.4 var(--font-label);
+}
+
+.linkpage__lang { color: var(--muted2); text-decoration: none; }
+.linkpage__lang:hover { color: var(--greenText); text-decoration: underline; }
+.linkpage__lang[aria-current="page"] { color: var(--greenText); font-weight: 500; }
+
+.linkpage__foot { text-align: center; font: 400 var(--mono-xs)/1.4 var(--font-label); }
+.linkpage__foot a { color: var(--faint); text-decoration: none; }
+.linkpage__foot a:hover { color: var(--greenText); }
+
+@media (prefers-reduced-motion: reduce) {
+    .linkpage__link, .linkpage__icon, .linkpage__article { transition: none; }
+    .linkpage__link:hover, .linkpage__icon:hover { transform: none; }
+}

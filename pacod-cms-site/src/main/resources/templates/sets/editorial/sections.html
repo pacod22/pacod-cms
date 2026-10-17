@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*
+  The editorial set's sections: one fragment per section type it implements, named as
+  SectionType.fragment() names it, each taking (s, lang) -- s a RenderedSection.
+
+  Fragments only read. PageComposer has looked everything up already (an article list's slot is
+  s.data), so a fragment never queries and never fails for want of data. Every one of these is
+  rendered by the page templates' region loops:
+      <th:block th:each="s : ${regions.get('main')}"> ... ~{sections :: ${s.fragment}(...)} ...
+  The primary section is not here: each page template renders its own content in its place.
+
+  An inclusion runs before th:case/th:if on the same element, hence every switch wraps its
+  th:replace in a block of its own.
+*/-->
+
+<!--/* A region without content of its own -- every section in it rendered by type. A page with
+       content of its own (its primary section) loops over its main region itself, rendering that
+       content where the primary section stands. */-->
+<th:block th:fragment="region(sections, lang)">
+    <th:block th:each="s : ${sections}">
+        <th:block th:unless="${s.primary}">
+            <th:block th:replace="~{sections :: ${s.fragment}(s=${s}, lang=${lang})}"></th:block>
+        </th:block>
+    </th:block>
+</th:block>
+
+<!--/* An article list: one of the widgets, by style. Its heading (the slot's name) is the section's
+       own, else the category's name, else "Most read" for that source -- decided by PageComposer. */-->
+<th:block th:fragment="articleList(s, lang)">
+    <section class="section section--list" th:with="named=${s.data}" th:if="${!s.data.isEmpty()}">
+        <th:block th:switch="${s.setting('style')}">
+            <th:block th:case="'hero'">
+                <div class="section-head" th:if="${!#strings.isEmpty(named.name)}">
+                    <h2 class="section-head__title" th:text="${named.name}">Heading</h2>
+                </div>
+                <th:block th:replace="~{fragments/widgets :: hero(${named}, ${lang})}"></th:block>
+            </th:block>
+            <th:block th:case="'list'">
+                <th:block th:replace="~{fragments/widgets :: vertical(${named}, ${lang})}"></th:block>
+            </th:block>
+            <th:block th:case="'ranked'">
+                <th:block th:replace="~{fragments/widgets :: ranked(${named}, ${lang})}"></th:block>
+            </th:block>
+            <th:block th:case="'video'">
+                <div class="section-head" th:if="${!#strings.isEmpty(named.name)}">
+                    <h2 class="section-head__title" th:text="${named.name}">Video</h2>
+                    <a class="section-head__link" th:if="${named.categoryId != null}"
+                       th:href="@{/list/{id}(id=${named.categoryId}, lang=${lang})}"
+                       th:text="#{list.showAll}">All articles</a>
+                </div>
+                <th:block th:replace="~{fragments/widgets :: videos(${named}, ${lang})}"></th:block>
+            </th:block>
+            <th:block th:case="*">
+                <th:block th:replace="~{fragments/widgets :: cards(${named}, ${lang}, true)}"></th:block>
+            </th:block>
+        </th:block>
+    </section>
+</th:block>
+
+<!--/* Text the website's owner wrote, as trusted as an article body; .article-body carries the
+       guards for pasted markup. */-->
+<th:block th:fragment="richText(s, lang)">
+    <section class="section section--text">
+        <div class="section-head" th:if="${s.setting('heading') != null}">
+            <h2 class="section-head__title" th:text="${s.setting('heading')}">Heading</h2>
+        </div>
+        <div class="article-body" th:utext="${s.setting('html')}">Text</div>
+    </section>
+</th:block>
+
+<th:block th:fragment="callToAction(s, lang)">
+    <section class="section callout">
+        <h2 class="callout__title" th:text="${s.setting('heading')}">Heading</h2>
+        <p class="callout__text" th:if="${s.setting('text') != null}" th:text="${s.setting('text')}">Text</p>
+        <a class="callout__button" th:href="${s.setting('url')}" th:text="${s.setting('label')}">Label</a>
+    </section>
+</th:block>
+
+<!--/* Not the navbar's form: its id and the Google button belong to the navbar alone. */-->
+<th:block th:fragment="searchBox(s, lang)">
+    <section class="section section-search">
+        <div class="section-head" th:if="${s.setting('heading') != null}">
+            <h2 class="section-head__title" th:text="${s.setting('heading')}">Heading</h2>
+        </div>
+        <form class="section-search__form" action="/search" method="get" role="search">
+            <input type="hidden" name="lang" th:value="${lang}">
+            <input class="section-search__input" type="search" name="q" th:placeholder="#{search.placeholder}"
+                   th:aria-label="#{nav.search}">
+            <button class="section-search__button" type="submit" th:text="#{search.submit}">Search</button>
+        </form>
+    </section>
+</th:block>
+
+<th:block th:fragment="socialLinks(s, lang)">
+    <section class="section section-follow" th:if="${site != null and !site.socialProfiles().isEmpty()}">
+        <div class="section-head">
+            <h2 class="section-head__title" th:text="${s.setting('heading') ?: #messages.msg('section.follow')}">Follow</h2>
+        </div>
+        <ul class="section-follow__list">
+            <li th:each="profile : ${site.socialProfiles()}">
+                <a th:href="${profile.url}" th:text="${profile.network}" target="_blank" rel="noopener">Network</a>
+            </li>
+        </ul>
+    </section>
+</th:block>
+
+</body>
+</html>

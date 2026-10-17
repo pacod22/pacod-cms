@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  Google Custom Search: GET /search-google.
+
+  THE CSE SCRIPT BELOW IS WHY THIS IS A TEMPLATE AND NOT A `Page` DOCUMENT, and moving it into
+  one would break search silently. page.html renders a stored body with th:utext, so the tag
+  would reach the browser and run -- but the studio edits page bodies through TinyMCE, whose
+  `xss_sanitization` option defaults to on and which mgmt.js does not override, so DOMPurify
+  strips <script> on save. Page carries no `previousText` the way Article does, so the first
+  operator to open that page and press Save would delete Google search outright, with no
+  undo and a 200 response. Here the markup has no editor anywhere near it.
+
+  The `cx` is the website's Programmable Search engine id, from its settings; without one this
+  route redirects to /search. It is a public identifier -- it travels in the script URL to every
+  reader -- not a credential.
+
+  This screen searches a DIFFERENT INDEX from /search: Google's crawl of the site, which reaches
+  the article PDFs and anything the Mongo regex query cannot see. That is why both exist and why
+  the navbar carries two controls rather than one.
+*/-->
+<head th:replace="~{fragments/head :: head(
+        lang=${lang},
+        pageTitle=${#messages.msg('search.google.title') + ' | ' + site.name(lang)},
+        pageDesc=${site.description(lang)},
+        ogUrl=${site.url('/search-google')},
+        ogImagePath=null,
+        ogImageType=null)}"></head>
+
+<body>
+<th:block th:replace="~{fragments/scripts :: gtmNoscript}"></th:block>
+
+<th:block th:replace="~{fragments/navbar :: navbar(${lang})}"></th:block>
+
+<div class="shell">
+    <th:block th:replace="~{fragments/ad-sidebar :: topBanners(${topBanners})}"></th:block>
+</div>
+
+<div class="shell layout">
+    <main class="layout__main">
+
+        <div class="page-head">
+            <h1 class="page-head__title"
+                th:text="#{search.google.title}">Search with Google</h1>
+        </div>
+
+        <!--/* The one place on the public site that needs a script to mean anything, and it is
+               stated rather than hidden: with scripting off these two divs stay empty, so the
+               note below points at /search, which does not. */-->
+        <script async th:src="@{https://cse.google.com/cse.js(cx=${site.googleCseCx()})}"></script>
+        <div class="gcse-searchbox"></div>
+        <div class="gcse-searchresults" data-defaultToImageSearch="true"></div>
+
+        <noscript>
+            <div class="empty-note">
+                <span th:text="#{search.google.noscript}">Google search needs JavaScript. The site search does not:</span>
+                <!--/* Carries the term across, so a reader who typed a word, clicked G and has
+                       scripting off is not asked to type it again. */-->
+                <a th:href="@{/search(q=${q}, lang=${lang})}"
+                   th:text="#{search.google.fallback}">search the archive</a>
+            </div>
+        </noscript>
+
+    </main>
+
+    <aside class="layout__aside">
+        <th:block th:replace="~{fragments/ad-sidebar :: adSidebar(${sidebarBanners})}"></th:block>
+    </aside>
+</div>
+
+
+<th:block th:replace="~{fragments/footer :: footer(${lang})}"></th:block>
+<th:block th:replace="~{fragments/scripts :: siteScripts}"></th:block>
+</body>
+</html>

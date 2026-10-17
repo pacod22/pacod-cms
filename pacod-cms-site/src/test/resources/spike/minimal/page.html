@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body class="minimal">
+<th:block th:each="s : ${sections}">
+    <th:block th:replace="~{${s.template} :: ${s.fragment}(settings=${s.settings})}"></th:block>
+</th:block>
+</body>
+</html>

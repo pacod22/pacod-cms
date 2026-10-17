@@ -1,0 +1,105 @@
+# What each pacod-cms role may do, through pacod-id's rules engine. Format:
+# ../engine-vectors/README.md. The manifest is pacod-cms-core/src/main/resources/authz/cms.yaml.
+manifests: [cms]
+cases:
+  - name: a platform admin does everything, everywhere
+    subject: { kind: user, bindings: [{ role: cms.platform_admin, path: [platform] }] }
+    checks:
+      - { allowed: cms.platform.manage, at: [platform], expect: true }
+      - { allowed: cms.website.manage, at: [platform, "organisation:o1", "cms.website:a"], expect: true }
+      - { can_grant: cms.platform_admin, at: [platform], expect: ok }
+      - { can_grant: cms.provisioner, at: [platform], expect: ok }
+
+  - name: the provisioner makes organisation admins and nothing else
+    subject: { kind: service, bindings: [{ role: cms.provisioner, path: [platform] }] }
+    checks:
+      - { can_grant: cms.org_admin, at: [platform, "organisation:o1"], expect: ok }
+      - { can_grant: cms.platform_admin, at: [platform], expect: not_permitted }
+      - { can_grant: cms.provisioner, at: [platform], expect: not_permitted }
+      - { allowed: cms.content.write, at: [platform, "organisation:o1", "cms.website:a"], expect: false }
+      - { allowed: cms.website.create, at: [platform, "organisation:o1"], expect: false }
+      - { allowed: cms.org.read, at: [platform, "organisation:o1"], expect: false }
+
+  - name: an organisation admin runs its organisation and every website in it, nothing else
+    subject: { kind: user, bindings: [{ role: cms.org_admin, path: [platform, "organisation:o1"] }] }
+    checks:
+      - { allowed: cms.website.create, at: [platform, "organisation:o1"], expect: true }
+      - { allowed: cms.content.publish, at: [platform, "organisation:o1", "cms.website:a"], expect: true }
+      - { allowed: cms.design.publish, at: [platform, "organisation:o1", "cms.website:a"], expect: true }
+      - { allowed: cms.ai.use, at: [platform, "organisation:o1", "cms.website:a"], expect: true }
+      - { allowed: cms.website.read, at: [platform, "organisation:o2", "cms.website:b"], expect: false }
+      - { allowed: cms.website.create, at: [platform, "organisation:o2"], expect: false }
+      - { allowed: cms.platform.manage, at: [platform], expect: false }
+      - { can_grant: cms.editor, at: [platform, "organisation:o1", "cms.website:a"], expect: ok }
+      - { can_grant: cms.org_admin, at: [platform, "organisation:o1"], expect: ok }
+      - { can_grant: cms.editor, at: [platform, "organisation:o2", "cms.website:b"], expect: not_permitted }
+      - { can_grant: cms.provisioner, at: [platform], expect: not_permitted }
+      - { touches: [platform, "organisation:o1", "cms.website:a"], expect: true }
+      - { touches: [platform, "organisation:o2"], expect: false }
+
+  - name: a website admin runs one website and cannot create others
+    subject:
+      kind: user
+      bindings: [{ role: cms.website_admin, path: [platform, "organisation:o1", "cms.website:a"] }]
+    checks:
+      - { allowed: cms.website.manage, at: [platform, "organisation:o1", "cms.website:a"], expect: true }
+      - { allowed: cms.ads.manage, at: [platform, "organisation:o1", "cms.website:a"], expect: true }
+      - { allowed: cms.website.read, at: [platform, "organisation:o1", "cms.website:b"], expect: false }
+      - { allowed: cms.website.create, at: [platform, "organisation:o1"], expect: false }
+      - { allowed: cms.org.read, at: [platform, "organisation:o1"], expect: false }
+      - { can_grant: cms.author, at: [platform, "organisation:o1", "cms.website:a"], expect: ok }
+      - { can_grant: cms.author, at: [platform, "organisation:o1", "cms.website:b"], expect: not_permitted }
+      - { can_grant: cms.org_admin, at: [platform, "organisation:o1"], expect: not_permitted }
+
+  - name: an editor edits and publishes content, and touches no design or advertising
+    subject:
+      kind: user
+      bindings: [{ role: cms.editor, path: [platform, "organisation:o1", "cms.website:a"] }]
+    checks:
+      - { allowed: cms.content.publish, at: [platform, "organisation:o1", "cms.website:a"], expect: true }
+      - { allowed: cms.content.delete, at: [platform, "organisation:o1", "cms.website:a"], expect: true }
+      - { allowed: cms.design.write, at: [platform, "organisation:o1", "cms.website:a"], expect: false }
+      - { allowed: cms.ads.manage, at: [platform, "organisation:o1", "cms.website:a"], expect: false }
+      - { allowed: cms.stats.read, at: [platform, "organisation:o1", "cms.website:a"], expect: false }
+      - { allowed: cms.members.manage, at: [platform, "organisation:o1", "cms.website:a"], expect: false }
+
+  - name: an author writes but does not publish or delete
+    subject:
+      kind: user
+      bindings: [{ role: cms.author, path: [platform, "organisation:o1", "cms.website:a"] }]
+    checks:
+      - { allowed: cms.content.write, at: [platform, "organisation:o1", "cms.website:a"], expect: true }
+      - { allowed: cms.content.publish, at: [platform, "organisation:o1", "cms.website:a"], expect: false }
+      - { allowed: cms.content.delete, at: [platform, "organisation:o1", "cms.website:a"], expect: false }
+
+  - name: a designer changes the look, not the words
+    subject:
+      kind: user
+      bindings: [{ role: cms.designer, path: [platform, "organisation:o1"] }]
+    checks:
+      - { allowed: cms.design.publish, at: [platform, "organisation:o1", "cms.website:a"], expect: true }
+      - { allowed: cms.content.read, at: [platform, "organisation:o1", "cms.website:a"], expect: true }
+      - { allowed: cms.content.write, at: [platform, "organisation:o1", "cms.website:a"], expect: false }
+
+  - name: an analyst reads statistics only
+    subject: { kind: user, bindings: [{ role: cms.analyst, path: [platform, "organisation:o1"] }] }
+    checks:
+      - { allowed: cms.stats.read, at: [platform, "organisation:o1", "cms.website:a"], expect: true }
+      - { allowed: cms.content.read, at: [platform, "organisation:o1", "cms.website:a"], expect: false }
+      - { allowed: cms.ai.use, at: [platform, "organisation:o1", "cms.website:a"], expect: false }
+
+  - name: an account without bindings may do nothing at all
+    subject: { kind: user, bindings: [] }
+    checks:
+      - { allowed: cms.website.read, at: [platform, "organisation:o1", "cms.website:a"], expect: false }
+      - { allowed_somewhere: cms.website.read, expect: false }
+      - { can_grant: cms.editor, at: [platform, "organisation:o1", "cms.website:a"], expect: not_permitted }
+
+  - name: the last organisation admin stays, unless a platform admin removes them
+    actor: { kind: user, bindings: [{ role: cms.org_admin, path: [platform, "organisation:o1"] }] }
+    checks:
+      - check_protected:
+          before:
+            - { principal: u1, role: cms.org_admin, path: [platform, "organisation:o1"] }
+          after: []
+        expect: { violation: { role: cms.org_admin, scope: "organisation:o1" } }

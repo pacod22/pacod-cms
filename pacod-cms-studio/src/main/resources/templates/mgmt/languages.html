@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  The languages the standing pages can be written in.
+
+  Under /mgmt/pages/ rather than on a prefix of its own, and that is load-bearing rather than
+  tidy: only /mgmt/, = /mgmt and /mgmt-assets/ are routed to this container, so a new prefix would
+  reach the PUBLIC application and fall outside MgmtSecurityConfig's authenticated matcher.
+
+  The «резервен» chips are read from LanguageChain's own constants, passed in as originalCode and
+  fallbackCode -- not hardcoded here. Those two codes are named in Java, which is exactly why the
+  screen must say so: the delete button is missing for them and an operator is owed the reason.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{pages.languages.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('pages')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{pages.languages.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <a class="btn btn-ghost" th:href="@{/mgmt/pages}">
+                    <svg class="i"><use href="#i-arrow-up"></use></svg> <span th:text="#{pages.allPages}">All pages</span>
+                </a>
+                <a class="btn btn-primary push" th:href="@{/mgmt/pages/languages/new}">
+                    <svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{pages.languages.new}">New language</span>
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <p class="muted" style="margin:0">
+                        <th:block th:text="#{pages.languages.intro.before}">These languages are offered…</th:block>
+                        <b th:text="${#strings.toUpperCase(fallbackCode)}">EN</b><th:block
+                            th:text="#{pages.languages.intro.middle}">, and if that is missing too, in</th:block>
+                        <b th:text="${#strings.toUpperCase(originalCode)}">BG</b>.
+                    </p>
+                    <p class="hint" th:text="#{pages.languages.chromeLanguages}">Built-in wording</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th class="shrink" th:text="#{pages.field.code}">Code</th>
+                            <th th:text="#{pages.languages.col.adminName}">Name (studio)</th>
+                            <th th:text="#{pages.languages.col.nativeName}">Own name</th>
+                            <th class="shrink" th:text="#{pages.field.sortOrder}">Sort order</th>
+                            <th class="shrink" th:text="#{pages.languages.col.pages}">Pages</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="l : ${languages}"
+                            th:attr="data-href=@{/mgmt/pages/languages/{code}(code=${l.code})}">
+                            <td><code th:text="${l.code}">bg</code></td>
+                            <td class="title-cell">
+                                <a th:href="@{/mgmt/pages/languages/{code}(code=${l.code})}"
+                                   th:text="${l.displayName()}">Bulgarian</a>
+                                <span class="badge" th:if="${l.code == originalCode}"
+                                      th:title="#{pages.languages.badge.original.title}"
+                                      th:text="#{pages.languages.badge.original}">fallback · original</span>
+                                <span class="badge" th:if="${l.code == fallbackCode}"
+                                      th:title="#{pages.languages.badge.fallback.title}"
+                                      th:text="#{pages.languages.badge.fallback}">fallback</span>
+                            </td>
+                            <td th:text="${l.nativeName}">Bulgarian</td>
+                            <td class="muted" th:text="${l.sortOrder}">0</td>
+                            <!--/*
+                              Bodies, not titles: a title with no body behind it is not a
+                              translation anybody can read, and this column is what the delete
+                              guard is about.
+                            */-->
+                            <td>
+                                <span class="chip" th:if="${pageCounts.get(l.code) != null}"
+                                      th:text="${pageCounts.get(l.code)}">4</span>
+                                <span class="muted" th:if="${pageCounts.get(l.code) == null}">—</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="empty" th:if="${languages.isEmpty()}">
+                    <svg class="i"><use href="#i-tag"></use></svg>
+                    <span th:text="#{pages.languages.empty}">No languages yet.</span>
+                    <a class="btn btn-sm" th:href="@{/mgmt/pages/languages/new}" th:text="#{pages.languages.addFirst}">Add the first one</a>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

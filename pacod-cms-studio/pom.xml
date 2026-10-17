@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>io.pacod</groupId>
+		<artifactId>pacod-cms</artifactId>
+		<version>0.0.1-SNAPSHOT</version>
+	</parent>
+
+	<artifactId>pacod-cms-studio</artifactId>
+	<groupId>io.pacod</groupId>
+	<packaging>jar</packaging>
+	<name>pacod-cms-studio</name>
+	<description>The pacod-cms studio: portal, per-site console and page composer</description>
+
+	<dependencies>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<!-- Sign-in through pacod-id: OpenID Connect, authorization code with PKCE. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security-oauth2-client</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>io.pacod</groupId>
+			<artifactId>pacod-cms-core</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-thymeleaf</artifactId>
+		</dependency>
+
+		<!--
+			HTML parsing for what the AI gateway answers: a translated body must keep its source's
+			skeleton exactly (studio.ai.HtmlTranslation). MIT.
+		-->
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>1.21.1</version>
+		</dependency>
+
+		<!--
+			The Public Suffix List, private section included, as browsers apply it to cookies
+			(InternetDomainName): what "the same registrable domain as the studio" means
+			(studio.portal.RegistrableDomains). Apache-2.0; the list inside it is MPL-2.0.
+		-->
+		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+			<version>33.7.2-jre</version>
+		</dependency>
+
+		<!--
+			Deliberately NO caffeine and no cache configuration. The console is a write surface for
+			a handful of operators, and the read caches its edits make stale live in another
+			process - see MgmtArticleService's javadoc. A cache manager here would only make a
+			@CacheEvict look as if it reached them.
+		-->
+
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>${lombok.version}</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>

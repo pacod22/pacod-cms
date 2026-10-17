@@ -1,0 +1,5 @@
+No certificate pair is supplied: Caddy obtains every certificate itself.
+
+docker-compose.yml mounts this file at /etc/caddy/tls/fullchain.pem and privkey.pem when
+SSL_CERT_FILE and SSL_KEY_FILE are unset, because a bind mount needs a source. Caddy never reads
+it: the pair is loaded only when SSL_CERT_FILE names one (CADDY_SUPPLIED_PAIR in compose).

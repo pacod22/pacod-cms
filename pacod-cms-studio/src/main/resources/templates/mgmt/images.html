@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{articles.c.images})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('images')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{articles.c.images})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <!--/* A GET form, like the author and article lists: every result is bookmarkable.
+                       The editor's picker searches the same collection without reloading, because
+                       reloading the editor would discard unsaved rich text -- this screen has no
+                       such constraint and so keeps the plain form. */-->
+                <form class="toolbar" method="get" th:action="@{/mgmt/images}" style="flex:1 1 640px; margin:0">
+                    <div class="search">
+                        <svg class="i"><use href="#i-search"></use></svg>
+                        <!--/* id="search-input" is what mgmt.js debounces, auto-submits and binds "/" to. */-->
+                        <input type="search" id="search-input" name="q" th:value="${q}"
+                               th:placeholder="#{articles.images.search.placeholder}"
+                               th:aria-label="#{articles.images.search.aria}">
+                        <kbd>/</kbd>
+                    </div>
+
+                    <!--/*
+                      Not a <select> of articles: there can be thousands of them. A number or a piece of
+                      the title, resolved server-side to that article's attachments -- the @DBRef
+                      points from the article to the image, so this cannot be a condition on the
+                      image query.
+                    */-->
+                    <input class="pick" type="search" id="article" name="article" th:value="${article}"
+                           th:placeholder="#{articles.images.article.placeholder}" th:aria-label="#{articles.images.article.aria}">
+
+                    <select class="pick" id="usage" name="usage" data-autosubmit
+                            th:aria-label="#{articles.images.usage.aria}">
+                        <option value="ANY" th:selected="${usage == 'ANY'}" th:text="#{articles.images.usage.any}">All</option>
+                        <option value="USED" th:selected="${usage == 'USED'}" th:text="#{articles.images.usage.used}">Used only</option>
+                        <option value="UNUSED" th:selected="${usage == 'UNUSED'}" th:text="#{articles.images.usage.unused}">Unused only</option>
+                    </select>
+
+                    <!--/* Without these a search would silently drop the page size back to the
+                           default and throw the column ordering away -- the form replaces the
+                           whole query string. «Изчисти» keeps all three for the same reason: it
+                           clears the filters, which is what it says, and not the operator's view
+                           of the list. */-->
+                    <input type="hidden" name="size" th:value="${size}">
+                    <input type="hidden" name="sort" th:value="${sort}">
+                    <input type="hidden" name="dir" th:value="${dir}">
+
+                    <button class="btn" type="submit" th:text="#{articles.c.search}">Search</button>
+                    <a class="btn btn-ghost" th:href="@{/mgmt/images(size=${size},sort=${sort},dir=${dir})}"
+                       th:if="${!#strings.isEmpty(q) or !#strings.isEmpty(article) or usage != 'ANY'}" th:text="#{articles.c.clear}">Clear</a>
+                </form>
+            </div>
+
+            <!--/*
+              What the filters actually did. The capped line is the one that has to be here: a
+              title search that used the first 25 of 200 matching articles looks exactly like one
+              that found 25, and the difference is a library that is quietly missing rows.
+            */-->
+            <p class="result-line" th:if="${images.totalElements > 0}">
+                <span th:text="#{articles.images.count(${images.totalElements})}">0 images</span>
+                <span th:if="${!#strings.isEmpty(q)}" th:text="#{articles.c.forTerm(${q})}"></span>
+                <span th:if="${articleFilter.active()}"
+                      th:text="#{articles.images.fromArticle(${articleFilter.term()})}"></span>
+                <span class="badge plain" th:if="${usage == 'UNUSED'}" th:text="#{articles.images.badge.unused}">unused</span>
+                <span class="badge plain" th:if="${usage == 'USED'}" th:text="#{articles.images.badge.used}">used</span>
+            </p>
+
+            <p class="result-line" th:if="${articleFilter.capped()}">
+                <svg class="i"><use href="#i-alert"></use></svg>
+                <span th:text="#{articles.images.capped(${articleMatchLimit}, ${articleFilter.matchedArticles()})}"></span>
+            </p>
+
+            <!--/*
+              There is no "ново изображение" button, and that is not an omission. An image is
+              uploaded against the article it belongs to, where the dimension rule (configurable,
+              and switchable off) and the ten-per-article cap are enforced together; this screen exists to find, reuse and retire what
+              is already there.
+            */-->
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <!--/*
+                          Every sortable header is a real <a> carrying all three filters and the
+                          page size, so a click reorders the list on the server and the result is a
+                          URL that can be bookmarked, shared and reloaded -- the /mgmt/authors
+                          arrangement, and here the argument is stronger: this list is PAGED, so a
+                          client-side table sorter would reorder the twenty-four rows on screen and
+                          call it an ordering of the library.
+
+                          Dropping any of q / article / usage here would clear the operator's
+                          filters on the first click and answer 200 with the whole collection.
+                          `page` is deliberately absent: a reordered list has different rows on
+                          page 4, so the only honest landing place is the first page.
+
+                          "flip" is the direction the *active* column's link must ask for; an
+                          inactive column always starts ascending, which is why it cannot simply be
+                          the negation of the current direction everywhere.
+                        */-->
+                        <thead>
+                        <tr th:with="flip=${dir == 'desc' ? 'asc' : 'desc'}">
+                            <th class="shrink"></th>
+                            <th class="num shrink"
+                                th:attr="aria-sort=${sort == 'id' ? (dir == 'desc' ? 'descending' : 'ascending') : null}">
+                                <a th:href="@{/mgmt/images(q=${q},article=${article},usage=${usage},size=${size},sort='id',dir=${sort == 'id' ? flip : 'desc'})}"
+                                   th:title="#{articles.c.sortById}">
+                                    <span>№</span>
+                                    <svg class="i sort-mark" th:if="${sort == 'id'}">
+                                        <use th:href="${dir == 'desc' ? '#i-arrow-down' : '#i-arrow-up'}"></use>
+                                    </svg>
+                                </a>
+                            </th>
+                            <th th:attr="aria-sort=${sort == 'name' ? (dir == 'desc' ? 'descending' : 'ascending') : null}">
+                                <a th:href="@{/mgmt/images(q=${q},article=${article},usage=${usage},size=${size},sort='name',dir=${sort == 'name' ? flip : 'asc'})}"
+                                   th:title="#{articles.images.sortByFile}">
+                                    <span th:text="#{articles.images.col.file}">File</span>
+                                    <svg class="i sort-mark" th:if="${sort == 'name'}">
+                                        <use th:href="${dir == 'desc' ? '#i-arrow-down' : '#i-arrow-up'}"></use>
+                                    </svg>
+                                </a>
+                            </th>
+                            <!--/* Not sortable, and not an omission. The path is the public prefix
+                                   plus the filename, one constant followed by the column to its
+                                   left, so ordering by it IS ordering by «Файл» -- two headers
+                                   doing one thing, and the operator would reasonably expect them
+                                   to differ. */-->
+                            <th th:text="#{articles.images.col.path}">Path</th>
+                            <th class="num shrink"
+                                th:attr="aria-sort=${sort == 'articles' ? (dir == 'desc' ? 'descending' : 'ascending') : null}">
+                                <a th:href="@{/mgmt/images(q=${q},article=${article},usage=${usage},size=${size},sort='articles',dir=${sort == 'articles' ? flip : 'asc'})}"
+                                   th:title="#{articles.images.sortByUsage}">
+                                    <span th:text="#{articles.images.col.usage}">Used in</span>
+                                    <svg class="i sort-mark" th:if="${sort == 'articles'}">
+                                        <use th:href="${dir == 'desc' ? '#i-arrow-down' : '#i-arrow-up'}"></use>
+                                    </svg>
+                                </a>
+                            </th>
+                            <th class="shrink"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <!--/* data-href opens the image's own screen once mgmt.js runs; the filename
+                               below stays a real <a>, so the row works without scripting and the
+                               path field, the copy button and the delete form keep their clicks --
+                               the handler steps aside for anything interactive. */-->
+                        <!--/* th:each runs before th:with, so `detail` is built per row -- and the
+                               link the row, the filename, the usage badge and the eye button all
+                               use is then written once, filters and all. */-->
+                        <tr th:each="img : ${images.content}"
+                            th:with="detail=@{/mgmt/images/{id}(id=${img.id()},q=${q},article=${article},usage=${usage},size=${size},sort=${sort},dir=${dir},page=${images.number})}"
+                            th:attr="data-href=${detail}">
+                            <td>
+                                <img class="thumb" loading="lazy" th:src="@{${img.path()}}" th:alt="${img.filename()}">
+                            </td>
+                            <td class="num muted" th:text="${img.id()}">1</td>
+                            <td class="title-cell">
+                                <a th:href="${detail}"
+                                   th:text="${img.filename()}" th:title="${img.filename()}">photo.jpg</a>
+                            </td>
+                            <td>
+                                <!--/* Readonly input rather than plain text plus a copy button:
+                                       navigator.clipboard does not exist on a plaintext origin, so
+                                       selecting has to work on its own. See mgmt.js. */-->
+                                <div class="path-row">
+                                    <input class="path" type="text" readonly
+                                           th:value="${img.path()}" th:title="${img.path()}"
+                                           th:aria-label="#{articles.c.imagePath}">
+                                    <button class="btn btn-icon btn-sm" type="button" data-copy th:title="#{articles.c.copyPath}">
+                                        <svg class="i"><use href="#i-copy"></use></svg>
+                                        <span class="sr-only" th:text="#{articles.c.copyPath}">Copy path</span>
+                                    </button>
+                                </div>
+                            </td>
+                            <td class="num">
+                                <!--/* The count is one cheap query per row; the titles behind it are
+                                       not -- every article eager-loads three @DBRef collections.
+                                       So the number links to the screen that can afford to name
+                                       them. */-->
+                                <a th:if="${img.usages() > 0}"
+                                   th:href="${detail} + '#usage'"
+                                   th:title="#{articles.images.usage.link}">
+                                    <span class="badge" th:text="#{articles.images.usage.badge(${img.usages()})}">articles: 2</span>
+                                </a>
+                                <span class="muted" th:if="${img.usages() == 0}">—</span>
+                            </td>
+                            <td>
+                                <div class="row-actions">
+                                    <a class="btn btn-ghost btn-icon btn-sm" th:title="#{articles.images.detail.title}"
+                                       th:href="${detail}">
+                                        <svg class="i"><use href="#i-eye"></use></svg>
+                                        <span class="sr-only" th:text="#{articles.images.detail}">Image details</span>
+                                    </a>
+
+                                    <!--/* Deleting is refused while any article holds the image; the
+                                           button is offered anyway rather than hidden, so the refusal
+                                           says why. The same count is re-checked server-side in
+                                           ImageService.deleteImage, which is the guard that counts. */-->
+                                    <form class="inline-form" method="post"
+                                          th:action="@{/mgmt/images/{id}/delete(id=${img.id()})}"
+                                          th:data-confirm="#{articles.images.delete.confirm}">
+                                        <button class="btn btn-danger btn-icon btn-sm" type="submit" th:title="#{articles.images.delete.title}">
+                                            <svg class="i"><use href="#i-trash"></use></svg>
+                                            <span class="sr-only" th:text="#{articles.images.delete}">Delete the image</span>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!--/*
+                  Five ways to be empty, and they call for four different reactions. "No such
+                  article" means retype; "that article has no images" means the filter worked;
+                  "everything is in use" is the answer to the question «what can I delete»; and
+                  the article + неизползвани pair describes nothing at all -- an attached image is
+                  used by definition, so no data will ever satisfy both.
+                */-->
+                <div class="empty" th:if="${images.isEmpty()}">
+                    <svg class="i"><use href="#i-image"></use></svg>
+
+                    <span th:if="${articleFilter.active() and usage == 'UNUSED'}"
+                          th:text="#{articles.images.empty.contradiction}">These two filters can never both match.</span>
+                    <span th:if="${articleFilter.active() and usage != 'UNUSED' and articleFilter.matchedArticles() == 0}"
+                          th:text="#{articles.images.empty.noArticle(${articleFilter.term()})}"></span>
+                    <span th:if="${articleFilter.active() and usage != 'UNUSED' and articleFilter.matchedArticles() > 0}"
+                          th:text="#{articles.images.empty.articleNoImages}">This article has no matching images.</span>
+                    <span th:if="${!articleFilter.active() and usage == 'UNUSED'}"
+                          th:text="#{articles.images.empty.allUsed}">Every image is used.</span>
+                    <span th:if="${!articleFilter.active() and usage != 'UNUSED'}"
+                          th:text="${#strings.isEmpty(q) and usage == 'ANY'}
+                                   ? #{articles.images.empty.none}
+                                   : #{articles.images.empty.noMatch}">No images uploaded.</span>
+                </div>
+
+                <!--/*
+                  The footer is guarded on there being rows, NOT on there being more than one page
+                  -- which is how the articles screen does it and would be wrong here. Two and a
+                  half thousand articles always paginate; the image library at 96 a page, or under
+                  any search at all, routinely does not. Gate the size control on the pager and it
+                  disappears exactly when the operator wants to go back to a smaller page, leaving
+                  the URL as the only way out.
+                */-->
+                <div class="pager" th:if="${images.totalElements > 0}"
+                     th:with="from=${images.number - 3 < 0 ? 0 : images.number - 3},
+                              to=${images.number + 3 > images.totalPages - 1 ? images.totalPages - 1 : images.number + 3}">
+
+                    <th:block th:if="${images.totalPages > 1}">
+                        <a th:if="${!images.first}" th:title="#{articles.c.prevPage}"
+                           th:href="@{/mgmt/images(q=${q},article=${article},usage=${usage},size=${size},sort=${sort},dir=${dir},page=${images.number - 1})}">&larr;</a>
+
+                        <th:block th:each="p : ${#numbers.sequence(from, to)}">
+                            <span class="page current" th:if="${p == images.number}" th:text="${p + 1}">1</span>
+                            <a th:unless="${p == images.number}"
+                               th:href="@{/mgmt/images(q=${q},article=${article},usage=${usage},size=${size},sort=${sort},dir=${dir},page=${p})}"
+                               th:text="${p + 1}">2</a>
+                        </th:block>
+
+                        <a th:if="${!images.last}" th:title="#{articles.c.nextPage}"
+                           th:href="@{/mgmt/images(q=${q},article=${article},usage=${usage},size=${size},sort=${sort},dir=${dir},page=${images.number + 1})}">&rarr;</a>
+                    </th:block>
+
+                    <!--/*
+                      Its own GET form: the search form is elsewhere on the page, so the term rides
+                      along as a hidden field. `page` deliberately does not -- a page of 96 taken
+                      down to 24 has no page 4 to land on, and starting over at the first page is
+                      the only answer that is always in range. mgmt.js submits it on change;
+                      without scripting the noscript button does.
+                    */-->
+                    <form class="size-form count" method="get" th:action="@{/mgmt/images}">
+                        <input type="hidden" name="q" th:value="${q}">
+                        <input type="hidden" name="article" th:value="${article}">
+                        <input type="hidden" name="usage" th:value="${usage}">
+                        <input type="hidden" name="sort" th:value="${sort}">
+                        <input type="hidden" name="dir" th:value="${dir}">
+                        <label for="page-size" th:text="#{articles.c.perPage}">Per page</label>
+                        <select id="page-size" name="size" data-autosubmit>
+                            <option th:each="s : ${ {12, 24, 48, 96} }"
+                                    th:value="${s}" th:text="${s}" th:selected="${s == size}"></option>
+                        </select>
+                        <span th:text="#{articles.c.ofTotal(${images.totalElements})}">of 0</span>
+                        <noscript><button class="btn btn-sm" type="submit" th:text="#{articles.c.ok}">OK</button></noscript>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

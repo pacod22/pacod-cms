@@ -1,0 +1,12 @@
+# A test-only template set (TemplateSetIsolationIT); its templates are under templates/sets/probe/.
+id: probe
+name: Probe
+description: Two views, for the isolation test.
+sections: [primary]
+pageTypes:
+  HOME: {regions: [main]}
+  ARTICLE: {regions: [main], layout: {main: [{type: primary}]}}
+  CATEGORY: {regions: [main], layout: {main: [{type: primary}]}}
+  LATEST: {regions: [main], layout: {main: [{type: primary}]}}
+  PAGE: {regions: [main], layout: {main: [{type: primary}]}}
+  SEARCH: {regions: [main], layout: {main: [{type: primary}]}}

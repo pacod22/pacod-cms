@@ -1,0 +1,66 @@
+# pacod-cms's roles and permissions, for pacod-id's rules engine.
+#
+# The studio pushes this file to pacod-id at startup (PUT /internal/v1/catalog/cms) and evaluates
+# every check against it locally, with the bindings the feed delivers: tokens carry no roles.
+# The vectors in pacod-cms-core/src/test/resources/authz/vectors/cms.yaml pin what each role may
+# do; change both together.
+#
+# Scopes: platform > organisation > cms.website.
+#
+# Permissions:
+#   platform.manage                 the installation: every organisation, platform settings
+#   org.manage, org.read            an organisation: change it, see it
+#   website.create                  create a website in an organisation
+#   website.manage, website.read    a website: its settings, domains, deletion; see it
+#   content.read, content.write     articles, pages, images, menus: see them, edit them
+#   content.publish                 put content in front of readers (and take it down)
+#   content.delete                  delete content
+#   design.read, design.write       layouts, themes, templates: see them, edit drafts
+#   design.publish                  make a draft layout or theme the live one
+#   ads.manage                      bookings, creatives, banner layouts
+#   stats.read                      monitoring, crawlers, social statistics
+#   ai.use                          the AI features (where the organisation has them enabled)
+#   members.manage                  give and take roles
+product: cms
+scope_types:
+  website: { parent: organisation }
+roles:
+  platform_admin:
+    at: [platform]
+    permissions: ["*"]
+    # Nobody removes the last platform admin.
+    protected: true
+  # The studio's own service account. Its one job is the binding nobody else can make: the
+  # creator of a new organisation becomes its org_admin. It can grant (members.manage) but not
+  # make platform admins or other provisioners (grant rules below), and holds no other permission.
+  provisioner:
+    at: [platform]
+    permissions: [members.manage]
+  org_admin:
+    at: [organisation]
+    permissions: [org.manage, org.read, website.create, website.manage, website.read, "content.*", "design.*",
+                  ads.manage, stats.read, ai.use, members.manage]
+    # Only a platform admin may leave an organisation without an organisation admin.
+    protected: { bypass: platform.manage }
+  website_admin:
+    at: [website]
+    permissions: [website.manage, website.read, "content.*", "design.*", ads.manage, stats.read, ai.use,
+                  members.manage]
+  designer:
+    at: [organisation, website]
+    permissions: [website.read, content.read, "design.*", ai.use]
+  editor:
+    at: [organisation, website]
+    permissions: [website.read, "content.*", ai.use]
+  author:
+    at: [website]
+    permissions: [website.read, content.read, content.write, ai.use]
+  analyst:
+    at: [platform, organisation, website]
+    permissions: [org.read, website.read, stats.read]
+grant:
+  # Organisation and website admins give roles where they hold theirs; only a platform admin makes
+  # platform admins or provisioners.
+  default: members.manage
+  platform_admin: platform.manage
+  provisioner: platform.manage

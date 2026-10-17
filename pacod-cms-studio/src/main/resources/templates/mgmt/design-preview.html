@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  The website's drafts in a frame (DesignPreview): the address is on the website's own origin --
+  never the studio's, the page runs the website's scripts -- and carries a short-lived token the
+  site checks. The frame is sandboxed without top navigation, so nothing in it can move this
+  window. Page type, width and template are links: the screen works with scripting off.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{design.preview.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('design')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{design.preview.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <a class="btn btn-ghost" th:href="@{/mgmt/design}">
+                    <svg class="i"><use href="#i-arrow-up"></use></svg> <span th:text="#{design.title}">Design</span>
+                </a>
+                <span class="spacer" style="margin-left:auto"></span>
+                <a class="btn" th:if="${preview.src() != null}"
+                   th:href="@{/mgmt/design/preview(page=${pageTypeSlug}, set=${preview.set()}, width=${width})}">
+                    <span th:text="#{design.preview.reload}">Reload</span>
+                </a>
+                <a class="btn" th:if="${preview.src() != null}" th:href="${preview.src()}"
+                   target="_blank" rel="noopener noreferrer">
+                    <svg class="i"><use href="#i-external"></use></svg> <span th:text="#{design.preview.open}">Open in a new tab</span>
+                </a>
+            </div>
+
+            <p class="muted" th:text="#{design.preview.intro}">The draft layouts and theme.</p>
+            <p class="hint" th:if="${previewSetName != null}"
+               th:text="#{design.preview.withSet(${previewSetName}, ${set.name()})}">Rendered with another template.</p>
+
+            <div class="preview-bar">
+                <nav class="chips" th:aria-label="#{design.preview.page}">
+                    <a class="chip" th:each="t : ${pageTypes}"
+                       th:classappend="${t == preview.pageType()} ? 'active'"
+                       th:href="@{/mgmt/design/preview(page=${#strings.toLowerCase(t.name())}, set=${preview.set()}, width=${width})}"
+                       th:text="${mgmtText.label(t)}">Home</a>
+                </nav>
+                <nav class="chips" th:aria-label="#{design.preview.width}">
+                    <a class="chip" th:each="w : ${widths}" th:classappend="${w == width} ? 'active'"
+                       th:href="@{/mgmt/design/preview(page=${pageTypeSlug}, set=${preview.set()}, width=${w})}"
+                       th:text="#{'design.preview.width.' + ${w}}">Full width</a>
+                </nav>
+            </div>
+
+            <div class="card" th:if="${preview.problem() != null}">
+                <div class="card-body">
+                    <p th:switch="${preview.problem().name()}">
+                        <span th:case="'OFF'" th:text="#{design.preview.off}">Previews are off.</span>
+                        <span th:case="'NO_ADDRESS'" th:text="#{design.preview.noAddress}">No address.</span>
+                        <span th:case="*" th:text="#{design.preview.nothing}">Nothing to show.</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="preview-stage" th:if="${preview.src() != null}" th:classappend="'preview-stage--' + ${width}">
+                <iframe class="preview-frame" th:src="${preview.src()}" th:title="#{design.preview.frame}"
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                        referrerpolicy="no-referrer"></iframe>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

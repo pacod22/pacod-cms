@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<!--/*
+  Shared chrome for the management console.
+
+  Deliberately NOT the fragments in templates/fragments/ -- those belong to the public site, and
+  the console has entirely different chrome anyway. Nothing here is used by a public page and
+  nothing public is used here.
+
+  Every screen is built from four pieces: head(pageTitle), sidebar(active), topbar(heading) and
+  flash. Editing one of them edits every screen.
+*/-->
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:fragment="head(pageTitle)">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="|${pageTitle} · #{chrome.title.suffix}|">Console</title>
+
+    <!--/* Read by mgmtCsrf() in mgmt.js. th:action covers the plain forms on its own. */-->
+    <meta th:if="${_csrf != null}" name="_csrf" th:content="${_csrf.token}">
+    <meta th:if="${_csrf != null}" name="_csrf_header" th:content="${_csrf.headerName}">
+
+    <meta name="robots" content="noindex, nofollow">
+
+    <!--/*
+      The console's own tab icon, and the reason it is declared rather than left to convention:
+      with no <link rel="icon"> the browser asks for /favicon.ico at the ROOT of the host, which
+      the console does not serve -- so the console tab would carry no mark of its own, and an
+      operator could not tell it at a glance from the website tab open beside it.
+
+      Served from the jar under /mgmt-assets/, for the two reasons mgmt.css is: the prefix is
+      outside the authenticated matcher, so the sign-in page gets its icon before anyone signs in,
+      and it does not depend on the content volume being mounted.
+
+      SVG only, no .ico. Every browser since 2020 renders an SVG favicon; an older one falls back
+      to asking for /favicon.ico at the root, which is the request it would have made with no icon
+      declared at all. Nothing is worse off, and the alternative is a binary in the repository
+      that nobody can diff.
+    */-->
+    <link rel="icon" type="image/svg+xml" th:href="@{/mgmt-assets/favicon.svg}">
+
+    <link rel="stylesheet" th:href="@{/mgmt-assets/mgmt.css}">
+
+    <!--/*
+      The script strings in the operator's language, read once by t() in mgmt.js: every js.* key
+      of the bundles, as JSON. th:utext is safe here because MgmtText.jsBundle() escapes < > & as
+      \u003c and so on -- a value cannot close this element. data-tinymce is the editor's
+      language pack (empty for English, which needs none).
+    */-->
+    <!--/*
+      Where this screen's console lives: /mgmt, or /sites/<id>/mgmt inside a website. mgmt.js builds
+      its fetch URLs on it, so a background request goes to the same website as the page.
+    */-->
+    <meta name="mgmt-base" th:content="@{/mgmt}">
+
+    <script type="application/json" id="mgmt-i18n"
+            th:data-tinymce="${mgmtText.tinymceLanguage()}"
+            th:utext="${mgmtText.jsBundle()}">{}</script>
+
+    <!--/*
+      Every stored layout choice is applied SYNCHRONOUSLY, before the first paint, exactly as the
+      public site applies its theme in fragments/head.html. Deferring any of these to mgmt.js
+      flashes the other state for a frame on every navigation, and the console is a full page-load
+      application: the theme flashes the wrong palette, `data-nav` slides the whole page sideways
+      as the sidebar's 250px margin collapses to 68, and `data-editor` builds TinyMCE at one width
+      and immediately reflows it to another. It also has to live here rather than in mgmt.js
+      because login.html loads no script at all.
+
+      No stored value means the default in each case -- follow the operating system, expanded
+      sidebar, two-column editor -- which is what mgmt.css says without any attribute, so an
+      attribute is only ever written once a choice has been made.
+
+      One script, three keys. mgmt.js owns the writing; see the theme and nav modules there.
+    */-->
+    <script>
+        (function () {
+            try {
+                var root = document.documentElement;
+
+                var theme = localStorage.getItem('pacod-mgmt-theme');
+                if (theme === 'light' || theme === 'dark') {
+                    root.setAttribute('data-theme', theme);
+                }
+
+                if (localStorage.getItem('pacod-mgmt-nav') === 'collapsed') {
+                    root.setAttribute('data-nav', 'collapsed');
+                }
+
+                if (localStorage.getItem('pacod-mgmt-editor') === 'wide') {
+                    root.setAttribute('data-editor', 'wide');
+                }
+            } catch (e) {
+                /* private mode: every default above is the no-attribute case */
+            }
+        }());
+    </script>
+</head>
+
+<body>
+
+<!--/* ================================================================== icons */-->
+<!--/*
+  One inline SVG sprite instead of an icon font or a CDN: no extra request, no FOUT, and it
+  inherits currentColor so the icons follow the palette in both schemes. Referenced as
+  <svg class="i"><use href="#i-name"></use></svg>. Include ONCE per page, before first use.
+
+  Stroke-drawn on a 24x24 grid; the shared stroke width and caps live on `svg.i` in mgmt.css.
+*/-->
+<svg th:fragment="icons" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+        <symbol id="i-leaf" viewBox="0 0 24 24">
+            <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/>
+            <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
+        </symbol>
+        <symbol id="i-file-text" viewBox="0 0 24 24">
+            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+            <path d="M14 2v5h5M9 13h6M9 17h6"/>
+        </symbol>
+        <symbol id="i-users" viewBox="0 0 24 24">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+        </symbol>
+        <symbol id="i-folder" viewBox="0 0 24 24">
+            <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>
+        </symbol>
+        <symbol id="i-shield" viewBox="0 0 24 24">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>
+            <path d="m9 12 2 2 4-4"/>
+        </symbol>
+        <symbol id="i-external" viewBox="0 0 24 24">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <path d="M15 3h6v6M10 14 21 3"/>
+        </symbol>
+        <symbol id="i-logout" viewBox="0 0 24 24">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <path d="m16 17 5-5-5-5M21 12H9"/>
+        </symbol>
+        <symbol id="i-search" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="7"/>
+            <path d="m21 21-4.3-4.3"/>
+        </symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24">
+            <path d="M12 5v14M5 12h14"/>
+        </symbol>
+        <symbol id="i-save" viewBox="0 0 24 24">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/>
+            <path d="M17 21v-8H7v8M7 3v5h8"/>
+        </symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24">
+            <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6"/>
+        </symbol>
+        <symbol id="i-image" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <circle cx="9" cy="9" r="2"/>
+            <path d="m21 15-4.6-4.6a2 2 0 0 0-2.8 0L3 21"/>
+        </symbol>
+        <symbol id="i-upload" viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <path d="m17 8-5-5-5 5M12 3v13"/>
+        </symbol>
+        <symbol id="i-calendar" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <path d="M16 2v4M8 2v4M3 10h18"/>
+        </symbol>
+        <symbol id="i-tag" viewBox="0 0 24 24">
+            <path d="M20.6 13.4 12 22l-9-9V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/>
+            <path d="M7.5 7.5h.01"/>
+        </symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24">
+            <path d="M12 9v4M12 17h.01"/>
+            <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>
+        </symbol>
+        <symbol id="i-check" viewBox="0 0 24 24">
+            <path d="M20 6 9 17l-5-5"/>
+        </symbol>
+        <symbol id="i-undo" viewBox="0 0 24 24">
+            <path d="M3 7v6h6"/>
+            <path d="M3.5 13a9 9 0 1 0 2.1-9.4L3 7"/>
+        </symbol>
+        <symbol id="i-menu" viewBox="0 0 24 24">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+        </symbol>
+        <symbol id="i-sun" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+        </symbol>
+        <symbol id="i-moon" viewBox="0 0 24 24">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>
+        </symbol>
+        <symbol id="i-inbox" viewBox="0 0 24 24">
+            <path d="M22 12h-6l-2 3h-4l-2-3H2"/>
+            <path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"/>
+        </symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24">
+            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/>
+            <circle cx="12" cy="12" r="3"/>
+        </symbol>
+        <symbol id="i-megaphone" viewBox="0 0 24 24">
+            <path d="M3 11v2a1 1 0 0 0 1 1h3l7 4V6L7 10H4a1 1 0 0 0-1 1Z"/>
+            <path d="M18 8a5 5 0 0 1 0 8"/>
+            <path d="M7 14v5h3v-4"/>
+        </symbol>
+        <!--/* «Макети»: a frame with a stack behind it -- a folder of rotating creatives. */-->
+        <symbol id="i-layout" viewBox="0 0 24 24">
+            <rect x="2" y="6" width="15" height="12" rx="2"/>
+            <path d="M20 8v9a2 2 0 0 1-2 2H6"/>
+        </symbol>
+        <!--/* The image screens: hide, copy a path, reorder, insert into the body. */-->
+        <symbol id="i-eye-off" viewBox="0 0 24 24">
+            <path d="M10.6 6.2A9.9 9.9 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3 3.7"/>
+            <path d="M6.6 6.7A17 17 0 0 0 2 12s3.6 6 10 6a9.6 9.6 0 0 0 4.3-1"/>
+            <path d="M14.1 14.1a3 3 0 0 1-4.2-4.2"/>
+            <path d="m3 3 18 18"/>
+        </symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24">
+            <rect x="9" y="9" width="12" height="12" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </symbol>
+        <symbol id="i-arrow-up" viewBox="0 0 24 24">
+            <path d="M12 19V5"/>
+            <path d="m5 12 7-7 7 7"/>
+        </symbol>
+        <symbol id="i-arrow-down" viewBox="0 0 24 24">
+            <path d="M12 5v14"/>
+            <path d="m19 12-7 7-7-7"/>
+        </symbol>
+        <symbol id="i-insert" viewBox="0 0 24 24">
+            <path d="M12 5v14"/>
+            <path d="M5 12h14"/>
+            <path d="M3 3h4M17 3h4M3 21h4M17 21h4"/>
+        </symbol>
+        <!--/*
+          The sidebar toggle and the editor's writing modes. Each pair is one shape with the arrows
+          reversed, so the icon always says what the click will do -- the same convention
+          paintThemeButton() follows for the sun and the moon.
+        */-->
+        <symbol id="i-panel-collapse" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="16" rx="2"/>
+            <path d="M10 4v16"/>
+            <path d="m7 10-2 2 2 2"/>
+        </symbol>
+        <symbol id="i-panel-expand" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="16" rx="2"/>
+            <path d="M10 4v16"/>
+            <path d="m5 10 2 2-2 2"/>
+        </symbol>
+        <symbol id="i-maximize" viewBox="0 0 24 24">
+            <path d="M4 9V5a1 1 0 0 1 1-1h4"/>
+            <path d="M15 4h4a1 1 0 0 1 1 1v4"/>
+            <path d="M20 15v4a1 1 0 0 1-1 1h-4"/>
+            <path d="M9 20H5a1 1 0 0 1-1-1v-4"/>
+        </symbol>
+        <symbol id="i-minimize" viewBox="0 0 24 24">
+            <path d="M9 4v4a1 1 0 0 1-1 1H4"/>
+            <path d="M20 9h-4a1 1 0 0 1-1-1V4"/>
+            <path d="M15 20v-4a1 1 0 0 1 1-1h4"/>
+            <path d="M4 15h4a1 1 0 0 1 1 1v4"/>
+        </symbol>
+        <!--/*
+          The video field: its two modes, and the kind of thing its address box takes. No brand
+          mark -- a YouTube logo cannot be drawn in this stroke style, and it would be the only
+          licensed asset in the sprite. The triangle is a path rather than a filled polygon for
+          the same reason everything else here is: svg.i sets fill:none.
+        */-->
+        <symbol id="i-play" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M10.5 8.6 16 12l-5.5 3.4Z"/>
+        </symbol>
+        <symbol id="i-code" viewBox="0 0 24 24">
+            <path d="m8 6-6 6 6 6"/>
+            <path d="m16 6 6 6-6 6"/>
+        </symbol>
+        <symbol id="i-link" viewBox="0 0 24 24">
+            <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.8 1.7"/>
+            <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.8-1.7"/>
+        </symbol>
+        <!--/* The monitoring screen: a line over an axis, in the same stroke style as the rest. */-->
+        <symbol id="i-activity" viewBox="0 0 24 24">
+            <path d="M4 4v15a1 1 0 0 0 1 1h15"/>
+            <path d="m7 15 4-5 3 3 5-6"/>
+        </symbol>
+        <!--/* /mgmt/social: three nodes joined, the conventional "share" glyph. */-->
+        <symbol id="i-share" viewBox="0 0 24 24">
+            <circle cx="18" cy="5" r="3"/>
+            <circle cx="6" cy="12" r="3"/>
+            <circle cx="18" cy="19" r="3"/>
+            <path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>
+        </symbol>
+        <!--/* /mgmt/crawlers: a robot's head -- antenna, face, two eyes, two ears. */-->
+        <symbol id="i-bot" viewBox="0 0 24 24">
+            <rect x="4" y="8" width="16" height="12" rx="2"/>
+            <path d="M12 8V4M9.5 4h5"/>
+            <path d="M9 13v2M15 13v2"/>
+            <path d="M2 13v3M22 13v3"/>
+        </symbol>
+        <!--/* /mgmt/dashboard: four tiles of unequal height, the conventional "overview" glyph. */-->
+        <symbol id="i-settings" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+        </symbol>
+        <symbol id="i-globe" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z"/>
+        </symbol>
+        <symbol id="i-building" viewBox="0 0 24 24">
+            <rect x="4" y="2" width="16" height="20" rx="2"/>
+            <path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/>
+        </symbol>
+        <symbol id="i-dashboard" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="9" rx="1"/>
+            <rect x="14" y="3" width="7" height="5" rx="1"/>
+            <rect x="14" y="12" width="7" height="9" rx="1"/>
+            <rect x="3" y="16" width="7" height="5" rx="1"/>
+        </symbol>
+    </defs>
+</svg>
+
+<!--/* ================================================================ sidebar */-->
+<!--/*
+  The checkbox in front of the <nav> is the mobile drawer. It is pure CSS -- `.nav-toggle:checked
+  ~ .sidebar` -- so the navigation opens on a phone with scripting disabled, which a JS-driven
+  hamburger would not.
+
+  Every label is wrapped in <span class="nav-text"> and every link carries a `title`, both for the
+  68px icon rail that `data-nav="collapsed"` turns this into above 1000px: CSS cannot address a bare
+  text node, and once the label is clipped the title is the only thing left that names the
+  destination on hover. The labels are CLIPPED there, never display:none -- see mgmt.css.
+*/-->
+<th:block th:fragment="sidebar(active)">
+    <input class="nav-toggle" type="checkbox" id="nav-toggle" aria-hidden="true" tabindex="-1">
+
+    <nav class="sidebar" id="nav-sidebar" th:aria-label="#{chrome.nav.aria}">
+        <a class="brand" th:href="${currentSite != null} ? @{/mgmt/dashboard} : @{/mgmt/sites}"
+           th:title="|#{chrome.brand.name} · #{chrome.brand.sub}|">
+            <span class="brand-mark"><svg class="i"><use href="#i-leaf"></use></svg></span>
+            <span class="brand-text">
+                <span class="brand-name" th:text="#{chrome.brand.name}">pacod-cms</span>
+                <span class="brand-sub" th:text="#{chrome.brand.sub}">Console</span>
+            </span>
+        </a>
+
+        <!--/*
+          A website's screens are offered only while one is open: under /sites/<id>/ every link
+          below gains that prefix, and without one each would land on the website list. The
+          platform's own screens are the last group, always shown.
+        */-->
+        <th:block th:if="${currentSite != null}">
+        <!--/* The landing page, above every group: it summarises all of them. */-->
+        <div>
+            <div class="nav">
+                <a th:href="@{/mgmt/dashboard}" th:classappend="${active == 'dashboard'} ? 'active'" th:title="#{chrome.nav.dashboard}">
+                    <svg class="i"><use href="#i-dashboard"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.dashboard}">dashboard</span>
+                </a>
+            </div>
+        </div>
+
+        <div>
+            <div class="nav-label" th:text="#{chrome.nav.group.content}">Content</div>
+            <div class="nav">
+                <a th:href="@{/mgmt/articles}" th:classappend="${active == 'articles'} ? 'active'" th:title="#{chrome.nav.articles}">
+                    <svg class="i"><use href="#i-file-text"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.articles}">articles</span>
+                </a>
+                <a th:href="@{/mgmt/authors}" th:classappend="${active == 'authors'} ? 'active'" th:title="#{chrome.nav.authors}">
+                    <svg class="i"><use href="#i-users"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.authors}">authors</span>
+                </a>
+                <a th:href="@{/mgmt/categories}" th:classappend="${active == 'categories'} ? 'active'" th:title="#{chrome.nav.categories}">
+                    <svg class="i"><use href="#i-folder"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.categories}">categories</span>
+                </a>
+                <a th:href="@{/mgmt/images}" th:classappend="${active == 'images'} ? 'active'" th:title="#{chrome.nav.images}">
+                    <svg class="i"><use href="#i-image"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.images}">images</span>
+                </a>
+                <a th:href="@{/mgmt/banners}" th:classappend="${active == 'banners'} ? 'active'" th:title="#{chrome.nav.banners}">
+                    <svg class="i"><use href="#i-megaphone"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.banners}">banners</span>
+                </a>
+                <!--/*
+                  The folders behind the HTML5 bookings. Its own entry rather than a link buried on
+                  the banner screen, because a layout outlives the booking that runs it: a campaign
+                  ends, the folder stays, and the next booking points at the same one.
+
+                  Routed under /mgmt/banners/ despite sitting beside «Реклами» here -- see
+                  MgmtBannerLayoutController for why a new prefix would reach the public app.
+                */-->
+                <a th:href="@{/mgmt/banners/layouts}" th:classappend="${active == 'layouts'} ? 'active'" th:title="#{chrome.nav.layouts}">
+                    <svg class="i"><use href="#i-layout"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.layouts}">layouts</span>
+                </a>
+                <!--/*
+                  The standing pages -- about, contact, terms and the rest. Under the content group
+                  rather than in a group of their own: they are text an editor writes,
+                  the same as an article, and the only difference is that they never appear in a
+                  listing.
+                */-->
+                <a th:href="@{/mgmt/pages}" th:classappend="${active == 'pages'} ? 'active'" th:title="#{chrome.nav.pages}">
+                    <svg class="i"><use href="#i-inbox"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.pages}">pages</span>
+                </a>
+                <!--/* /social, the link-in-bio page. Content, like the standing pages: what is on it is
+                       written here. Its numbers are under Наблюдение. */-->
+                <a th:href="@{/mgmt/social}" th:classappend="${active == 'social'} ? 'active'" th:title="#{chrome.nav.social}">
+                    <svg class="i"><use href="#i-share"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.social}">social</span>
+                </a>
+            </div>
+        </div>
+
+        <!--/*
+          Its own group: reading what the site is doing is neither editing content nor managing
+          who may edit it. Not gated on a property, unlike «Поддръжка» -- the screen degrades to
+          an empty chart when nothing has been recorded yet and says so, which is a truthful
+          answer rather than a broken link.
+        */-->
+        <div>
+            <div class="nav-label" th:text="#{chrome.nav.group.monitoring}">Monitoring</div>
+            <div class="nav">
+                <a th:href="@{/mgmt/monitoring}" th:classappend="${active == 'monitoring'} ? 'active'" th:title="#{chrome.nav.monitoring}">
+                    <svg class="i"><use href="#i-activity"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.monitoring}">monitoring</span>
+                </a>
+                <a th:href="@{/mgmt/social/stats}" th:classappend="${active == 'social-stats'} ? 'active'"
+                   th:title="#{chrome.nav.socialStats}">
+                    <svg class="i"><use href="#i-share"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.socialStats}">socialStats</span>
+                </a>
+                <a th:href="@{/mgmt/crawlers}" th:classappend="${active == 'crawlers'} ? 'active'" th:title="#{chrome.nav.crawlers}">
+                    <svg class="i"><use href="#i-bot"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.crawlers}">crawlers</span>
+                </a>
+            </div>
+        </div>
+
+
+        <!--/* The website's design: layouts per page type, its theme, its menus (MgmtDesignController). */-->
+        <div th:if="${can != null and can.site('design.read')}">
+            <div class="nav-label" th:text="#{chrome.nav.group.design}">Design</div>
+            <div class="nav">
+                <a th:href="@{/mgmt/design}" th:classappend="${active == 'design'} ? 'active'" th:title="#{chrome.nav.layouts.design}">
+                    <svg class="i"><use href="#i-layout"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.layouts.design}">layouts</span>
+                </a>
+                <a th:href="@{/mgmt/design/theme}" th:classappend="${active == 'design-theme'} ? 'active'" th:title="#{chrome.nav.theme}">
+                    <svg class="i"><use href="#i-sun"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.theme}">theme</span>
+                </a>
+                <a th:href="@{/mgmt/design/menus/main}" th:classappend="${active == 'design-menus'} ? 'active'" th:title="#{chrome.nav.menus}">
+                    <svg class="i"><use href="#i-menu"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.menus}">menus</span>
+                </a>
+            </div>
+        </div>
+
+        <!--/*
+          The website itself: its settings and who works on it. Offered only to who may open them;
+          each screen checks its own permission all the same.
+        */-->
+        <div th:if="${can != null and (can.site('website.manage') or can.site('website.read'))}">
+            <div class="nav-label" th:text="#{chrome.nav.group.website}">Website</div>
+            <div class="nav">
+                <a th:if="${can.site('website.manage')}" th:href="@{/mgmt/settings}"
+                   th:classappend="${active == 'settings'} ? 'active'" th:title="#{chrome.nav.settings}">
+                    <svg class="i"><use href="#i-settings"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.settings}">settings</span>
+                </a>
+                <a th:href="@{/mgmt/members}" th:classappend="${active == 'members'} ? 'active'" th:title="#{chrome.nav.members}">
+                    <svg class="i"><use href="#i-users"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.members}">members</span>
+                </a>
+            </div>
+        </div>
+
+        <!--/* Background work for this website: PDF exports and AI translations (MgmtJobController). */-->
+        <div th:if="${can != null and can.site('content.read')}">
+            <div class="nav-label" th:text="#{chrome.nav.group.maintenance}">Maintenance</div>
+            <div class="nav">
+                <a th:href="@{/mgmt/jobs}" th:classappend="${active == 'jobs'} ? 'active'" th:title="#{chrome.nav.jobs}">
+                    <svg class="i"><use href="#i-play"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.jobs}">jobs</span>
+                </a>
+            </div>
+        </div>
+        </th:block>
+
+        <!--/*
+          Absolute addresses, not @{}: these belong to no website, and from inside one @{} would
+          file them under its prefix. They answer there too (see StudioPaths), but the website list
+          is the one place that must never look as if it were part of a website.
+        */-->
+        <div>
+            <div class="nav-label" th:text="#{chrome.nav.group.platform}">Platform</div>
+            <div class="nav">
+                <a th:href="${studioRoot} + '/mgmt/sites'"
+                   th:classappend="${active == 'sites'} ? 'active'" th:title="#{chrome.nav.sites}">
+                    <svg class="i"><use href="#i-layout"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.sites}">sites</span>
+                </a>
+                <a th:href="${studioRoot} + '/mgmt/organisations'"
+                   th:classappend="${active == 'organisations'} ? 'active'" th:title="#{chrome.nav.organisations}">
+                    <svg class="i"><use href="#i-building"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.organisations}">organisations</span>
+                </a>
+                <a th:if="${can != null and can.platform()}" th:href="${studioRoot} + '/mgmt/platform'"
+                   th:classappend="${active == 'platform'} ? 'active'" th:title="#{chrome.nav.platform}">
+                    <svg class="i"><use href="#i-shield"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.platform}">platform</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="sidebar-foot" th:if="${currentSite != null and currentSite.publicUrl != null}">
+            <a th:href="${currentSite.publicUrl} + '/'" target="_blank" rel="noopener" th:title="#{chrome.nav.viewSite}">
+                <svg class="i"><use href="#i-external"></use></svg>
+                <span class="nav-text" th:text="#{chrome.nav.viewSite}">viewSite</span>
+            </a>
+        </div>
+    </nav>
+
+    <!--/* Tapping outside the drawer closes it: a <label> for the same checkbox. */-->
+    <label class="nav-scrim" for="nav-toggle" aria-hidden="true"></label>
+</th:block>
+
+<!--/* ================================================================= topbar */-->
+<header class="topbar" th:fragment="topbar(heading)">
+    <label class="nav-open" for="nav-toggle" th:title="#{chrome.menu}">
+        <svg class="i"><use href="#i-menu"></use></svg>
+        <span class="sr-only" th:text="#{chrome.menu.open}">Open menu</span>
+    </label>
+
+    <!--/*
+      Shrinks the sidebar to a 68px icon rail and remembers the choice. Set up by mgmt.js -- and
+      `hidden` until it is, because unlike the drawer above there is no CSS-only way to persist the
+      state, and a control on screen that does nothing without scripting is a dead button.
+      mgmt.css hides it below 1001px, where the drawer is the mechanism and collapsing would move
+      nothing.
+    */-->
+    <button class="btn btn-ghost btn-icon" type="button" id="nav-collapse" hidden
+            aria-expanded="true" aria-controls="nav-sidebar" th:title="#{chrome.menu.collapse}">
+        <svg class="i" id="nav-collapse-icon"><use href="#i-panel-collapse"></use></svg>
+        <span class="sr-only" th:text="#{chrome.menu.collapse}">Collapse menu</span>
+    </button>
+
+    <h1 th:text="${heading}">Heading</h1>
+
+    <a class="site-chip" th:if="${currentSite != null}" th:href="${studioRoot} + '/mgmt/sites'"
+       th:title="#{chrome.site.switch}">
+        <svg class="i"><use href="#i-layout"></use></svg>
+        <span class="sr-only" th:text="#{chrome.site.current}">Website</span>
+        <span th:text="${currentSite.name}">Demo</span>
+    </a>
+
+    <span class="spacer"></span>
+
+    <!--/*
+      Set up by mgmt.js. Rendered disabled-looking-but-inert without scripting rather than
+      hidden, so the markup stays static; mgmt.js is what gives it behaviour and its label.
+    */-->
+    <button class="btn btn-ghost btn-icon" type="button" id="theme-toggle" hidden
+            th:title="#{chrome.theme.toggle}" aria-live="polite">
+        <svg class="i" id="theme-icon"><use href="#i-moon"></use></svg>
+        <span class="sr-only" th:text="#{chrome.theme.change}">Change theme</span>
+    </button>
+
+    <span th:replace="~{mgmt/fragments :: uiLanguages}"></span>
+
+    <span class="who" th:if="${currentUser}">
+        <span class="avatar" th:text="${#strings.substring(currentUser, 0, 1)}">u</span>
+        <span th:text="${currentUser}">user</span>
+    </span>
+
+    <!--/*
+      A POST, not a link: with CSRF enabled Spring Security only accepts logout as a POST, and
+      an <a href="/mgmt/logout"> would fall through to MgmtHomeController's catch-all and 404.
+    */-->
+    <form class="inline-form" th:action="@{/mgmt/logout}" method="post">
+        <button class="btn btn-ghost btn-icon" type="submit" th:title="#{chrome.logout}">
+            <svg class="i"><use href="#i-logout"></use></svg>
+            <span class="sr-only" th:text="#{chrome.logout}">Sign out</span>
+        </button>
+    </form>
+</header>
+
+<!--/* ======================================================== language switch */-->
+<!--/*
+  The console's own language: BG EN DE RU as plain links to /mgmt/ui-language/{code}, which sets
+  the mgmt-lang cookie and comes back to this screen. Used by the topbar and by login.html. Not
+  the content language -- see MgmtLocaleResolver for why it is not called `lang`. The tag and the
+  title are the language's own name, which is the one text here that never translates.
+*/-->
+<span class="ui-lang" th:fragment="uiLanguages" role="group" th:aria-label="#{chrome.uiLanguage}">
+    <a th:each="l : ${mgmtText.languages()}"
+       th:href="@{/mgmt/ui-language/{code}(code=${l.code})}"
+       th:text="${l.tag}" th:title="${l.nativeName}" th:lang="${l.code}"
+       th:aria-current="${l.code == mgmtText.current()} ? 'true' : null">BG</a>
+</span>
+
+<!--/* ================================================================ flashes */-->
+<div th:fragment="flash">
+    <div class="flash ok" th:if="${message}">
+        <svg class="i"><use href="#i-check"></use></svg>
+        <span class="flash-text" th:text="${message}"></span>
+        <button class="flash-close" type="button" th:aria-label="#{chrome.close}">&times;</button>
+    </div>
+    <div class="flash err" th:if="${error}">
+        <svg class="i"><use href="#i-alert"></use></svg>
+        <span class="flash-text" th:text="${error}"></span>
+        <button class="flash-close" type="button" th:aria-label="#{chrome.close}">&times;</button>
+    </div>
+</div>
+
+<!--/*
+  ========================================================== form errors
+
+  Insert INSIDE the <form> that carries th:object: `*` resolves against the form object bound
+  there, and a fragment inserted inside the form is processed in that same local scope.
+*/-->
+<div class="errors" th:fragment="errors" th:if="${#fields.hasErrors('*')}">
+    <svg class="i"><use href="#i-alert"></use></svg>
+    <ul>
+        <li th:each="e : ${#fields.errors('*')}" th:text="${e}">error</li>
+    </ul>
+</div>
+
+
+<!--/*
+  The article editor's language strip: "Original" for the source, then one link per language the
+  article is already translated into. `current` is the code of the translation screen being
+  rendered, or null on the main editor, which edits the original.
+  `translations` is code -> console name, from MgmtArticleController.
+
+  A .card-foot, inserted at the bottom of the editor's text card rather than as a card of its own:
+  one horizontal row that wraps, instead of a whole card's worth of height above the editor.
+
+  Links, never tabs over one form. Each translation is its own screen and its own POST, so
+  switching language posts nothing, and neither form can ever write the other's fields -- the
+  pages editor's rule, for the same reason. The foot sits inside <form id="article-form">, which
+  is safe only because a link carries no name=. Rendered not at all when there are no
+  translations: new ones come from translation jobs, so there would be nothing to switch to.
+*/-->
+<div class="card-foot lang-strip" th:fragment="articleLanguages(article, current, translations)"
+     th:unless="${translations == null or translations.isEmpty()}">
+    <span class="lang-strip-label">
+        <svg class="i"><use href="#i-tag"></use></svg> <span th:text="#{chrome.lang.label}">Language</span>
+    </span>
+    <a class="btn btn-sm"
+       th:classappend="${current == null} ? 'btn-primary' : 'btn-ghost'"
+       th:href="@{/mgmt/articles/{id}(id=${article.id})}" th:text="#{chrome.lang.original}">Original</a>
+    <a class="btn btn-sm" th:each="t : ${translations}"
+       th:classappend="${current == t.key} ? 'btn-primary' : 'btn-ghost'"
+       th:href="@{/mgmt/articles/{id}/translations/{lang}(id=${article.id}, lang=${t.key})}"
+       th:text="${t.value}">English</a>
+</div>
+
+</body>
+</html>

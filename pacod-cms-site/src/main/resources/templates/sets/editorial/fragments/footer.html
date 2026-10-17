@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*
+  Site footer, shared by all public templates.
+
+  Everything in it is the website's own data: the contact block and the profiles come from
+  ${site} (SiteSettings), the links from the `footer` Menu document. Each column renders only
+  when it has something to say, so a new website shows no empty headings.
+
+  The social links are wordmarks, not an icon font -- the design loads none.
+*/-->
+<footer th:fragment="footer(lang)" class="site-footer">
+    <div class="shell site-footer__grid">
+
+        <div class="site-footer__col" th:if="${site != null and site.hasContact()}">
+            <span class="site-footer__label" th:text="#{footer.contact}">Contact</span>
+            <span class="site-footer__text">
+                <th:block th:each="line : ${site.contactAddressLines()}">
+                    <span th:text="${line}">Address</span><br/>
+                </th:block>
+                <th:block th:if="${site.contactPhone() != null}">
+                    <a th:href="${'tel:' + site.contactPhone().replace(' ', '')}"
+                       th:text="${site.contactPhone()}">Phone</a><br/>
+                </th:block>
+                <a th:if="${site.contactEmail() != null}" th:href="${'mailto:' + site.contactEmail()}"
+                   th:text="${site.contactEmail()}">E-mail</a>
+            </span>
+        </div>
+
+        <!--/* th:with on a block of its own: th:if is evaluated before th:with on one element,
+               so `links` would not exist yet in the condition. */-->
+        <th:block th:with="links=${site != null ? site.menu('footer', lang) : {}}">
+            <div class="site-footer__col" th:unless="${links.isEmpty()}">
+                <span class="site-footer__label" th:text="${site.name(lang)}">Website</span>
+                <a th:each="entry : ${links}" th:unless="${entry.group()}" th:href="${entry.href()}"
+                   th:text="${entry.label()}"
+                   th:target="${entry.external() ? '_blank' : null}" th:rel="${entry.external() ? 'noopener' : null}">Link</a>
+            </div>
+        </th:block>
+
+        <div class="site-footer__col" th:if="${site != null}">
+            <span class="site-footer__label" th:text="${site.name(lang)}">Website</span>
+            <span class="site-footer__text" th:if="${site.tagline(lang) != null}"
+                  th:text="${site.tagline(lang)}">Tagline</span>
+            <div class="site-footer__social" th:unless="${site.socialProfiles().isEmpty()}">
+                <a th:each="profile : ${site.socialProfiles()}" th:href="${profile.url}"
+                   th:text="${#strings.toUpperCase(profile.network)}" target="_blank" rel="noopener">NETWORK</a>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="site-footer__bottom" th:if="${site != null}">
+        <div class="shell site-footer__bottom-inner">
+            <span th:text="${site.footerNote(lang) ?: site.name(lang)}">©</span>
+        </div>
+    </div>
+</footer>
+</body>
+</html>

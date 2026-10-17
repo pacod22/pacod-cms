@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{articles.author.pageTitle})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('authors')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(${isNew} ? #{articles.authors.new} : #{articles.author.edit})}"></header>
+
+        <main class="content form-page">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <form method="post" th:object="${form}"
+                  th:action="${isNew} ? @{/mgmt/authors} : @{/mgmt/authors/{id}(id=${form.id})}">
+
+                <div th:replace="~{mgmt/fragments :: errors}"></div>
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-users"></use></svg>
+                        <th:block th:text="#{articles.author.data}">Author details</th:block>
+                        <span class="hint" th:unless="${isNew}" th:text="|№ ${form.id}|"></span>
+                    </h2>
+
+                    <div class="card-body">
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="title"><th:block th:text="#{articles.author.titleLabel}">Title</th:block> <span class="help" th:text="#{articles.c.optional}">— optional</span></label>
+                                <input type="text" id="title" th:field="*{title}" th:placeholder="#{articles.author.title.placeholder}">
+                            </div>
+
+                            <div class="field">
+                                <label for="firstname" th:text="#{articles.author.firstname}">First name</label>
+                                <input type="text" id="firstname" th:field="*{firstname}">
+                                <span class="field-error" th:if="${#fields.hasErrors('firstname')}" th:errors="*{firstname}"></span>
+                            </div>
+
+                            <div class="field">
+                                <label for="lastname" th:text="#{articles.author.lastname}">Last name</label>
+                                <input type="text" id="lastname" th:field="*{lastname}">
+                                <span class="field-error" th:if="${#fields.hasErrors('lastname')}" th:errors="*{lastname}"></span>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label for="description" th:text="#{articles.c.description}">Description</label>
+                            <textarea id="description" th:field="*{description}" rows="4"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-save"></use></svg> <th:block th:text="#{articles.c.save}">Save</th:block>
+                        </button>
+                        <a class="btn btn-ghost" th:href="@{/mgmt/authors}" th:text="#{articles.c.toList}">Back to the list</a>
+                    </div>
+                </div>
+            </form>
+
+            <div class="card danger" th:unless="${isNew}">
+                <h2><svg class="i"><use href="#i-trash"></use></svg> <th:block th:text="#{articles.c.deletion}">Delete</th:block></h2>
+                <div class="card-body">
+                    <p class="muted" style="margin-top:0" th:text="#{articles.author.delete.note}">
+                        Articles that cite this author will be left with a broken reference.
+                    </p>
+                    <form method="post" th:action="@{/mgmt/authors/{id}/delete(id=${form.id})}"
+                          th:data-confirm="#{articles.author.delete.confirm}">
+                        <button class="btn btn-danger" type="submit">
+                            <svg class="i"><use href="#i-trash"></use></svg> <th:block th:text="#{articles.author.delete}">Delete the author</th:block>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

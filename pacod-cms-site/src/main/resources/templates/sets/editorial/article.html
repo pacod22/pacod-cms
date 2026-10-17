@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  One article: GET /article/{id}.
+
+  The head, navbar, ad sidebar and footer are shared fragments, as on every other page; keep
+  them that way, since per-page copies drift apart. The head is parameterised, so this page
+  keeps its per-article title, description and share image.
+
+  The body itself lives in fragments/article-view, because index.html renders the same thing.
+*/-->
+<head th:replace="~{fragments/head :: head(
+        lang=${lang},
+        pageTitle=${article.title},
+        pageDesc=${article.description},
+        ogUrl=${site.url('/article/' + article.id + '?lang=' + lang)},
+        ogImagePath=${article.image},
+        ogImageType=${article.content})}"></head>
+
+<body>
+<th:block th:replace="~{fragments/scripts :: gtmNoscript}"></th:block>
+<th:block th:replace="~{fragments/scripts :: facebookSdk(${lang})}"></th:block>
+
+<th:block th:replace="~{fragments/navbar :: navbar(${lang})}"></th:block>
+
+<div class="shell">
+    <th:block th:replace="~{fragments/ad-sidebar :: topBanners(${topBanners})}"></th:block>
+</div>
+
+<div class="shell layout">
+    <main class="layout__main">
+        <!--/* The main region: this page's own content where its primary section stands, the
+               layout's other sections around it (PageComposer; sections.html). */-->
+        <th:block th:each="s : ${regions.get('main')}">
+            <th:block th:if="${s.primary}">
+                <th:block th:replace="~{fragments/article-view :: articleView(${article}, ${lang})}"></th:block>
+            </th:block>
+            <th:block th:unless="${s.primary}">
+                <th:block th:replace="~{sections :: ${s.fragment}(s=${s}, lang=${lang})}"></th:block>
+            </th:block>
+        </th:block>
+    </main>
+
+    <aside class="layout__aside">
+        <th:block th:replace="~{fragments/ad-sidebar :: adSidebar(${sidebarBanners})}"></th:block>
+        <th:block th:replace="~{sections :: region(${regions.get('aside')}, ${lang})}"></th:block>
+    </aside>
+</div>
+
+
+<th:block th:replace="~{fragments/footer :: footer(${lang})}"></th:block>
+<th:block th:replace="~{fragments/scripts :: siteScripts}"></th:block>
+</body>
+</html>

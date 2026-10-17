@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.1.0</version>
+	</parent>
+
+	<groupId>io.pacod</groupId>
+	<artifactId>pacod-cms</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>pacod-cms</name>
+	<description>A multi-tenant content management system</description>
+
+	<!--
+		Inherited by all three modules. Covers this project's own code only: the TinyMCE build
+		vendored in pacod-cms-studio is GPL-2.0-or-later; see THIRD-PARTY-NOTICES.md.
+	-->
+	<licenses>
+		<license>
+			<name>Apache-2.0</name>
+			<url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+
+	<packaging>pom</packaging>
+
+	<properties>
+		<java.version>25</java.version>
+	</properties>
+
+	<modules>
+		<module>pacod-cms-site</module>
+		<!--
+			The studio. Its own deployable so a studio deploy cannot take the public sites down,
+			and so the site's jar carries neither the vendored editor, the sign-in chain nor any
+			upload endpoint.
+		-->
+		<module>pacod-cms-studio</module>
+        <module>pacod-cms-core</module>
+    </modules>
+
+	<dependencies>
+		<!-- Version managed by the Spring Boot BOM via ${lombok.version}. -->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!--
+			Not bundled by spring-boot-starter-test. Without it there is no @WithMockUser and no
+			SecurityMockMvcRequestPostProcessors, so the studio's filter chains could not be
+			tested at all.
+		-->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+
+	<profiles>
+		<!--
+			`make it` (./mvnw verify -Pit): the integration tests, *IT, against a real MongoDB in a
+			Testcontainers container. A profile of their own so `make verify` stays Docker-free:
+			the unit suite needs no MongoDB at all.
+		-->
+		<profile>
+			<id>it</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-failsafe-plugin</artifactId>
+						<executions>
+							<execution>
+								<goals>
+									<goal>integration-test</goal>
+									<goal>verify</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+</project>

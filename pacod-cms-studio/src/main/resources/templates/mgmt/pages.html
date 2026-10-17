@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{pages.list.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('pages')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{pages.list.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <form class="toolbar" method="get" th:action="@{/mgmt/pages}" style="flex:1 1 420px; margin:0">
+                    <div class="search">
+                        <svg class="i"><use href="#i-search"></use></svg>
+                        <!--/* id="search-input" is what mgmt.js debounces, auto-submits and binds "/" to. */-->
+                        <input type="search" id="search-input" name="q" th:value="${q}"
+                               th:placeholder="#{pages.list.search.placeholder}"
+                               th:aria-label="#{pages.list.search.aria}">
+                        <kbd>/</kbd>
+                    </div>
+                    <button class="btn" type="submit" th:text="#{pages.action.search}">Search</button>
+                    <a class="btn btn-ghost" th:href="@{/mgmt/pages}" th:if="${!#strings.isEmpty(q)}" th:text="#{pages.action.clear}">Clear</a>
+                </form>
+
+                <a class="btn btn-ghost push" th:href="@{/mgmt/pages/languages}">
+                    <svg class="i"><use href="#i-tag"></use></svg> <span th:text="#{pages.field.languages}">Languages</span>
+                </a>
+                <a class="btn btn-primary" th:href="@{/mgmt/pages/new}">
+                    <svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{pages.list.new}">New page</span>
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{pages.field.address}">Address</th>
+                            <th th:text="#{pages.field.title}">Title</th>
+                            <th class="shrink" th:text="#{pages.field.languages}">Languages</th>
+                            <th class="shrink" th:text="#{pages.field.status}">Status</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="p : ${pages}" th:attr="data-href=@{/mgmt/pages/{slug}(slug=${p.slug})}">
+                            <td><code th:text="'/p/' + ${p.slug}">/p/terms</code></td>
+                            <td class="title-cell">
+                                <a th:href="@{/mgmt/pages/{slug}(slug=${p.slug})}"
+                                   th:text="${p.title(titleChain)}">Title</a>
+                            </td>
+                            <!--/*
+                              Which languages this page is actually WRITTEN in -- writtenIn() reads
+                              the stored bodies, so a language whose body is blank is absent here
+                              rather than shown as covered. That is the whole point of the column:
+                              it is the operator's to-do list.
+
+                              It reads the DOCUMENT, not the configured language list, so a body
+                              written in a language later removed from /mgmt/pages/languages still
+                              shows up. The text did not disappear because a row did.
+                            */-->
+                            <td>
+                                <span class="chip" th:each="c : ${p.writtenIn()}"
+                                      th:text="${#strings.toUpperCase(c)}">BG</span>
+                                <span class="muted" th:if="${p.writtenIn().isEmpty()}">—</span>
+                            </td>
+                            <td>
+                                <span class="badge" th:classappend="${p.published} ? 'published' : 'draft'"
+                                      th:text="${p.published} ? #{pages.status.published} : #{pages.status.draft}">Published</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="empty" th:if="${pages.isEmpty()}">
+                    <svg class="i"><use href="#i-file-text"></use></svg>
+                    <span th:text="${#strings.isEmpty(q)} ? #{pages.list.empty} : #{pages.list.noMatch}">No pages yet.</span>
+                    <a class="btn btn-sm" th:href="@{/mgmt/pages/new}" th:if="${#strings.isEmpty(q)}" th:text="#{pages.list.addFirst}">Add the first one</a>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+[
+  {
+    "slug": "about",
+    "sortOrder": 0,
+    "published": true,
+    "titles": {
+      "en": "About us",
+      "de": "Über uns"
+    },
+    "descriptions": {
+      "en": "Who we are, what we publish and how this website is made.",
+      "de": "Wer wir sind, was wir veröffentlichen und wie diese Website entsteht."
+    },
+    "bodies": {
+      "en": "<h2>About us</h2>\n<p>This is a demonstration website built with <strong>pacod-cms</strong>, an open-source content management system for organisations that run one or many websites.</p>\n<p>Everything you see here &mdash; the articles, the categories, this page &mdash; is sample content. Replace it in the studio: open <em>Pages</em>, pick this page and write your own story.</p>\n<h3>What we publish</h3>\n<ul>\n<li>News and short updates</li>\n<li>In-depth features and guides</li>\n<li>Interviews and opinion pieces</li>\n</ul>",
+      "de": "<h2>Über uns</h2>\n<p>Dies ist eine Demonstrations-Website, erstellt mit <strong>pacod-cms</strong>, einem quelloffenen Content-Management-System für Organisationen mit einer oder vielen Websites.</p>\n<p>Alles, was Sie hier sehen &mdash; die Artikel, die Kategorien, diese Seite &mdash; ist Beispielinhalt. Ersetzen Sie ihn im Studio: Öffnen Sie <em>Seiten</em>, wählen Sie diese Seite und schreiben Sie Ihre eigene Geschichte.</p>"
+    }
+  },
+  {
+    "slug": "contact",
+    "sortOrder": 10,
+    "published": true,
+    "titles": {
+      "en": "Contact",
+      "de": "Kontakt"
+    },
+    "descriptions": {
+      "en": "How to reach the editorial team.",
+      "de": "So erreichen Sie die Redaktion."
+    },
+    "bodies": {
+      "en": "<h2>Contact</h2>\n<p>We are happy to hear from readers, contributors and partners.</p>\n<p><strong>Editorial team</strong><br>E-mail: <a href=\"mailto:editors@example.com\">editors@example.com</a></p>\n<p>Replace these details with your own in the studio, under <em>Pages</em>.</p>",
+      "de": "<h2>Kontakt</h2>\n<p>Wir freuen uns über Nachrichten von Leserinnen und Lesern, Autorinnen und Autoren sowie Partnern.</p>\n<p><strong>Redaktion</strong><br>E-Mail: <a href=\"mailto:editors@example.com\">editors@example.com</a></p>"
+    }
+  },
+  {
+    "slug": "advertise",
+    "sortOrder": 20,
+    "published": true,
+    "titles": {
+      "en": "Advertise with us"
+    },
+    "descriptions": {
+      "en": "Banner formats and how to book them."
+    },
+    "bodies": {
+      "en": "<h2>Advertise with us</h2>\n<p>This website carries image and HTML5 banners in three formats:</p>\n<ul>\n<li><strong>Leaderboard</strong> &mdash; 728&times;90, above the content</li>\n<li><strong>Rectangle</strong> &mdash; 300&times;250, in the side column</li>\n<li><strong>Half page</strong> &mdash; 300&times;600, in the side column</li>\n</ul>\n<p>Bookings can be limited to particular page types and to a start and end date. Write to <a href=\"mailto:ads@example.com\">ads@example.com</a>.</p>"
+    }
+  },
+  {
+    "slug": "terms",
+    "sortOrder": 30,
+    "published": true,
+    "officialInDefaultLanguageOnly": true,
+    "titles": {
+      "en": "Terms of use"
+    },
+    "descriptions": {
+      "en": "The terms on which this website is offered."
+    },
+    "bodies": {
+      "en": "<h2>Terms of use</h2>\n<p><strong>This is placeholder text, not legal advice.</strong> Replace it with terms written for your organisation before publishing your website.</p>\n<p>Typical sections cover who operates the website, acceptable use, intellectual property in the published content, links to other websites, limitation of liability and the law that governs the terms.</p>"
+    }
+  },
+  {
+    "slug": "privacy",
+    "sortOrder": 40,
+    "published": true,
+    "officialInDefaultLanguageOnly": true,
+    "titles": {
+      "en": "Privacy policy"
+    },
+    "descriptions": {
+      "en": "What this website records about its readers, and why."
+    },
+    "bodies": {
+      "en": "<h2>Privacy policy</h2>\n<p><strong>This is placeholder text, not legal advice.</strong> Replace it with a policy written for your organisation before publishing your website.</p>\n<p>pacod-cms itself sets one cookie on the public website, <code>lang</code>, which remembers the language a reader chose. Reader statistics are counted without cookies: a salted, truncated hash of the address and browser identifies a reader for one day, and no address is stored.</p>\n<p>Any analytics or advertising service you enable in the site settings sets cookies of its own and needs to be described here.</p>"
+    }
+  }
+]

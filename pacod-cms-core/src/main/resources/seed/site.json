@@ -1,0 +1,50 @@
+{
+  "settings": {
+    "names": {
+      "en": "Demo Journal",
+      "de": "Demo-Journal"
+    },
+    "taglines": {
+      "en": "News, features and guides — a pacod-cms demonstration website",
+      "de": "Nachrichten, Reportagen und Ratgeber — eine Demonstrations-Website von pacod-cms"
+    },
+    "descriptions": {
+      "en": "A demonstration website of pacod-cms, the open-source content management system for organisations with one or many websites."
+    },
+    "footerNotes": {
+      "en": "© Demo Journal. Published with pacod-cms.",
+      "de": "© Demo-Journal. Veröffentlicht mit pacod-cms."
+    },
+    "favicon": "/site-assets/favicon.svg",
+    "contactAddress": "1 Example Street\nExample City",
+    "contactEmail": "editors@example.com"
+  },
+  "menus": [
+    {
+      "key": "main",
+      "items": [
+        { "labels": { "en": "Home", "de": "Start" }, "kind": "HOME" },
+        { "labels": { "en": "Latest", "de": "Neueste" }, "kind": "LATEST" },
+        {
+          "labels": { "en": "About", "de": "Über uns" },
+          "kind": "NONE",
+          "children": [
+            { "labels": { "en": "About us", "de": "Über uns" }, "kind": "PAGE", "target": "about" },
+            { "labels": { "en": "Contact", "de": "Kontakt" }, "kind": "PAGE", "target": "contact" },
+            { "labels": { "en": "Advertise", "de": "Werbung" }, "kind": "PAGE", "target": "advertise" }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "footer",
+      "items": [
+        { "labels": { "en": "About us", "de": "Über uns" }, "kind": "PAGE", "target": "about" },
+        { "labels": { "en": "Contact", "de": "Kontakt" }, "kind": "PAGE", "target": "contact" },
+        { "labels": { "en": "Advertise", "de": "Werbung" }, "kind": "PAGE", "target": "advertise" },
+        { "labels": { "en": "Terms of use", "de": "Nutzungsbedingungen" }, "kind": "PAGE", "target": "terms" },
+        { "labels": { "en": "Privacy policy", "de": "Datenschutz" }, "kind": "PAGE", "target": "privacy" }
+      ]
+    }
+  ]
+}

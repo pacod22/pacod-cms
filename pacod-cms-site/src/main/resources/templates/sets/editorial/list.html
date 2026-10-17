@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  A category or tag listing: GET /list/{id}.
+
+  ${list} is an ArticleListPageable -- a name, an optional numeric id, and a Page<ListItem>.
+  When the path segment is not a number it is treated as a tag and `id` stays null, which is
+  why every pagination link falls back to `list.name` for the path variable.
+
+  totalElements is read off a Page that has already been materialised, so it costs nothing
+  extra here. Do not copy the pattern into code that builds a Page purely to count: building
+  it reads articles, and every Article eager-loads its authors, categories and images
+  (@DBRef), three more queries per article than it looks.
+*/-->
+<head th:replace="~{fragments/head :: head(
+        lang=${lang},
+        pageTitle=${list.name + ' | ' + site.name(lang)},
+        pageDesc=${list.name},
+        ogUrl=${site.url('/list/' + (list.id != null ? list.id : list.name))},
+        ogImagePath=null,
+        ogImageType=null)}"></head>
+
+<body>
+<th:block th:replace="~{fragments/scripts :: gtmNoscript}"></th:block>
+
+<th:block th:replace="~{fragments/navbar :: navbar(${lang})}"></th:block>
+
+<div class="shell">
+    <th:block th:replace="~{fragments/ad-sidebar :: topBanners(${topBanners})}"></th:block>
+</div>
+
+<div class="shell layout">
+    <main class="layout__main">
+        <!--/* The main region: this page's own content where its primary section stands, the
+               layout's other sections around it (PageComposer; sections.html). */-->
+        <th:block th:each="s : ${regions.get('main')}">
+            <th:block th:if="${s.primary}">
+
+                <div class="page-head">
+                    <div class="page-head__kicker">
+                        <span th:text="${list.page.totalElements}">0</span>
+                        <span th:text="#{list.count}">articles</span>
+                    </div>
+                    <h1 class="page-head__title" th:utext="${list.name}"></h1>
+                </div>
+
+                <div class="empty-note" th:if="${list.page.totalElements == 0}"
+                     th:text="#{list.empty}">Nothing here yet.</div>
+
+                <article class="list-row" th:each="item : ${list.page.content}">
+                    <a class="list-row__thumb" th:if="${!#strings.isEmpty(item.imageFilename)}"
+                       th:href="@{/article/{id}(id=${item.id}, lang=${lang})}">
+                        <img th:src="'/assets/img/articles/' + ${item.imageFilename}" th:alt="${item.imageAlt}"
+                             loading="lazy"/>
+                    </a>
+                    <!--/* Unlike the landing widgets, an imageless article is not skipped here -- a
+                           listing that silently omits rows is worse than one with a blank thumbnail,
+                           and the pagination counts would stop matching. It gets a placeholder so the
+                           text column does not jump. */-->
+                    <span class="list-row__thumb list-row__thumb--empty"
+                          th:if="${#strings.isEmpty(item.imageFilename)}" aria-hidden="true"></span>
+
+                    <div class="list-row__body">
+                        <span class="list-row__meta">
+                            <th:block th:replace="~{fragments/widgets :: metaLine(${item}, ${lang})}"></th:block>
+                        </span>
+                        <h2 class="list-row__title">
+                            <a th:href="@{/article/{id}(id=${item.id}, lang=${lang})}" th:utext="${item.title}"></a>
+                        </h2>
+                        <p class="card__byline" th:if="${!#strings.isEmpty(item.description)}"
+                           th:utext="${item.description}"></p>
+                        <span class="list-row__author"><th:block th:replace="~{fragments/widgets :: authors(${item})}"></th:block></span>
+                    </div>
+                </article>
+
+                <nav class="pager" th:if="${list.page.totalPages > 1}" th:aria-label="#{pager.label}">
+                    <a class="pager__item"
+                       th:href="@{/list/{id}(id=${list.id != null ? list.id : list.name}, size=${list.pageSize}, sort=${list.sort}, page=${list.previousPage}, lang=${lang})}"
+                       th:aria-label="#{pager.previous}">«</a>
+
+                    <!--/* th:classappend, not th:class with both names in one literal: Thymeleaf
+                           preprocesses __...__ inside attribute expressions, and two BEM element
+                           separators in one string ("pager__item pager__item--current") look exactly
+                           like that -- it fails to parse "item pager" as an expression. One separator
+                           per expression is safe. */-->
+                    <a th:each="i : ${#numbers.sequence(list.startPage, list.lastPage)}"
+                       class="pager__item"
+                       th:classappend="${list.pageNumber == i} ? 'pager__item--current' : ''"
+                       th:href="@{/list/{id}(id=${list.id != null ? list.id : list.name}, size=${list.pageSize}, sort=${list.sort}, page=${i}, lang=${lang})}"
+                       th:text="${i + 1}"></a>
+
+                    <a class="pager__item"
+                       th:href="@{/list/{id}(id=${list.id != null ? list.id : list.name}, size=${list.pageSize}, sort=${list.sort}, page=${list.nextPage}, lang=${lang})}"
+                       th:aria-label="#{pager.next}">»</a>
+
+                    <span class="pager__count" id="total-pages">
+                        <span th:text="#{list.pages} + ' '">Pages: </span>
+                        <span th:text="${list.page.totalPages}">1</span>
+                    </span>
+                </nav>
+            </th:block>
+            <th:block th:unless="${s.primary}">
+                <th:block th:replace="~{sections :: ${s.fragment}(s=${s}, lang=${lang})}"></th:block>
+            </th:block>
+        </th:block>
+    </main>
+
+    <aside class="layout__aside">
+        <th:block th:replace="~{fragments/ad-sidebar :: adSidebar(${sidebarBanners})}"></th:block>
+        <th:block th:replace="~{sections :: region(${regions.get('aside')}, ${lang})}"></th:block>
+    </aside>
+</div>
+
+
+<th:block th:replace="~{fragments/footer :: footer(${lang})}"></th:block>
+<th:block th:replace="~{fragments/scripts :: siteScripts}"></th:block>
+</body>
+</html>

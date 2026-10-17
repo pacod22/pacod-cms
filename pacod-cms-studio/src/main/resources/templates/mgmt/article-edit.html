@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{articles.edit.pageTitle})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('articles')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{articles.edit.heading})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <!--/*
+              Two columns: the body on the left, everything that describes the article in a
+              sticky rail on the right, so status, date and categories never sit below a
+              600-pixel-tall editor that has to be scrolled past to change one of them.
+
+              The images are attached and removed by their own forms further down, so an upload
+              is durable the moment it succeeds -- an upload whose reference waited in browser
+              memory for the next save would orphan its file on disk whenever the operator
+              navigated away.
+
+              ONE .editor-grid for the whole screen. The form is not that grid -- it carries
+              `editor-form`, which is `display: contents`, so its two children become items of the
+              grid around it and the image/restore/delete cards can be a third item in the same
+              column, immediately below the body. As a SECOND grid they would start below the
+              taller rail, a few hundred pixels below the text, because the row holding the body
+              is as tall as the rail. See mgmt.css.
+            */-->
+            <div class="editor-grid">
+                <form id="article-form" class="editor-form"
+                      th:action="@{/mgmt/articles/{id}(id=${article.id})}" th:object="${form}" method="post">
+
+                    <div class="editor-main">
+                        <div th:replace="~{mgmt/fragments :: errors}"></div>
+
+                        <div class="card">
+                            <h2>
+                                <svg class="i"><use href="#i-file-text"></use></svg>
+                                <th:block th:text="#{articles.edit.content}">Content</th:block>
+                                <span class="hint" th:text="|№ ${article.id}|">№ 1</span>
+                            </h2>
+
+                            <div class="card-body">
+                                <div class="field">
+                                    <label for="title" th:text="#{articles.c.title}">Title</label>
+                                    <textarea id="title" th:field="*{title}" rows="2" maxlength="256"></textarea>
+                                    <span class="field-error" th:if="${#fields.hasErrors('title')}" th:errors="*{title}"></span>
+                                </div>
+
+                                <div class="field">
+                                    <label for="description"><th:block th:text="#{articles.c.shortDescription}">Short description</th:block> <span class="help" th:text="#{articles.edit.description.help}">— shown in lists</span></label>
+                                    <textarea id="description" th:field="*{description}" rows="3"></textarea>
+                                    <!--/* Inside #article-form, so a button with no name: it posts nothing. Rendered
+                                           hidden; mgmt.js shows it. It fills the field, and saving is the operator's. */-->
+                                    <div class="field-actions" th:if="${aiAvailable}">
+                                        <button type="button" class="btn btn-sm btn-ghost" hidden data-ai-describe
+                                                th:data-article="${article.id}">
+                                            <svg class="i"><use href="#i-insert"></use></svg> <th:block th:text="#{ai.suggest.description}">Suggest a summary</th:block>
+                                        </button>
+                                        <span class="library-note" data-ai-note></span>
+                                    </div>
+                                </div>
+
+                                <div class="field">
+                                    <!--/*
+                                      Both buttons are set up by mgmt.js and `hidden` until it runs:
+                                      one needs TinyMCE loaded, the other needs somewhere to store
+                                      the choice, and neither can be honoured by markup alone.
+
+                                      type="button" is load-bearing -- this is inside
+                                      <form id="article-form">, and a bare <button> would save the
+                                      article instead. Being buttons rather than inputs, they also
+                                      cannot arm the unsaved-changes guard, which listens for
+                                      input/change.
+
+                                      Fullscreen is TinyMCE's own (Ctrl+Shift+F, registered by the
+                                      plugin); it is repeated here because at this width the editor
+                                      keeps one toolbar row and hides the tail of it -- fullscreen
+                                      included -- behind a „…" overflow button.
+                                    */-->
+                                    <div class="field-head">
+                                        <label for="text" th:text="#{articles.c.text}">Text</label>
+                                        <span class="spacer"></span>
+                                        <button class="btn btn-sm btn-ghost" type="button" id="editor-wide" hidden
+                                                aria-pressed="false" th:title="#{articles.edit.wide.title}">
+                                            <svg class="i" id="editor-wide-icon"><use href="#i-maximize"></use></svg>
+                                            <span id="editor-wide-label" th:text="#{articles.edit.wide}">Wide mode</span>
+                                        </button>
+                                        <button class="btn btn-sm btn-ghost" type="button" id="editor-fullscreen" hidden
+                                                th:title="#{articles.edit.fullscreen.title}">
+                                            <svg class="i" id="editor-fullscreen-icon"><use href="#i-maximize"></use></svg>
+                                            <span id="editor-fullscreen-label" th:text="#{articles.edit.fullscreen}">Full screen</span>
+                                        </button>
+                                    </div>
+                                    <!--/*
+                                      Filled in by mgmt.js only when opening the article changed its
+                                      HTML. Empty and invisible otherwise.
+                                    */-->
+                                    <div id="fidelity-warning"></div>
+                                    <!--/* data-ai-assist: mgmt.js adds the editor's AI button where AI is available. */-->
+                                    <textarea id="text" th:field="*{text}" rows="20" th:data-ai-assist="${aiAvailable}"></textarea>
+                                </div>
+
+                                <!--/*
+                                  Two views of ONE control. #embedded keeps its id, its name and
+                                  its th:field throughout; everything else here is layered on top,
+                                  the way the author/category pickers are layered on their
+                                  <select multiple>. With scripting off the operator sees the
+                                  textarea and nothing else -- the switch and the visual pane are
+                                  `hidden`, and mgmt.css carries the [hidden] guard that makes that
+                                  stick against `.btn { display: inline-flex }`.
+
+                                  The address box has NO name and never gets one. ArticleForm has
+                                  one field for this and MgmtArticleService.save writes the fields
+                                  the form carries, so a second parameter would be silently ignored
+                                  today and silently authoritative tomorrow.
+
+                                  It is type="text", not type="url", and that is load-bearing: an
+                                  input with no name still takes part in constraint validation, so
+                                  a half-typed address in a type="url" box would make
+                                  requestSubmit() refuse silently and Ctrl+S do nothing. It also has
+                                  to accept a whole pasted <iframe> and a bare 11-character id,
+                                  neither of which is a URL.
+
+                                  Every button is type="button" -- this is inside
+                                  <form id="article-form">, where a bare <button> saves the article.
+
+                                  Opening an article NEVER rewrites this field. The visual view
+                                  recognises one shape, a lone <iframe> whose src is a YouTube
+                                  /embed/ URL; anything else -- Vimeo, a <script> embed, a wrapper
+                                  div -- opens the HTML view with the value byte-identical.
+                                  Unrecognised is not broken.
+                                */-->
+                                <div class="field" id="embed-field">
+                                    <div class="field-head">
+                                        <label for="embedded" id="embed-label" th:text="#{articles.edit.embed.label}">Embedded video</label>
+                                        <span class="spacer"></span>
+                                        <div class="segmented" id="embed-modes" role="group"
+                                             th:aria-label="#{articles.edit.embed.modes}" hidden>
+                                            <button class="btn btn-sm btn-ghost" type="button" id="embed-mode-visual"
+                                                    aria-pressed="true"
+                                                    th:title="#{articles.edit.embed.visual.title}">
+                                                <svg class="i"><use href="#i-play"></use></svg>
+                                                <span th:text="#{articles.edit.embed.visual}">Video</span>
+                                            </button>
+                                            <button class="btn btn-sm btn-ghost" type="button" id="embed-mode-html"
+                                                    aria-pressed="false"
+                                                    th:title="#{articles.edit.embed.html.title}">
+                                                <svg class="i"><use href="#i-code"></use></svg>
+                                                <span>HTML</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!--/*
+                                      data-no-dirty is on this pane, not on the card. The address
+                                      box is scratch space like .picker-search: typing an address
+                                      that fails to parse changes nothing and must not arm the
+                                      unsaved-changes guard. #embedded is a *sibling* of the pane,
+                                      not a child, which is what keeps the other half working --
+                                      the `input` event mgmt.js dispatches after a write bubbles
+                                      from outside this subtree and still counts as an edit. Moving
+                                      the textarea in here for tidiness would make the guard
+                                      swallow its own writes.
+                                    */-->
+                                    <div class="embed-visual" id="embed-visual" hidden data-no-dirty>
+                                        <!--/*
+                                          Stated, not implied by an empty-looking pane: the field
+                                          holds markup this view does not recognise, and it stays
+                                          exactly as it is until an address is typed above.
+                                        */-->
+                                        <p class="embed-note" id="embed-note" hidden th:text="#{articles.edit.embed.note}">
+                                            The current HTML is not recognised as a YouTube video.
+                                        </p>
+                                        <div class="embed-input">
+                                            <svg class="i"><use href="#i-link"></use></svg>
+                                            <input type="text" id="embed-url" autocomplete="off" spellcheck="false"
+                                                   th:placeholder="#{articles.edit.embed.url.placeholder}"
+                                                   th:aria-label="#{articles.edit.embed.url.aria}">
+                                        </div>
+                                        <p class="embed-status" id="embed-status" role="status"></p>
+                                        <div class="embed-preview" id="embed-preview"></div>
+                                        <div class="embed-actions">
+                                            <button class="btn btn-sm btn-ghost" type="button" id="embed-clear" hidden>
+                                                <svg class="i"><use href="#i-trash"></use></svg>
+                                                <span th:text="#{articles.edit.embed.clear}">Remove the video</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!--/*
+                                      The bound control. Visible on its own with scripting off; in
+                                      the visual view mgmt.js only hides it, because a hidden
+                                      control is still submitted and this is what carries the
+                                      binding.
+                                    */-->
+                                    <textarea id="embedded" th:field="*{embedded}" rows="3"></textarea>
+                                    <p class="field-hint" id="embed-html-hint" hidden th:text="#{articles.edit.embed.htmlHint}">
+                                        The code is output exactly as stored.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!--/*
+                              The language strip, shared with article-translation-edit.html: a
+                              horizontal row at the foot of this card. Links only -- see the
+                              fragment. Absent when the article has no translations.
+                            */-->
+                            <div th:replace="~{mgmt/fragments :: articleLanguages(${article}, null, ${translations})}"></div>
+                        </div>
+                    </div>
+
+                    <div class="editor-rail">
+                        <div class="card">
+                            <h2><svg class="i"><use href="#i-calendar"></use></svg> <th:block th:text="#{articles.edit.publishing}">Publishing</th:block></h2>
+
+                            <div class="card-body">
+                                <div class="field">
+                                    <label for="status" th:text="#{articles.c.status}">Status</label>
+                                    <!--/* Disabled without content.publish: the server ignores a move into or out of
+                                           PUBLISHED from such a person anyway (MgmtArticleService.save). */-->
+                                    <select id="status" th:field="*{status}" th:disabled="${can != null and !can.site('content.publish')}">
+                                        <option th:each="s : ${statuses}" th:value="${s}" th:text="${mgmtText.label(s)}"></option>
+                                    </select>
+                                    <span class="hint" th:if="${can != null and !can.site('content.publish')}"
+                                          th:text="#{portal.publish.needed}">Publishing is up to an editor.</span>
+                                </div>
+
+                                <div class="field">
+                                    <label for="date" th:text="#{articles.c.date}">Date</label>
+                                    <input type="datetime-local" id="date" th:field="*{date}">
+                                </div>
+
+                                <div class="field">
+                                    <label for="priority"><th:block th:text="#{articles.edit.priority}">Priority</th:block> <span class="help" th:text="#{articles.edit.priority.help}">— higher comes first</span></label>
+                                    <input type="number" id="priority" th:field="*{priority}" min="0">
+                                </div>
+
+                                <div class="field">
+                                    <label for="titleOverlayClasses" th:text="#{articles.edit.titleStyle}">Title style</label>
+                                    <select id="titleOverlayClasses" th:field="*{titleOverlayClasses}">
+                                        <option value="" th:text="#{articles.edit.titleStyle.default}">default</option>
+                                        <option value="title-overlay-dark" th:text="#{articles.edit.titleStyle.dark}">dark background</option>
+                                        <option value="title-overlay-darktext" th:text="#{articles.edit.titleStyle.darktext}">dark text</option>
+                                        <option value="title-overlay-bluetext" th:text="#{articles.edit.titleStyle.bluetext}">blue text</option>
+                                        <option value="title-overlay-redtext" th:text="#{articles.edit.titleStyle.redtext}">red text</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h2><svg class="i"><use href="#i-tag"></use></svg> <th:block th:text="#{articles.edit.classification}">Classification</th:block></h2>
+
+                            <div class="card-body">
+                                <!--/*
+                                  The two <select multiple> elements keep their ids and their
+                                  th:field bindings; mgmt.js hides each one behind a searchable
+                                  checkbox list and drives option.selected from it. With scripting
+                                  off the native control is what the operator sees and the form
+                                  posts exactly the same parameter either way -- which matters,
+                                  because MgmtArticleService.save writes the fields the form
+                                  carries, so a picker that failed to bind would strip the
+                                  article's authors and categories on the next save.
+                                */-->
+                                <div class="field">
+                                    <label for="authorIds"><th:block th:text="#{articles.c.authors}">Authors</th:block>
+                                        <span class="help" th:text="#{articles.edit.authors.help}">— ordered below the text</span></label>
+                                    <select id="authorIds" th:field="*{authorIds}" multiple size="8"
+                                            th:data-picker="#{articles.edit.authors.picker}">
+                                        <option th:each="a : ${authors}"
+                                                th:value="${a.id}"
+                                                th:text="|${a.id} · ${a.title != null ? a.title : ''} ${a.fullname()}|"></option>
+                                    </select>
+                                </div>
+
+                                <div class="field">
+                                    <label for="categoryIds" th:text="#{articles.c.categories}">Categories</label>
+                                    <select id="categoryIds" th:field="*{categoryIds}" multiple size="8"
+                                            th:data-picker="#{articles.edit.categories.picker}">
+                                        <option th:each="c : ${categories}"
+                                                th:value="${c.id}"
+                                                th:text="|${c.id} · ${c.name}|"></option>
+                                    </select>
+                                </div>
+
+                                <div class="field">
+                                    <label for="tags"><th:block th:text="#{articles.edit.tags}">Tags</th:block> <span class="help" th:text="#{articles.edit.tags.help}">— comma-separated</span></label>
+                                    <input type="text" id="tags" th:field="*{tags}">
+                                    <div class="field-actions" th:if="${aiAvailable}">
+                                        <button type="button" class="btn btn-sm btn-ghost" hidden data-ai-tags
+                                                th:data-article="${article.id}">
+                                            <svg class="i"><use href="#i-tag"></use></svg> <th:block th:text="#{ai.suggest.tags}">Suggest tags</th:block>
+                                        </button>
+                                        <span class="library-note" data-ai-note></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!--/*
+                          Read-only ON THIS SCREEN, and it has to stay that way. The translations live in
+                          Article.texts, which MgmtArticleService.save deliberately does NOT write
+                          -- it applies the form onto the stored document precisely so texts,
+                          titles and descriptions survive an edit. A bound field here would let one
+                          console save wipe every translation, silently and with no undo:
+                          Article.previousText covers the body and nothing else.
+
+                          The original language is absent by construction, not by omission -- it
+                          is the source, stored in the scalar `text` field this screen edits above.
+                          See Article.translatedIn() for why an entry for the original in `texts`
+                          must not be listed as a translation.
+
+                          Codes rather than names: article translations are keyed by bare language
+                          codes that need not have a row in the language collection at
+                          /mgmt/pages/languages, so a name looked up there could be missing; a code
+                          with no row shows as itself, uppercased. The same reason the languages
+                          column on /mgmt/pages shows codes.
+                        
+                          Each chip is a LINK to that translation's own screen, never a control: a
+                          link carries no name=, so nothing here reaches this form's POST, and the
+                          card still posts nothing. MgmtScreenRenderTest asserts exactly that.
+                        */-->
+                        <div class="card">
+                            <h2>
+                                <svg class="i"><use href="#i-tag"></use></svg>
+                                <th:block th:text="#{articles.edit.translations}">Translations</th:block>
+                                <span class="hint" th:with="n=${article.translatedIn().size()}"
+                                      th:text="${n == 1} ? #{articles.c.langs.one} : #{articles.c.langs.many(${n})}">14 languages</span>
+                            </h2>
+
+                            <div class="card-body" th:with="langs=${article.translatedIn()}">
+                                <div th:unless="${langs.isEmpty()}">
+                                    <a class="chip" th:each="c : ${langs}"
+                                       th:href="@{/mgmt/articles/{id}/translations/{lang}(id=${article.id}, lang=${c})}"
+                                       th:title="#{articles.edit.translations.chip(${translations.get(c)})}"
+                                       th:text="${#strings.toUpperCase(c)}">EN</a>
+                                </div>
+
+                                <p class="muted" style="margin-top:0" th:if="${langs.isEmpty()}"
+                                   th:text="#{articles.edit.translations.none}">Not translated yet.</p>
+
+                                <!--/*
+                                  Where they come from, since nothing on this screen makes one.
+                                */-->
+                                <p class="muted" style="margin-bottom:0">
+                                    <th:block th:unless="${langs.isEmpty()}" th:text="#{articles.edit.translations.click}">Click a language to edit its translation.</th:block>
+                                    <th:block th:text="#{articles.edit.translations.fromJobs}">New translations come from translation jobs</th:block>
+                                        <th:block th:text="#{articles.edit.translations.see}">— see</th:block> <a th:href="@{/mgmt/jobs}" th:text="#{articles.edit.translations.jobs}">Jobs</a>.
+                                    <th:block th:text="#{articles.edit.translations.originalOnly}">This screen edits the original text only.</th:block>
+                                </p>
+                            </div>
+                        </div>
+
+                        <!--/*
+                          The image library, beside the editor rather than beside the Изображения card
+                          below, because that is what makes dragging a picture into the body possible
+                          without scrolling the page mid-drag.
+
+                          Four things about this card follow from the fact that it sits INSIDE
+                          <form id="article-form">:
+
+                            - it contains no <form> of its own, because nesting one is illegal HTML.
+                              Searching, attaching and inserting are all fetch() calls in mgmt.js;
+                            - every button is type="button", or it would submit the article;
+                            - Enter in the search box is preventDefault'ed by mgmt.js, exactly as it is
+                              in the author/category picker and for the same reason;
+                            - data-no-dirty keeps its events out of the unsaved-changes tracker, which
+                              listens for input/change bubbling up to this form. Without it, typing a
+                              search term would mark the article dirty and every later navigation would
+                              be met with a warning about changes nobody made.
+
+                          Its search input is deliberately NOT id="search-input": mgmt.js debounces that
+                          id and auto-submits its enclosing form, which here is the article.
+
+                          «Уголеми» lays this card over the whole window, the author and category
+                          pickers' mechanism and the same code -- makeOverlay in mgmt.js, which moves
+                          the card to <body> and leaves a slot holding the rail's height open. That
+                          adds a fifth item to the list above, and it is the one that bites: while
+                          expanded the card is NOT inside this form, so a control in here that ever
+                          grew a `name` would be posted in one state and dropped in the other, with
+                          nothing on screen to show for it. Nothing in it carries one today -- not the
+                          search box, not the ordering buttons mgmt.js builds above the list.
+                        */-->
+                        <div class="card" id="image-library" data-no-dirty
+                             th:attr="data-article=${article.id},data-prefix=${imagePathPrefix}">
+                            <h2>
+                                <svg class="i"><use href="#i-image"></use></svg>
+                                <th:block th:text="#{articles.edit.library}">Library</th:block>
+                                <span class="hint" th:text="#{articles.edit.library.hint}">all images on the site</span>
+                            </h2>
+
+                            <div class="card-body">
+                                <div class="search">
+                                    <svg class="i"><use href="#i-search"></use></svg>
+                                    <input type="search" id="library-search"
+                                           th:placeholder="#{articles.edit.library.placeholder}"
+                                           th:aria-label="#{articles.edit.library.aria}" autocomplete="off">
+                                </div>
+
+                                <!--/* Filled in by mgmt.js. With scripting off the card shows the note
+                                       below and the /mgmt/images screen does the same job. */-->
+                                <div class="library-list" id="library-list" aria-live="polite"></div>
+
+                                <noscript>
+                                    <p class="muted">
+                                        <th:block th:text="#{articles.edit.library.noscript}">The library needs JavaScript. The list of all images is on the page</th:block>
+                                        <a th:href="@{/mgmt/images}" th:text="#{articles.c.images}">Images</a>.
+                                    </p>
+                                </noscript>
+
+                                <button class="btn btn-sm btn-ghost hidden" type="button" id="library-more"
+                                        th:text="#{articles.edit.library.more}">Show more</button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+
+                <!--/*
+                  Outside the form above: HTML forbids nesting one form inside another, and each of
+                  these cards is its own POST. Inside the same grid, though -- a sibling of the
+                  form's two columns rather than a second grid below it -- which is what puts the
+                  images directly under the text instead of below the whole rail.
+                */-->
+                <div class="editor-tail">
+                    <!--/*
+                      The selected authors, in the order the byline prints them.
+
+                      The order is not decorative: ArticleModel.getAuthorsAsText() walks the stored
+                      list, so the first author here is the one that leads the byline under every
+                      title. And the order has exactly one home -- a <select multiple> submits its
+                      options in TREE order, so the order of the <option> elements in #authorIds IS
+                      what reaches the server. That is why the arrows below reorder the options
+                      themselves and this card posts nothing of its own, for the same reason the
+                      picker's checkboxes carry no name: MgmtArticleService.save writes the fields
+                      the form carries, so a second parameter would be silently ignored today and
+                      silently authoritative tomorrow.
+
+                      Rendered `hidden` and EMPTY. mgmt.js builds every row and every button, then
+                      unhides the card. Arrows in the markup that need a script to work would be
+                      dead controls with scripting off (the public site's gallery follows the same
+                      rule: its script builds every control), and the card sits outside
+                      <form id="article-form"> -- so a button here that reached the form would save
+                      the article. With scripting off nothing is shown and the native
+                      <select multiple> in the rail is what the operator uses, which is the same
+                      fallback the picker already relies on.
+
+                      `hidden` works unaided here: .card declares background, border and margin but
+                      no display, so it is not one of the elements the [hidden] guard in mgmt.css
+                      has to name.
+                    */-->
+                    <div class="card" id="author-order" hidden>
+                        <h2>
+                            <svg class="i"><use href="#i-users"></use></svg>
+                            <th:block th:text="#{articles.c.authors}">Authors</th:block>
+                            <span class="hint" th:text="#{articles.edit.authorOrder.hint}">the byline order</span>
+                        </h2>
+
+                        <div class="card-body">
+                            <ol class="order-list" id="author-order-list"></ol>
+
+                            <p class="muted" id="author-order-empty" th:text="#{articles.edit.authorOrder.empty}">
+                                No authors selected.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>
+                            <svg class="i"><use href="#i-image"></use></svg>
+                            <th:block th:text="#{articles.c.images}">Images</th:block>
+                            <!--/*
+                              The hint states what the server would refuse, so each clause has to
+                              follow the flag that governs it. The two switches are independent --
+                              four combinations -- so the sentence is ASSEMBLED from three clauses
+                              rather than written out once per combination: four th:if variants
+                              become eight the moment a third rule is added, and the one that is
+                              wrong is the one nobody re-read.
+
+                              Neither "off" clause is silent about the limit. Saying nothing about
+                              size reads as "any size", and an operator would find out otherwise
+                              from a bare 413 -- Caddy and the servlet container refuse above
+                              transportKilobytes whatever these flags say, below the level where
+                              anything here could phrase it.
+                            */-->
+                            <span class="hint"
+                                  th:with="dimHint=${imageRules.dimensionCheck()}
+                                                   ? #{articles.edit.images.dimExact(${imageRules.width()}, ${imageRules.height()})}
+                                                   : #{articles.edit.images.dimFree(${imageRules.width()}, ${imageRules.height()})},
+                                           sizeHint=${imageRules.fileSizeCheck()}
+                                                   ? #{articles.edit.images.sizeMax(${imageRules.maxKilobytes()})}
+                                                   : #{articles.edit.images.sizeFree(${imageRules.transportKilobytes()})}"
+                                  th:text="#{articles.edit.images.hint(${dimHint}, ${sizeHint}, ${maxImages})}"></span>
+                        </h2>
+
+                        <div class="card-body">
+                            <!--/*
+                              Order is the whole cover mechanism: the public site takes the first
+                              VISIBLE image as the share card and as every list thumbnail, and
+                              renders the rest as the gallery strip in this order. There is no
+                              separate cover field, which is why the arrows below are not a
+                              convenience.
+
+                              The loop walks article.images -- stored order, hidden ones included --
+                              so "which one is the cover" is a comparison against visibleImages()[0]
+                              and not an index test. mgmt.js repaints both badges after a reorder;
+                              this is what they look like on load.
+                            */-->
+                            <!--/* Always rendered, empty or not: attaching from the library appends
+                                   a card here without a reload, so the container has to exist. */-->
+                            <div class="images" id="article-images"
+                                 th:attr="data-article=${article.id}"
+                                 th:with="cover=${article.visibleImages().isEmpty() ? null : article.visibleImages()[0]}">
+
+                                <div class="image-card" th:each="img : ${article.images}" draggable="true"
+                                     th:attr="data-image=${img.id},data-path=${imagePathPrefix + img.filename}"
+                                     th:classappend="${article.hiddenImageIds != null and article.hiddenImageIds.contains(img.id)} ? 'is-hidden'">
+
+                                    <span class="image-badge cover" th:if="${cover != null and cover.id == img.id}" th:text="#{articles.edit.images.cover}">cover</span>
+                                    <span class="image-badge hidden-badge" th:text="#{articles.edit.images.hidden}">hidden</span>
+
+                                    <img loading="lazy" th:src="@{${imagePathPrefix} + ${img.filename}}"
+                                         th:alt="${img.filename}">
+
+                                    <div class="meta">
+                                        <span class="name" th:text="${img.filename}" th:title="${img.filename}">file</span>
+                                        <form class="inline-form" method="post"
+                                              th:action="@{/mgmt/articles/{id}/images/{imageId}/delete(id=${article.id},imageId=${img.id})}"
+                                              th:data-confirm="#{articles.edit.images.removeConfirm}">
+                                            <button class="btn btn-danger btn-icon btn-sm" type="submit" th:title="#{articles.edit.images.remove.title}">
+                                                <svg class="i"><use href="#i-trash"></use></svg>
+                                                <span class="sr-only" th:text="#{articles.edit.images.remove}">Remove the image</span>
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    <!--/*
+                                      Buttons, not only a drag handle. Dragging is unusable on a
+                                      touch screen and unreachable from a keyboard, so it is the
+                                      enhancement here and never the mechanism.
+                                    */-->
+                                    <div class="image-actions">
+                                        <button class="btn btn-icon btn-sm" type="button" data-move="up" th:title="#{articles.edit.images.up.title}">
+                                            <svg class="i"><use href="#i-arrow-up"></use></svg>
+                                            <span class="sr-only" th:text="#{articles.edit.images.up}">Move up</span>
+                                        </button>
+                                        <button class="btn btn-icon btn-sm" type="button" data-move="down" th:title="#{articles.edit.images.down.title}">
+                                            <svg class="i"><use href="#i-arrow-down"></use></svg>
+                                            <span class="sr-only" th:text="#{articles.edit.images.down}">Move down</span>
+                                        </button>
+                                        <button class="btn btn-icon btn-sm" type="button" data-toggle-hidden
+                                                th:title="#{articles.edit.images.toggle.title}">
+                                            <svg class="i on-shown"><use href="#i-eye"></use></svg>
+                                            <svg class="i on-hidden"><use href="#i-eye-off"></use></svg>
+                                            <span class="sr-only" th:text="#{articles.edit.images.toggle}">Show or hide in the gallery</span>
+                                        </button>
+                                        <button class="btn btn-icon btn-sm" type="button" data-insert
+                                                th:title="#{articles.edit.images.insert}">
+                                            <svg class="i"><use href="#i-insert"></use></svg>
+                                            <span class="sr-only" th:text="#{articles.edit.images.insert}">Insert into the text</span>
+                                        </button>
+                                    </div>
+
+                                    <!--/*
+                                      A readonly input, not a copy button alone. navigator.clipboard
+                                      is undefined on a plaintext origin, which is exactly how the
+                                      local stack is reached -- so selecting the text has to work by
+                                      itself, and the button is what is layered on top. No name
+                                      attribute: this sits outside the article form today, but the
+                                      identical row in the library card does not.
+                                    */-->
+                                    <div class="path-row">
+                                        <input class="path" type="text" readonly
+                                               th:value="${imagePathPrefix + img.filename}"
+                                               th:title="${imagePathPrefix + img.filename}"
+                                               th:aria-label="#{articles.c.imagePath}">
+                                        <button class="btn btn-icon btn-sm" type="button" data-copy th:title="#{articles.c.copyPath}">
+                                            <svg class="i"><use href="#i-copy"></use></svg>
+                                            <span class="sr-only" th:text="#{articles.c.copyPath}">Copy path</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="empty" id="images-empty" style="padding:20px 0"
+                                 th:classappend="${article.images != null and !article.images.isEmpty()} ? 'hidden'">
+                                <svg class="i"><use href="#i-image"></use></svg>
+                                <span th:text="#{articles.edit.images.empty}">No images attached.</span>
+                            </div>
+
+                            <p class="muted arrange-status" id="arrange-status" role="status"></p>
+
+                            <!--/*
+                              mgmt.js turns this into a drop target, previews the choice, and --
+                              because of `data-async` -- posts the files with fetch instead of
+                              submitting, appending a card per upload.
+
+                              The action stays declared and stays right: it is what «Качи» does
+                              with scripting off, and the enhancement is a wrapper over it rather
+                              than a replacement, exactly as the pickers wrap their <select>. It
+                              must not be dropped because "JavaScript handles it" -- the no-script
+                              path would then post nowhere and answer 200.
+
+                              `data-async` is what scopes the interception to this screen:
+                              banner-edit.html and banner-layout-edit.html reuse this same id and
+                              upload trio, and both of them do want the redirect.
+
+                              `multiple`, because the drop handler can hand this input several
+                              files at once; without it the browser keeps them all and only the
+                              first is ever posted, silently.
+                            */-->
+                            <form method="post" enctype="multipart/form-data" id="image-form" data-async
+                                  th:action="@{/mgmt/articles/{id}/images(id=${article.id})}"
+                                  style="margin-top:16px">
+                                <div class="dropzone" id="dropzone">
+                                    <span class="dz-icon"><svg class="i"><use href="#i-upload"></use></svg></span>
+                                    <span class="dz-body">
+                                        <span class="dz-title" th:text="#{articles.edit.images.new}">New image</span>
+                                        <input type="file" id="image-file" name="file" multiple
+                                               accept="image/jpeg,image/png,image/gif" required>
+                                        <span class="dz-preview" id="upload-hint"></span>
+                                    </span>
+                                    <button class="btn" type="submit" id="upload-submit">
+                                        <svg class="i"><use href="#i-upload"></use></svg> <th:block th:text="#{articles.edit.images.upload}">Upload</th:block>
+                                    </button>
+                                </div>
+                                <p class="muted arrange-status" id="upload-status" role="status"></p>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!--/*
+                      Only offered when there is something to go back to. The editor can rewrite
+                      markup simply by opening an article, so a save is not always the change the
+                      operator meant to make.
+                    */-->
+                    <div class="card"
+                         th:if="${article.previousText != null and article.previousText != article.text}">
+                        <h2>
+                            <svg class="i"><use href="#i-undo"></use></svg>
+                            <th:block th:text="#{articles.edit.previous}">Previous version of the text</th:block>
+                            <span class="hint" th:text="#{articles.edit.previous.chars(${#strings.length(article.previousText)})}"></span>
+                        </h2>
+                        <div class="card-body">
+                            <p class="muted" style="margin-top:0" th:text="#{articles.edit.previous.note}">
+                                The version from before the last save is kept.
+                            </p>
+                            <form method="post" th:action="@{/mgmt/articles/{id}/restore-text(id=${article.id})}"
+                                  th:data-confirm="#{articles.edit.previous.confirm}">
+                                <button class="btn" type="submit">
+                                    <svg class="i"><use href="#i-undo"></use></svg> <th:block th:text="#{articles.edit.previous.restore}">Restore the previous text</th:block>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!--/* Translation by the AI gateway, as a job (MgmtJobController): its own POST,
+                           outside #article-form. Only where AI is available to this person here. The
+                           checkboxes are named, but in this form alone -- never in #article-form. */-->
+                    <div class="card" th:if="${aiAvailable and can != null and can.site('content.write')}">
+                        <h2><svg class="i"><use href="#i-globe"></use></svg> <th:block th:text="#{jobs.article.translate}">Translate</th:block></h2>
+                        <form method="post" th:action="@{/mgmt/jobs/translate}">
+                            <div class="card-body">
+                                <p class="muted" style="margin-top:0" th:text="#{jobs.article.translate.intro}">Translated in the background.</p>
+                                <input type="hidden" name="ids" th:value="${article.id}">
+                                <input type="hidden" name="next" value="true">
+                                <input type="hidden" name="back" th:value="'/mgmt/articles/' + ${article.id}">
+                                <p class="muted" th:if="${translateLanguages.isEmpty()}" th:text="#{jobs.translate.none}">No other language.</p>
+                                <div class="checkline" th:each="l : ${translateLanguages}">
+                                    <input type="checkbox" name="languages" th:id="'tr-' + ${l.code()}" th:value="${l.code()}"
+                                           th:checked="${!l.present()}">
+                                    <label th:for="'tr-' + ${l.code()}"
+                                           th:text="${l.name() ?: l.code()} + (${l.present()} ? ' · ' + #{jobs.translate.present} : '')">Deutsch</label>
+                                </div>
+                                <div class="checkline">
+                                    <input type="checkbox" id="tr-all" name="mode" value="all">
+                                    <label for="tr-all" th:text="#{jobs.translate.mode.all}">Translate again where a translation exists</label>
+                                </div>
+                            </div>
+                            <div class="card-foot" th:unless="${translateLanguages.isEmpty()}">
+                                <button class="btn" type="submit">
+                                    <svg class="i"><use href="#i-play"></use></svg> <th:block th:text="#{jobs.article.translate.make}">Translate</th:block>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!--/* The article's PDFs, made by a job (MgmtJobController): its own POST, outside
+                           #article-form like the cards around it. Only while PDF export is set up. */-->
+                    <div class="card" th:if="${pdfEnabled and can != null and can.site('content.write')}">
+                        <h2><svg class="i"><use href="#i-file-text"></use></svg> <th:block th:text="#{jobs.article.pdf}">PDF</th:block></h2>
+                        <div class="card-body">
+                            <p class="muted" style="margin-top:0" th:text="#{jobs.article.pdf.intro}">One PDF per language.</p>
+                            <form method="post" th:action="@{/mgmt/jobs/pdf}">
+                                <input type="hidden" name="ids" th:value="${article.id}">
+                                <input type="hidden" name="next" value="true">
+                                <input type="hidden" name="back" th:value="'/mgmt/articles/' + ${article.id}">
+                                <button class="btn" type="submit">
+                                    <svg class="i"><use href="#i-play"></use></svg> <th:block th:text="#{jobs.article.pdf.make}">Make the PDFs</th:block>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card danger">
+                        <h2><svg class="i"><use href="#i-trash"></use></svg> <th:block th:text="#{articles.c.deletion}">Delete</th:block></h2>
+                        <div class="card-body">
+                            <p class="muted" style="margin-top:0" th:text="#{articles.edit.delete.note}">
+                                The article and its images are deleted permanently.
+                            </p>
+                            <form method="post"
+                                  th:action="@{/mgmt/articles/{id}/delete(id=${article.id})}"
+                                  th:data-confirm="#{articles.edit.delete.confirm}">
+                                <button class="btn btn-danger" type="submit">
+                                    <svg class="i"><use href="#i-trash"></use></svg> <th:block th:text="#{articles.edit.delete}">Delete the article</th:block>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!--/*
+          The save bar. Fixed, so "Запази" is reachable from anywhere in a 600-pixel editor
+          instead of only from the bottom of the third card.
+
+          The buttons sit outside <form id="article-form"> and reach it through the `form`
+          attribute -- the answer that needs no JavaScript. mgmt.js additionally binds Ctrl/Cmd+S
+          and keeps the dirty indicator honest.
+        */-->
+        <div class="savebar">
+            <span class="status" id="save-status" th:text="#{articles.c.ctrlS}">Ctrl+S saves</span>
+            <a class="btn btn-ghost" th:href="@{/mgmt/articles/{id}/preview(id=${article.id})}" target="_blank" rel="noopener">
+                <svg class="i"><use href="#i-eye"></use></svg> <th:block th:text="#{articles.c.preview}">Preview</th:block>
+            </a>
+            <a class="btn" th:href="@{/mgmt/articles}" th:text="#{articles.c.toList}">Back to the list</a>
+            <button class="btn btn-primary" type="submit" form="article-form">
+                <svg class="i"><use href="#i-save"></use></svg> <th:block th:text="#{articles.c.save}">Save</th:block>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!--/*
+  TinyMCE 8, vendored in this jar under /mgmt-assets/tinymce/ — not loaded from the web volume,
+  and not from a CDN. TinyMCE resolves its own skins, plugins, icons and languages relative to
+  this file, so this one tag is the whole integration; do not add a base_url.
+
+  mgmt.js leaves the plain textarea usable if this fails to load, so a missing editor degrades
+  rather than breaking the page.
+*/-->
+<script th:src="@{/mgmt-assets/tinymce/tinymce.min.js}" referrerpolicy="origin"></script>
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

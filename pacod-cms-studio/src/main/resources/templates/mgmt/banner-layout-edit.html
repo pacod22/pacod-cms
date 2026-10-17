@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<!--/*
+  The builder.
+
+  Two ids are reused from the article editor on purpose, exactly as page-edit.html reuses them:
+  the form is id="article-form", which is what the save bar's form= attribute, Ctrl/Cmd+S and the
+  unsaved-changes guard all look for, and the upload block uses #dropzone / #image-file /
+  #upload-hint, which mgmt.js already turns into a drop target. Both are guarded on the element
+  existing, so reusing them inherits the behaviour and costs nothing. There is deliberately no
+  id="text" here -- that is what mgmt.js binds TinyMCE to, and an editor configured to preserve
+  stored article bodies would still reformat a banner's markup on every open.
+
+  The per-slide buttons sit inside the row but belong to forms emitted at the end of the document,
+  through the form= attribute -- the same mechanism the save bar uses. HTML forbids nesting a form
+  inside another, and each of these is its own POST.
+*/-->
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{banners.layout.title})}"></head>
+
+<body>
+
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('layouts')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{banners.layout.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <div class="grow">
+                    <code th:text="${layout.id}">acme-2026</code>
+                    <span class="badge plain" th:text="${mgmtText.label(layout.origin)}">Built</span>
+                    <span class="badge plain" th:if="${skeleton != null}"
+                          th:text="#{banners.layout.skeletonBadge(${skeleton.title})}">Template</span>
+                </div>
+                <a class="btn btn-ghost push"
+                   th:href="@{/mgmt/banners/layouts/{id}/files(id=${layout.id})}">
+                    <svg class="i"><use href="#i-code"></use></svg> <th:block th:text="#{banners.layout.files}">Files</th:block>
+                </a>
+                <a class="btn btn-ghost" th:href="@{/mgmt/banners/layouts}" th:text="#{banners.layout.toList}">Back to the list</a>
+            </div>
+
+            <!--/* ============================================ built: the form ============ */-->
+            <form id="article-form" method="post" th:if="${layout.built}"
+                  th:action="@{/mgmt/banners/layouts/{id}(id=${layout.id})}" th:object="${form}">
+
+                <div th:replace="~{mgmt/fragments :: errors}"></div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-layout"></use></svg> <span th:text="#{banners.layout.basics}">Basics</span></h2>
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="title" th:text="#{banners.layout.field.title}">Title</label>
+                            <input type="text" id="title" th:field="*{title}" maxlength="128">
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="width" th:text="#{banners.layout.field.width}">Width (px)</label>
+                                <input type="number" id="width" th:field="*{width}" min="1" max="4000">
+                            </div>
+                            <div class="field">
+                                <label for="height" th:text="#{banners.layout.field.height}">Height (px)</label>
+                                <input type="number" id="height" th:field="*{height}" min="1" max="4000">
+                            </div>
+                        </div>
+                        <span class="hint" th:utext="#{banners.layout.size.hint}">
+                            Set both or leave both empty.
+                        </span>
+
+                        <div class="grid-2" style="margin-top:16px">
+                            <div class="field">
+                                <label for="rotationMs" th:text="#{banners.layout.field.rotation}">Frame change (ms)</label>
+                                <input type="number" id="rotationMs" th:field="*{rotationMs}"
+                                       min="1000" max="600000" step="500">
+                                <span class="hint" th:text="#{banners.layout.field.rotation.hint}">10000 is about ten seconds.</span>
+                            </div>
+                            <div class="field">
+                                <label for="gtmId">Google Tag Manager</label>
+                                <input type="text" id="gtmId" th:field="*{gtmId}" maxlength="64"
+                                       placeholder="GTM-XXXXXXX">
+                                <span class="hint" th:if="${skeleton != null and skeleton.gtmId != null}"
+                                      th:text="#{banners.layout.field.gtm.required}">
+                                    The template loads GTM, so the code is required.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-image"></use></svg>
+                        <span th:text="#{banners.layout.slides}">Frames</span>
+                        <span class="hint" th:text="#{banners.layout.slides.hint}">The first frame is the one seen immediately</span>
+                    </h2>
+                    <div class="card-body">
+                        <div class="empty" id="slides-empty" th:hidden="${!layout.slides.isEmpty()}">
+                            <svg class="i"><use href="#i-image"></use></svg>
+                            <span th:text="#{banners.layout.slides.empty}">No frames yet.</span>
+                        </div>
+
+                        <!--/*
+                          Rendered even with no slides, hidden: the first upload made through fetch
+                          needs a table to put its row in.
+                        */-->
+                        <div class="table-wrap" id="slides-table" th:hidden="${layout.slides.isEmpty()}">
+                            <table>
+                                <thead>
+                                <tr>
+                                    <th class="shrink">№</th>
+                                    <th class="shrink" th:text="#{banners.layout.slides.col.image}">Image</th>
+                                    <th th:text="#{banners.layout.slides.col.text}">Address, caption and alt text</th>
+                                    <th class="shrink" th:text="#{banners.layout.slides.col.order}">Order</th>
+                                </tr>
+                                </thead>
+                                <tbody id="slides-body">
+                                <!--/* th:replace runs before th:each, so the loop is its own element. */-->
+                                <th:block th:each="slide, it : ${layout.slides}">
+                                    <tr th:replace="~{mgmt/banner-layout-edit :: slide-row(${slide}, ${it.index}, ${it.last})}"></tr>
+                                </th:block>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="savebar">
+                    <span class="spacer"></span>
+                    <span id="save-status" class="muted"></span>
+                    <button class="btn btn-primary" type="submit" form="article-form">
+                        <svg class="i"><use href="#i-save"></use></svg> <th:block th:text="#{banners.layout.save}">Save</th:block>
+                    </button>
+                </div>
+            </form>
+
+            <!--/*
+              Everything below is its own POST and therefore outside the form above.
+              The slide action forms come first so their buttons resolve; a form= attribute needs
+              the form to exist in the document, not to precede the button.
+            */-->
+            <th:block th:if="${layout.built}">
+                <div id="slide-forms">
+                    <th:block th:each="slide, it : ${layout.slides}">
+                        <th:block th:replace="~{mgmt/banner-layout-edit :: slide-forms(${it.index})}"></th:block>
+                    </th:block>
+                </div>
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-upload"></use></svg>
+                        <span th:text="#{banners.layout.upload}">New image</span>
+                        <span class="hint" th:text="#{banners.layout.upload.limit(${bannerRules.maxKilobytes})}">up to 1024 KB</span>
+                    </h2>
+                    <div class="card-body">
+                        <p class="muted" style="margin-top:0" th:text="#{banners.layout.upload.help}">
+                            One at a time.
+                        </p>
+                        <!--/*
+                          data-slide-upload, not data-async: the latter is the article editor's
+                          multi-file module. The action stays declared and correct, so with scripting
+                          off «Качи» posts it and gets the redirect exactly as before.
+                        */-->
+                        <form method="post" enctype="multipart/form-data" id="image-form" data-slide-upload
+                              th:action="@{/mgmt/banners/layouts/{id}/slides(id=${layout.id})}">
+                            <div class="dropzone" id="dropzone">
+                                <span class="dz-icon"><svg class="i"><use href="#i-upload"></use></svg></span>
+                                <span class="dz-body">
+                                    <span class="dz-title" th:text="#{banners.layout.upload.dropTitle}">Frame image</span>
+                                    <input type="file" id="image-file" name="file"
+                                           accept="image/jpeg,image/png,image/gif,image/webp" required>
+                                    <span class="dz-preview" id="upload-hint"></span>
+                                </span>
+                                <button class="btn" type="submit" id="upload-submit">
+                                    <svg class="i"><use href="#i-upload"></use></svg> <th:block th:text="#{banners.layout.upload.submit}">Upload</th:block>
+                                </button>
+                            </div>
+                        </form>
+                        <p class="muted arrange-status" id="upload-status" role="status" aria-live="polite"></p>
+                    </div>
+                </div>
+            </th:block>
+
+            <div class="card" th:unless="${layout.built}">
+                <h2><svg class="i"><use href="#i-upload"></use></svg> <span th:text="#{banners.layout.imported}">Uploaded layout</span></h2>
+                <div class="card-body">
+                    <p class="muted" style="margin-top:0" th:text="#{banners.layout.imported.help}">
+                        This layout is not in a form the console knows.
+                    </p>
+                    <p class="muted">
+                        <th:block th:text="#{banners.layout.imported.files.before}">The address and images can still be changed: from</th:block>
+                        <a th:href="@{/mgmt/banners/layouts/{id}/files(id=${layout.id})}" th:text="#{banners.layout.imported.files.link}">“Files”</a>
+                        <th:block th:text="#{banners.layout.imported.files.after}">every text file can be edited.</th:block>
+                    </p>
+                </div>
+            </div>
+
+            <!--/*
+              ================================================================== преглед
+
+              Зарежда се с бутон, не автоматично. Папката съдържа блока на Google Tag Manager, така
+              че всяко отваряне на този кадър праща посещение към контейнера на рекламодателя. При
+              автоматично зареждане това щеше да се случва при всяко отваряне на екрана — включително
+              след всяко запазване — и щеше да се брои като трафик от сайта.
+
+              Показва се точно публикуваният файл, а не негово копие без GTM: преглед, който не е
+              публикуваният файл, не е преглед.
+            */-->
+            <div class="card">
+                <h2>
+                    <svg class="i"><use href="#i-eye"></use></svg>
+                    <span th:text="#{banners.layout.preview}">Preview</span>
+                    <span class="hint" th:text="${layout.publicPath()}">/resources/banners/…</span>
+                </h2>
+                <div class="card-body">
+                    <p class="muted" style="margin-top:0" th:text="#{banners.layout.preview.help}">
+                        The preview opens the folder itself.
+                    </p>
+                    <!--/*
+                      Framed from the WEBSITE's origin, never the studio's: the folder is HTML and
+                      JavaScript its owner wrote, and on the studio's origin it would run with the
+                      studio's cookies. With no domain yet there is nothing safe to frame.
+                    */-->
+                    <div id="layout-preview"
+                         th:data-src="${currentSite?.publicUrl != null} ? ${currentSite.publicUrl + layout.publicPath()} : ''"
+                         th:data-width="${layout.width}" th:data-height="${layout.height}"></div>
+                    <div class="actions">
+                        <button class="btn" type="button" id="layout-preview-load">
+                            <svg class="i"><use href="#i-play"></use></svg> <th:block th:text="#{banners.layout.preview.load}">Show the preview</th:block>
+                        </button>
+                        <a class="btn btn-ghost" th:if="${currentSite?.publicUrl != null}"
+                           th:href="${currentSite.publicUrl + layout.publicPath()}" target="_blank" rel="noopener">
+                            <svg class="i"><use href="#i-external"></use></svg> <th:block th:text="#{banners.layout.preview.newTab}">Open in a new tab</th:block>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!--/* ================================================================== файлове */-->
+            <div class="card">
+                <h2><svg class="i"><use href="#i-folder"></use></svg> <span th:text="#{banners.layout.disk}">Files on disk</span></h2>
+                <div class="card-body">
+                    <p class="muted" style="margin-top:0" th:if="${!files.present}" th:text="#{banners.layout.disk.absent}">
+                        The folder does not exist on disk.
+                    </p>
+                    <p class="muted" style="margin-top:0" th:if="${files.present and !files.readable}" th:text="#{banners.layout.disk.unreadable}">
+                        The folder exists but cannot be read.
+                    </p>
+                    <th:block th:if="${files.present and files.readable}">
+                        <p class="muted" style="margin-top:0"
+                           th:with="modified=${files.modifiedOn != null
+                                    ? #temporals.format(files.modifiedOn, 'dd.MM.yyyy HH:mm') : '—'}"
+                           th:text="#{banners.layout.disk.summary(${files.files}, ${files.bytes / 1024}, ${modified})}">
+                            Files: 5, 96 KB, last modified —.
+                        </p>
+                        <ul class="muted" style="margin:0; padding-left:18px">
+                            <li th:each="name : ${files.names}"><code th:text="${name}">index.html</code></li>
+                        </ul>
+                    </th:block>
+                </div>
+            </div>
+
+            <!--/* ================================================================== реклами */-->
+            <div class="card">
+                <h2><svg class="i"><use href="#i-megaphone"></use></svg> <span th:text="#{banners.layout.bookings}">Advertisements using this layout</span></h2>
+                <div class="card-body">
+                    <p class="muted" style="margin-top:0" th:if="${bookings.isEmpty()}" th:text="#{banners.layout.bookings.none}">
+                        No advertisement points to this layout yet.
+                    </p>
+                    <ul th:unless="${bookings.isEmpty()}" style="margin:0; padding-left:18px">
+                        <li th:each="b : ${bookings}">
+                            <a th:href="@{/mgmt/banners/{id}(id=${b.id})}"
+                               th:text="'№ ' + ${b.id} + ' · ' + ${b.name}">№ 1 · Acme</a>
+                        </li>
+                    </ul>
+                    <!--/*
+                      The click is counted by the public page's site.js, which listens inside the
+                      same-origin frame and reports per booking -- not per frame of the rotation, and
+                      not by anything in this folder, which is why nothing generated here changed for
+                      it. A layout's frames each link straight to the advertiser.
+                    */-->
+                    <p class="muted" th:text="#{banners.layout.bookings.stats}">
+                        Impressions and clicks are counted per advertisement.
+                    </p>
+                </div>
+                <div class="card-foot">
+                    <a class="btn btn-primary"
+                       th:href="@{/mgmt/banners/new(layout=${layout.id})}">
+                        <svg class="i"><use href="#i-plus"></use></svg> <th:block th:text="#{banners.layout.bookings.create}">Create an advertisement from this layout</th:block>
+                    </a>
+                </div>
+            </div>
+
+            <!--/* ================================================================= изтриване */-->
+            <div class="card danger">
+                <h2><svg class="i"><use href="#i-trash"></use></svg> <span th:text="#{banners.layout.delete}">Delete the layout</span></h2>
+                <div class="card-body">
+                    <p class="muted" th:text="#{banners.layout.delete.help}">
+                        Deletes the document and the whole folder on disk.
+                    </p>
+                </div>
+                <div class="card-foot">
+                    <form method="post"
+                          th:data-confirm="#{banners.layout.delete.confirm}"
+                          th:action="@{/mgmt/banners/layouts/{id}/delete(id=${layout.id})}">
+                        <button class="btn btn-danger" type="submit" th:text="#{banners.layout.delete.submit}">Delete the layout</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!--/*
+  ======================================================================= fragments
+
+  Never rendered here: a fragment selector finds its element in the markup whatever the
+  enclosing th:if says, so the definitions can sit behind one that is always false.
+
+  slide-row and slide-forms are what the page's own loop renders AND what
+  MgmtBannerLayoutController.uploadSlide answers a fetch with, so a row added without a reload
+  cannot drift from a rendered one. That is also why the inputs spell out th:name/th:value rather
+  than th:field: *{…} needs a th:object in scope, and a fragment rendered on its own has none.
+  rerender() squares form.slides against the document, so slides[i] always exists.
+*/-->
+<th:block th:if="${false}">
+    <table><tbody>
+    <tr th:fragment="slide-row(slide, i, last)">
+        <td class="slide-number" th:text="${i + 1}">1</td>
+        <td>
+            <!--/*
+              The thumbnail is the replace target once mgmt.js has wired it: click to pick a file,
+              or drop one on it. data-no-dirty because the upload is durable the moment it is
+              accepted -- there is nothing unsaved about it to warn over.
+            */-->
+            <span class="slide-thumb" data-no-dirty th:attr="data-slide-index=${i}">
+                <img class="thumb" th:src="@{${imagePrefix + slide.image}}"
+                     th:alt="${slide.image}" loading="lazy">
+            </span>
+            <div class="cell-sub muted slide-image-name" th:text="${slide.image}">banner-1.webp</div>
+        </td>
+        <td>
+            <div class="field">
+                <label th:for="'slide-href-' + ${i}" th:text="#{banners.layout.slide.href}">Address</label>
+                <input type="text" th:id="'slide-href-' + ${i}"
+                       th:name="|slides[${i}].href|" th:value="${form.slides[i].href}"
+                       placeholder="https://…" maxlength="512">
+            </div>
+            <div class="grid-2">
+                <div class="field">
+                    <label th:for="'slide-title-' + ${i}" th:text="#{banners.layout.slide.title}">Caption</label>
+                    <input type="text" th:id="'slide-title-' + ${i}"
+                           th:name="|slides[${i}].title|" th:value="${form.slides[i].title}"
+                           maxlength="256">
+                </div>
+                <div class="field">
+                    <label th:for="'slide-alt-' + ${i}" th:text="#{banners.layout.slide.alt}">Alt text</label>
+                    <input type="text" th:id="'slide-alt-' + ${i}"
+                           th:name="|slides[${i}].alt|" th:value="${form.slides[i].alt}"
+                           maxlength="256">
+                </div>
+            </div>
+        </td>
+        <td class="path-row">
+            <!--/*
+              form= rather than nesting: each of these is its own POST.
+              Reordering is what decides which creative a reader who
+              never scrolls sees, so it is the whole mechanism rather
+              than a convenience -- the same as an article's images.
+            */-->
+            <button class="btn btn-icon btn-sm slide-up" type="submit"
+                    th:form="'slide-up-' + ${i}"
+                    th:disabled="${i == 0}" th:title="#{banners.layout.slide.up}">
+                <svg class="i"><use href="#i-arrow-up"></use></svg>
+            </button>
+            <button class="btn btn-icon btn-sm slide-down" type="submit"
+                    th:form="'slide-down-' + ${i}"
+                    th:disabled="${last}" th:title="#{banners.layout.slide.down}">
+                <svg class="i"><use href="#i-arrow-down"></use></svg>
+            </button>
+            <button class="btn btn-icon btn-sm btn-danger" type="submit"
+                    th:form="'slide-del-' + ${i}" th:title="#{banners.layout.slide.remove}">
+                <svg class="i"><use href="#i-trash"></use></svg>
+            </button>
+            <!--/*
+              Смяна на изображението, без да се губят адресът и редът —
+              точно това, което трябва, когато рекламодателят прати нов
+              банер за същата кампания. И полето, и бутонът сочат към
+              формата долу през form=, както прави лентата за запазване:
+              качването е отделен POST, а вложена форма е забранена.
+              С изключен JavaScript това е начинът; с включен mgmt.js го
+              скрива и миниатюрата отваря същото поле.
+            */-->
+            <span class="slide-swap" data-no-dirty>
+                <input type="file" name="file"
+                       accept="image/jpeg,image/png,image/gif,image/webp"
+                       th:form="'slide-img-' + ${i}"
+                       th:aria-label="#{banners.layout.slide.newImage(${i + 1})}">
+                <button class="btn btn-icon btn-sm" type="submit"
+                        th:form="'slide-img-' + ${i}"
+                        th:title="#{banners.layout.slide.swap}">
+                    <svg class="i"><use href="#i-upload"></use></svg>
+                </button>
+            </span>
+        </td>
+    </tr>
+    </tbody></table>
+
+    <th:block th:fragment="slide-forms(i)">
+        <form th:id="'slide-up-' + ${i}" method="post" class="hidden"
+              th:action="@{/mgmt/banners/layouts/{id}/slides/{i}/move(id=${layout.id},i=${i})}">
+            <input type="hidden" name="delta" value="-1">
+        </form>
+        <form th:id="'slide-down-' + ${i}" method="post" class="hidden"
+              th:action="@{/mgmt/banners/layouts/{id}/slides/{i}/move(id=${layout.id},i=${i})}">
+            <input type="hidden" name="delta" value="1">
+        </form>
+        <form th:id="'slide-del-' + ${i}" method="post" class="hidden"
+              th:data-confirm="#{banners.layout.slide.remove.confirm}"
+              th:action="@{/mgmt/banners/layouts/{id}/slides/{i}/delete(id=${layout.id},i=${i})}">
+        </form>
+        <form th:id="'slide-img-' + ${i}" method="post" class="hidden"
+              enctype="multipart/form-data"
+              th:action="@{/mgmt/banners/layouts/{id}/slides/{i}/image(id=${layout.id},i=${i})}">
+        </form>
+    </th:block>
+
+    <!--/* The answer to POST …/slides/upload: the new row, then its forms. */-->
+    <th:block th:fragment="slide-added">
+        <table><tbody>
+        <tr th:replace="~{mgmt/banner-layout-edit :: slide-row(${layout.slides[addedIndex]}, ${addedIndex}, true)}"></tr>
+        </tbody></table>
+        <th:block th:replace="~{mgmt/banner-layout-edit :: slide-forms(${addedIndex})}"></th:block>
+    </th:block>
+
+    <!--/* The answer to a refused …/slides/upload, at 409; mgmt.js reads the reason out of it. */-->
+    <p th:fragment="slide-refused" class="upload-refusal" th:text="${error}">The file was not accepted.</p>
+</th:block>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

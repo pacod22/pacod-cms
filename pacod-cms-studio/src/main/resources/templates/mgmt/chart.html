@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<!--/*
+  One line chart, twice on the monitoring screen and nowhere else.
+
+  A file of its own rather than a fragment inside monitoring.html, because a th:fragment defined
+  in the page it is used from also renders where it is defined. Deliberately NOT added to
+  mgmt/fragments.html either: that file is the console's shared chrome -- head, sidebar, topbar,
+  flash, errors -- and a chart is content.
+
+  EVERY coordinate here comes from MgmtChart, already formatted. Nothing in this file computes a
+  position, and it must stay that way: Thymeleaf would format a computed number in the platform
+  locale, and a Bulgarian console writes "52,00", which SVG reads as two numbers. The chart would
+  not fail -- it would draw somewhere else.
+
+  It also needs no JavaScript. The tooltips are <title> elements the browser renders itself, which
+  is why the hover bands exist: one transparent full-height rect per bucket, reporting every series
+  at the same instant. Arrows and controls that need a script to work are the bug the public site's
+  gallery rewrite exists to prevent.
+*/-->
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<body>
+
+<div class="card" th:fragment="chart(chart, heading, hint)">
+    <h2>
+        <svg class="i"><use href="#i-activity"></use></svg>
+        <span th:text="${heading}">Heading</span>
+        <span class="hint" th:text="${hint}"></span>
+    </h2>
+
+    <div class="card-body">
+        <!--/*
+          The empty state is the honest answer on a fresh deployment: none of this data could be
+          back-filled, so the series genuinely starts at zero length. A flat line along the axis
+          would look like a site nobody visits rather than a chart with nothing in it yet.
+        */-->
+        <div class="empty" th:if="${chart.empty}">
+            <svg class="i"><use href="#i-activity"></use></svg>
+            <span th:text="#{ops.chart.empty}">No data recorded for this period yet.</span>
+        </div>
+
+        <th:block th:unless="${chart.empty}">
+            <div class="chart-legend">
+                <span class="chart-key" th:each="s : ${chart.series}" th:classappend="${s.key}">
+                    <span class="chart-swatch"></span>
+                    <!--/*
+                      A series label may be a bundle key (the monitoring and crawler charts pass
+                      one) or literal text; msg() returns a string that is not a key as written.
+                    */-->
+                    <span th:text="${mgmtText.msg(s.label)}">Series</span>
+                    <b th:text="${s.total}">0</b>
+                </span>
+            </div>
+
+            <svg class="chart-svg" th:attr="viewBox=${chart.viewBox}" role="img"
+                 th:aria-label="|${heading}: ${hint}|">
+
+                <g class="chart-grid">
+                    <line th:each="g : ${chart.gridlines}"
+                          th:attr="x1=${chart.plotLeft},x2=${chart.plotRight},y1=${g.y},y2=${g.y}"/>
+                </g>
+
+                <g class="chart-axis">
+                    <text th:each="g : ${chart.gridlines}" text-anchor="end" dominant-baseline="middle"
+                          th:attr="x=${chart.labelX},y=${g.y}" th:text="${g.label}">0</text>
+                    <text th:each="t : ${chart.xTicks}" text-anchor="middle"
+                          th:attr="x=${t.x},y=${chart.xLabelY}" th:text="${t.label}">00:00</text>
+                </g>
+
+                <!--/* Fills first, then lines, then markers: painter's order, no z-index in SVG. */-->
+                <g class="chart-areas">
+                    <path th:each="s : ${chart.series}" th:if="${!#strings.isEmpty(s.area)}"
+                          th:classappend="${s.key}" th:attr="d=${s.area}"/>
+                </g>
+
+                <g class="chart-lines">
+                    <polyline th:each="s : ${chart.series}" th:classappend="${s.key}"
+                              th:attr="points=${s.points}"/>
+                </g>
+
+                <g class="chart-dots">
+                    <th:block th:each="s : ${chart.series}">
+                        <circle th:each="d : ${s.dots}" r="2.5" th:classappend="${s.key}"
+                                th:attr="cx=${d.x},cy=${d.y}"/>
+                    </th:block>
+                </g>
+
+                <!--/*
+                  Last, so they sit on top and take the pointer. Transparent, full plot height, one
+                  per bucket: the browser's own tooltip, no script, and it names every series at
+                  that instant rather than making the reader hover each line in turn.
+                */-->
+                <g class="chart-bands">
+                    <rect th:each="b : ${chart.bands}"
+                          th:attr="x=${b.x},width=${b.width},y=${chart.plotTop},height=${chart.plotHeight}">
+                        <title th:text="${b.tooltip}"></title>
+                    </rect>
+                </g>
+            </svg>
+        </th:block>
+    </div>
+</div>
+
+</body>
+</html>

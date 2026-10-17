@@ -1,0 +1,62 @@
+# The editorial template set: a magazine front page, a column of content beside an aside.
+# Templates: pacod-cms-site/src/main/resources/templates/sets/editorial/.
+#
+# Regions are the set's own names for where sections go: main (the content column), aside (under
+# the advertising column) and, on the home page, wide (full width, below both). Advertising stays
+# where the set puts it -- the top row and the head of the aside -- and is booked in the studio's
+# Advertising screen, not placed here.
+#
+# The default layouts name no category: a website has none of its own yet when it is created.
+id: editorial
+name: Editorial
+description: A magazine front page with a lead story, cards and a ranked aside.
+sections: [primary, article-list, rich-text, call-to-action, search-box, social-links]
+pageTypes:
+  HOME:
+    regions: [main, aside, wide]
+    layout:
+      main:
+        - {type: article-list, settings: {source: latest, count: 1, style: hero}}
+        - {type: article-list, settings: {source: latest, count: 6, offset: 1, style: cards}}
+      aside:
+        - {type: article-list, settings: {source: most-read, count: 5, style: ranked}}
+  ARTICLE:
+    regions: [main, aside]
+    layout:
+      main: [{type: primary}]
+  CATEGORY:
+    regions: [main, aside]
+    layout:
+      main: [{type: primary}]
+  LATEST:
+    regions: [main, aside]
+    layout:
+      main: [{type: primary}]
+  PAGE:
+    regions: [main, aside]
+    layout:
+      main: [{type: primary}]
+  SEARCH:
+    regions: [main, aside]
+    layout:
+      main: [{type: primary}]
+
+# Looks the studio offers as a starting point for a website's theme. A theme overrides only what it
+# sets; the set's stylesheet supplies the rest.
+themes:
+  classic:
+    name: Classic
+    tokens: {bg: "#f4f0e6", surface: "#fbf9f3", line: "#ded7c6", ink: "#1e1c17", muted: "#4a4536",
+             faint: "#8a8271", accent: "#2c4a32", highlight: "#9a5433", tint: "#edf1e7", hover: "#efeadc",
+             panel: "#1e1c17", "bg@dark": "#12110b", "surface@dark": "#1b1913", "line@dark": "#332f26",
+             "ink@dark": "#efeadb", "muted@dark": "#c0b9a5", "faint@dark": "#7f7867", "accent@dark": "#26382a",
+             "highlight@dark": "#ce9061", "tint@dark": "#1a2118", "hover@dark": "#25231c", "panel@dark": "#0c0b06",
+             font-display: lora, font-text: plex-sans, font-label: plex-mono}
+  harbour:
+    name: Harbour
+    tokens: {bg: "#eef2f5", surface: "#f9fbfc", line: "#d3dce3", ink: "#14202b", muted: "#3c4f5e",
+             faint: "#7a8b98", accent: "#1d4e6f", highlight: "#b5532c", tint: "#e3edf3", hover: "#e6ecf0",
+             panel: "#14202b", "bg@dark": "#0b1117", "surface@dark": "#121b23", "line@dark": "#26333e",
+             "ink@dark": "#e6edf2", "muted@dark": "#a9b8c4", "faint@dark": "#6f8090", "accent@dark": "#1f4057",
+             "highlight@dark": "#e08a61", "tint@dark": "#13212c", "hover@dark": "#1a2731", "panel@dark": "#070b0f",
+             font-display: georgia, font-text: system-sans, font-label: system-mono}

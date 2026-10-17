@@ -1,0 +1,40 @@
+# Caddy, the front door on a developer machine: env/dev.env sets CADDYFILE to this file.
+# Stage and production use Caddyfile; the rules all three run are in routes.caddy.
+#
+# Plain HTTP on HTTP_PORT is the way in: every address names its scheme, because a bare hostname
+# would get automatic HTTPS, which redirects to https://<host>/ on port 443 -- not the port this
+# machine publishes. The same hosts answer HTTPS on HTTPS_PORT with certificates from Caddy's own
+# local CA (in the caddy-data volume, trusted by no browser), a website's issued on demand after the
+# same /_internal/tls-ask production asks. A pair named by SSL_CERT_FILE/SSL_KEY_FILE is served
+# instead for every name it covers, as in production.
+{
+	on_demand_tls {
+		ask http://site:8443/_internal/tls-ask
+	}
+	local_certs
+	skip_install_trust
+	auto_https disable_redirects
+	{$CADDY_GLOBAL_OPTIONS}
+}
+
+import routes.caddy
+{$CADDY_SUPPLIED_PAIR}
+
+http://{$STUDIO_HOST}, https://{$STUDIO_HOST} {
+	import studio
+}
+
+http://{$ID_HOST}, https://{$ID_HOST} {
+	import id
+}
+
+http:// {
+	import site
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+	import site
+}

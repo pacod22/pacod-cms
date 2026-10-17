@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* design-menu.html's two pieces: an item's card (its moves, removal and form) and an item's
+       fields. In a file of their own so that defining them renders nothing. */-->
+<th:block th:fragment="itemCard(item, position, first, last)">
+    <div class="menu-item__head">
+        <strong th:text="${labels.menuLabel(item, null) ?: '—'}">Label</strong>
+        <span class="muted" th:text="${mgmtText.label(item.kind)} + (${item.target != null} ? ' · ' + ${item.target} : '')">Category · 2</span>
+        <span class="spacer" style="margin-left:auto"></span>
+        <form method="post" class="inline-form" th:unless="${first}"
+              th:action="@{/mgmt/design/menus/{k}/items/{p}/move(k=${menuKey}, p=${position})}">
+            <input type="hidden" name="dir" value="up">
+            <button class="btn btn-sm btn-ghost" type="submit" th:aria-label="#{design.up}">↑</button>
+        </form>
+        <form method="post" class="inline-form" th:unless="${last}"
+              th:action="@{/mgmt/design/menus/{k}/items/{p}/move(k=${menuKey}, p=${position})}">
+            <input type="hidden" name="dir" value="down">
+            <button class="btn btn-sm btn-ghost" type="submit" th:aria-label="#{design.down}">↓</button>
+        </form>
+        <form method="post" class="inline-form" th:data-confirm="#{design.remove.confirm}"
+              th:action="@{/mgmt/design/menus/{k}/items/{p}/remove(k=${menuKey}, p=${position})}">
+            <button class="btn btn-sm btn-danger" type="submit" th:text="#{design.remove}">Remove</button>
+        </form>
+    </div>
+    <details>
+        <summary th:text="#{design.settings}">Settings</summary>
+        <form method="post" th:action="@{/mgmt/design/menus/{k}/items/{p}(k=${menuKey}, p=${position})}">
+            <th:block th:replace="~{mgmt/design-menu-items :: itemFields(item=${item}, prefix=${'i' + position})}"></th:block>
+            <div class="actions"><button class="btn btn-primary" type="submit" th:text="#{design.saveSection}">Save</button></div>
+        </form>
+    </details>
+</th:block>
+
+<th:block th:fragment="itemFields(item, prefix)">
+    <div class="grid-2">
+        <div class="field" th:each="l : ${languages}">
+            <label th:for="${prefix + '-label-' + l.code}" th:text="#{design.menu.label(${l.displayName()})}">Label (English)</label>
+            <input type="text" th:id="${prefix + '-label-' + l.code}" th:name="'label_' + ${l.code}" maxlength="80"
+                   th:value="${item == null ? null : labels.menuLabel(item, l.code)}">
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="field">
+            <label th:for="${prefix + '-kind'}" th:text="#{design.menu.kind}">Links to</label>
+            <select th:id="${prefix + '-kind'}" name="kind">
+                <option th:each="k : ${kinds}" th:value="${k}" th:text="${mgmtText.label(k)}"
+                        th:selected="${item != null and item.kind == k}">Category</option>
+            </select>
+        </div>
+        <div class="field">
+            <label th:for="${prefix + '-target'}" th:text="#{design.menu.target}">Which one</label>
+            <input type="text" th:id="${prefix + '-target'}" name="target" maxlength="2048"
+                   th:value="${item == null ? null : item.target}">
+            <span class="hint" th:text="#{design.menu.target.hint}">A category's number, a page's slug, or an address.</span>
+        </div>
+    </div>
+</th:block>
+
+</body>
+</html>

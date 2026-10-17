@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  The installation (platform.manage): who may create organisations, the self-service limits, AI for
+  new organisations, and every organisation with its AI switch.
+
+  The policy can be fixed by configuration (PACOD_ORG_CREATION=platform-admins), which this screen
+  cannot loosen; it says so and keeps the control disabled.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{portal.platform.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('platform')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{portal.platform.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="stat-grid">
+                <div class="stat">
+                    <span class="stat-label" th:text="#{portal.platform.organisations}">Organisations</span>
+                    <span class="stat-value" th:text="${organisations.size()}">3</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label" th:text="#{portal.platform.websites}">Websites</span>
+                    <span class="stat-value" th:text="${siteCount}">5</span>
+                </div>
+                <div class="stat" th:classappend="${!canProvision} ? 'stat-warn'">
+                    <span class="stat-label" th:text="#{portal.platform.provisioner}">Self-service</span>
+                    <span class="stat-value" th:text="${canProvision} ? #{portal.platform.provisioner.on} : #{portal.platform.provisioner.off}">ready</span>
+                    <span class="stat-note" th:unless="${canProvision}" th:text="#{portal.platform.provisioner.hint}">make id-provisioner</span>
+                </div>
+            </div>
+
+            <form class="form-page" method="post" th:action="${studioRoot} + '/mgmt/platform'" th:object="${form}">
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-settings"></use></svg> <span th:text="#{portal.platform.settings}">Settings</span></h2>
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="orgCreation" th:text="#{portal.platform.orgCreation}">Who may create organisations</label>
+                            <select id="orgCreation" th:field="*{orgCreation}" th:disabled="${orgCreationFixed}">
+                                <option th:each="c : ${orgCreations}" th:value="${c}" th:text="${mgmtText.label(c)}">anyone</option>
+                            </select>
+                            <span class="hint" th:if="${orgCreationFixed}" th:text="#{portal.platform.orgCreation.fixed}">Fixed by configuration.</span>
+                        </div>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="maxOrgsPerUser" th:text="#{portal.platform.maxOrgs}">Organisations per person</label>
+                                <input type="number" id="maxOrgsPerUser" th:field="*{maxOrgsPerUser}" min="0" max="10000">
+                            </div>
+                            <div class="field">
+                                <label for="maxSitesPerOrg" th:text="#{portal.platform.maxSites}">Websites per organisation</label>
+                                <input type="number" id="maxSitesPerOrg" th:field="*{maxSitesPerOrg}" min="0" max="10000">
+                            </div>
+                        </div>
+                        <span class="hint" th:text="#{portal.platform.limits.hint}">Platform admins are not limited.</span>
+                        <div class="checkline">
+                            <input type="checkbox" id="aiEnabledForNewOrgs" th:field="*{aiEnabledForNewOrgs}">
+                            <div>
+                                <label for="aiEnabledForNewOrgs" th:text="#{portal.platform.aiNew}">AI for new organisations</label>
+                                <span class="help" th:text="#{portal.platform.aiNew.help}">Every AI call spends the installation's gateway key.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{portal.action.save}">Save</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-globe"></use></svg> <span th:text="#{portal.platform.ai.title}">AI gateway</span></h2>
+                <p class="card-body muted" th:unless="${aiConfigured}" th:text="${mgmtText.label(aiNotSetUp)}">AI is not set up.</p>
+                <form method="post" th:if="${aiConfigured}" th:action="${studioRoot} + '/mgmt/platform/ai-test'">
+                    <div class="card-body">
+                        <p th:text="#{portal.platform.ai.model(${aiModel})}">Model: @fast</p>
+                        <span class="hint" th:text="#{portal.platform.ai.test.hint}">One short call through the gateway.</span>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn" type="submit">
+                            <svg class="i"><use href="#i-play"></use></svg> <span th:text="#{portal.platform.ai.test}">Test the connection</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-building"></use></svg> <span th:text="#{portal.platform.organisations}">Organisations</span></h2>
+                <div class="table-wrap" th:if="${!organisations.isEmpty()}">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{portal.orgs.col.name}">Organisation</th>
+                            <th class="shrink" th:text="#{portal.orgs.col.websites}">Websites</th>
+                            <th class="shrink" th:text="#{portal.org.ai}">AI features</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="o : ${organisations}">
+                            <td class="title-cell">
+                                <a th:href="${studioRoot} + '/mgmt/organisations/' + ${o.id}" th:text="${o.name}">Acme</a>
+                                <span class="cell-sub" th:text="${o.id}">org_…</span>
+                            </td>
+                            <td class="muted" th:text="${o.websites}">2</td>
+                            <td>
+                                <form method="post" class="inline-form" th:action="${studioRoot} + '/mgmt/platform/organisations/' + ${o.id} + '/ai'">
+                                    <input type="hidden" name="enabled" th:value="${!o.organisation.aiEnabled}">
+                                    <button class="btn btn-sm" type="submit"
+                                            th:text="${o.organisation.aiEnabled} ? #{portal.platform.ai.turnOff} : #{portal.platform.ai.turnOn}">Turn on</button>
+                                </form>
+                                <span class="badge" th:classappend="${o.organisation.aiEnabled} ? 'published' : 'off'"
+                                      th:text="${o.organisation.aiEnabled} ? #{portal.org.ai.on} : #{portal.org.ai.off}">off</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${organisations.isEmpty()}">
+                    <svg class="i"><use href="#i-building"></use></svg>
+                    <span th:text="#{portal.platform.noOrganisations}">No organisations yet.</span>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

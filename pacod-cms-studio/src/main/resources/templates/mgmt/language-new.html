@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  Adding a language.
+
+  The code IS the document id and the key every stored text is filed under, so it is chosen once
+  here and is not editable afterwards -- an "edit" of it would orphan every translation already
+  written under the old code rather than rename anything.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{pages.languages.new})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('pages')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{pages.languages.new})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <form class="form-page" method="post" th:action="@{/mgmt/pages/languages}"
+                  th:object="${form}">
+
+                <div th:replace="~{mgmt/fragments :: errors}"></div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{pages.languages.new}">New language</span></h2>
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="code" th:text="#{pages.field.code}">Code</label>
+                            <input type="text" id="code" th:field="*{code}" required
+                                   placeholder="es" maxlength="3" pattern="[a-zA-Z]{2,3}">
+                            <span class="hint" th:utext="#{pages.language.code.hint}">ISO 639</span>
+                        </div>
+
+                        <div class="field">
+                            <label for="adminName" th:text="#{pages.language.adminName}">Name in the studio</label>
+                            <input type="text" id="adminName" th:field="*{adminName}"
+                                   th:placeholder="#{pages.language.adminName.placeholder}" maxlength="60">
+                            <span class="hint" th:text="#{pages.language.adminName.hint}">Shown in this console.</span>
+                        </div>
+
+                        <div class="field">
+                            <label for="nativeName" th:text="#{pages.language.nativeName}">Own name</label>
+                            <input type="text" id="nativeName" th:field="*{nativeName}"
+                                   placeholder="Español" maxlength="60">
+                            <span class="hint" th:text="#{pages.language.nativeName.hint}">Shown to readers.</span>
+                        </div>
+
+                        <div class="field">
+                            <label for="sortOrder" th:text="#{pages.field.sortOrder}">Sort order</label>
+                            <input type="number" id="sortOrder" th:field="*{sortOrder}">
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit" th:text="#{pages.action.create}">Create</button>
+                        <a class="btn btn-ghost" th:href="@{/mgmt/pages/languages}" th:text="#{pages.action.cancel}">Cancel</a>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <p class="hint" style="margin:0" th:text="#{pages.language.notices.later}">
+                            The notice texts are filled in on the next screen.
+                        </p>
+                    </div>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

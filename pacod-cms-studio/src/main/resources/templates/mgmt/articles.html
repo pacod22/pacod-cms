@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{articles.c.articles})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('articles')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{articles.c.articles})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <!--/*
+              Filters and the create action share one row, so the screen opens with a single
+              band of controls above the table rather than three stacked ones.
+
+              The filter form is a GET, so every result is a bookmarkable, shareable URL.
+            */-->
+            <div class="toolbar">
+                <form class="toolbar" method="get" th:action="@{/mgmt/articles}" style="flex:1 1 640px; margin:0">
+                    <div class="search">
+                        <svg class="i"><use href="#i-search"></use></svg>
+                        <!--/* id="search-input" is what mgmt.js debounces, auto-submits and binds "/" to. */-->
+                        <input type="search" id="search-input" name="q" th:value="${q}"
+                               th:placeholder="#{articles.list.search.placeholder}"
+                               th:aria-label="#{articles.list.search.aria}">
+                        <kbd>/</kbd>
+                    </div>
+
+                    <select class="pick" id="category" name="category" data-autosubmit
+                            th:aria-label="#{articles.list.filter.category}">
+                        <option value="" th:text="#{articles.list.allCategories}">All categories</option>
+                        <option th:each="c : ${categories}"
+                                th:value="${c.id}"
+                                th:text="|${c.id} · ${c.name}|"
+                                th:selected="${c.id == selectedCategory}"></option>
+                    </select>
+
+                    <select class="pick" id="author" name="author" data-autosubmit
+                            th:aria-label="#{articles.list.filter.author}">
+                        <option value="" th:text="#{articles.list.allAuthors}">All authors</option>
+                        <option th:each="a : ${authors}"
+                                th:value="${a.id}"
+                                th:text="|${a.id} · ${a.fullname()}|"
+                                th:selected="${a.id == selectedAuthor}"></option>
+                    </select>
+
+                    <input type="hidden" name="size" th:value="${size}">
+                    <button class="btn" type="submit" th:text="#{articles.list.filter}">Filter</button>
+
+                    <!--/* Only worth offering when a filter is actually on. */-->
+                    <a class="btn btn-ghost" th:href="@{/mgmt/articles}"
+                       th:if="${!#strings.isEmpty(q) or selectedCategory != null or selectedAuthor != null}" th:text="#{articles.c.clear}">Clear</a>
+                </form>
+
+                <!--/*
+                  A POST, not a link: creating an article is a write, and a GET must never create
+                  a row as a side effect (ArticleService.createNewArticle, not
+                  getArticleByIdWithCreate).
+                */-->
+                <form class="inline-form push" th:action="@{/mgmt/articles}" method="post">
+                    <button class="btn btn-primary" type="submit">
+                        <svg class="i"><use href="#i-plus"></use></svg> <th:block th:text="#{articles.list.new}">New article</th:block>
+                    </button>
+                </form>
+            </div>
+
+            <p class="result-line" th:if="${articles.totalElements > 0}">
+                <span th:text="#{articles.list.count(${articles.totalElements})}">0 articles</span>
+                <span th:if="${!#strings.isEmpty(q)}" th:text="#{articles.c.forTerm(${q})}"></span>
+            </p>
+
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th class="num shrink">№</th>
+                            <th class="shrink"><span class="sr-only" th:text="#{articles.c.image}">Image</span></th>
+                            <th th:text="#{articles.c.title}">Title</th>
+                            <th th:text="#{articles.c.categories}">Categories</th>
+                            <th class="shrink" th:text="#{articles.c.date}">Date</th>
+                            <th class="shrink" th:text="#{articles.c.status}">Status</th>
+                            <th class="num shrink" th:text="#{articles.list.col.reads}">Reads</th>
+                            <th class="shrink"><span class="sr-only" th:text="#{articles.c.actions}">Actions</span></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <!--/*
+                          data-href makes the whole row clickable once mgmt.js runs. The title is
+                          still a real <a>, so the row works without scripting and middle-click
+                          still opens a tab.
+                        */-->
+                        <th:block th:each="a : ${articles.content}" th:with="langs=${a.translatedIn()}">
+                        <tr th:attr="data-href=@{/mgmt/articles/{id}(id=${a.id})}"
+                            th:classappend="${langs.isEmpty()} ? '' : 'has-langs'">
+                            <td class="num muted" th:text="${a.id}">1</td>
+                            <td>
+                                <img class="thumb" alt="" loading="lazy"
+                                     th:if="${a.images != null and !a.images.isEmpty()}"
+                                     th:src="@{'/assets/img/articles/' + ${a.images[0].filename}}">
+                                <span class="thumb-empty" th:if="${a.images == null or a.images.isEmpty()}"
+                                      th:title="#{articles.list.noImage}">
+                                    <svg class="i"><use href="#i-image"></use></svg>
+                                </span>
+                            </td>
+                            <td class="title-cell">
+                                <a th:href="@{/mgmt/articles/{id}(id=${a.id})}" th:text="${a.title}">Title</a>
+                                <!--/* Authors under the title, not in a column of their own: one column fewer, same information. */-->
+                                <span class="cell-sub" th:if="${a.authors != null and !a.authors.isEmpty()}">
+                                    <span th:each="au, it : ${a.authors}"
+                                          th:text="${au.fullname()} + (${it.last} ? '' : ', ')">Author</span>
+                                </span>
+                            </td>
+                            <td>
+                                <span class="chip" th:each="c : ${a.categories}" th:text="${c.name}">Category</span>
+                            </td>
+                            <td class="muted"
+                                th:text="${a.date != null} ? ${#temporals.format(a.date, 'dd.MM.yyyy')} : '—'">01.01.2020</td>
+                            <td>
+                                <span class="badge"
+                                      th:if="${a.status != null}"
+                                      th:classappend="${a.status.name().toLowerCase()}"
+                                      th:text="${mgmtText.label(a.status)}">PUBLISHED</span>
+                            </td>
+                            <td class="num muted" th:text="${a.counter}">0</td>
+                            <td>
+                                <div class="row-actions">
+                                    <a class="btn btn-ghost btn-icon btn-sm" th:title="#{articles.c.viewOnSite}"
+                                       th:href="@{/article/{id}(id=${a.id})}" target="_blank" rel="noopener">
+                                        <svg class="i"><use href="#i-eye"></use></svg>
+                                        <span class="sr-only" th:text="#{articles.c.viewOnSite}">View on the site</span>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        <!--/*
+                          Which languages the article has been TRANSLATED into, as a horizontal
+                          band at the bottom of the article's row rather than a column: a column
+                          capped to a sane width wrapped a dozen chips into five or six lines and
+                          made every translated row that tall. Spans from the title to the end, so
+                          it indents under the title and never widens the table.
+
+                          translatedIn() reads the stored bodies, so a language whose text is blank
+                          is absent rather than shown as covered, and the original language never
+                          appears: it is the source, kept in the scalar `text` field. See
+                          Article.translatedIn().
+
+                          It reads the DOCUMENT, not the language collection at
+                          /mgmt/pages/languages: article translations are keyed by bare language
+                          codes that need not have a row there, and a code with no row would
+                          otherwise vanish rather than show up as itself, uppercased.
+
+                          The count is rendered as well as the chips -- a dozen two-letter chips
+                          are hard to count by eye. An untranslated article gets no band at all,
+                          which is what makes it stand out in a scan down the list.
+
+                          Each chip opens that translation; mgmt.js lets a click on a link win over
+                          the row's own data-href, which the band carries too so a click beside the
+                          chips still opens the article.
+
+                          No extra query: the list already loads whole Article documents --
+                          neither findAllArticle nor fulltextSearch carries a `fields` projection --
+                          so `texts` is on the object this row was built from.
+                        */-->
+                        <tr class="lang-row" th:unless="${langs.isEmpty()}"
+                            th:attr="data-href=@{/mgmt/articles/{id}(id=${a.id})}">
+                            <td colspan="2"></td>
+                            <td colspan="6">
+                                <span class="lang-count" th:text="${langs.size() == 1} ? #{articles.c.langs.one} : #{articles.c.langs.many(${langs.size()})}">14 languages</span>
+                                <a class="chip" th:each="c : ${langs}"
+                                   th:href="@{/mgmt/articles/{id}/translations/{lang}(id=${a.id}, lang=${c})}"
+                                   th:text="${#strings.toUpperCase(c)}">EN</a>
+                            </td>
+                        </tr>
+                        </th:block>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="empty" th:if="${articles.totalElements == 0}">
+                    <svg class="i"><use href="#i-inbox"></use></svg>
+                    <span th:text="#{articles.list.empty}">No articles match the filter.</span>
+                    <a class="btn btn-sm" th:href="@{/mgmt/articles}" th:text="#{articles.list.clearFilters}">Clear filters</a>
+                </div>
+
+                <!--/*
+                  Window of at most seven pages around the current one, so the pager stays the
+                  same width whether there are three pages or three hundred.
+                */-->
+                <div class="pager" th:if="${articles.totalPages > 1}"
+                     th:with="from=${articles.number - 3 < 0 ? 0 : articles.number - 3},
+                              to=${articles.number + 3 > articles.totalPages - 1 ? articles.totalPages - 1 : articles.number + 3}">
+
+                    <a th:if="${!articles.first}" th:title="#{articles.c.prevPage}"
+                       th:href="@{/mgmt/articles(q=${q},category=${selectedCategory},author=${selectedAuthor},size=${size},page=${articles.number - 1})}">&larr;</a>
+
+                    <th:block th:each="p : ${#numbers.sequence(from, to)}">
+                        <span class="page current" th:if="${p == articles.number}" th:text="${p + 1}">1</span>
+                        <a th:unless="${p == articles.number}"
+                           th:href="@{/mgmt/articles(q=${q},category=${selectedCategory},author=${selectedAuthor},size=${size},page=${p})}"
+                           th:text="${p + 1}">2</a>
+                    </th:block>
+
+                    <a th:if="${!articles.last}" th:title="#{articles.c.nextPage}"
+                       th:href="@{/mgmt/articles(q=${q},category=${selectedCategory},author=${selectedAuthor},size=${size},page=${articles.number + 1})}">&rarr;</a>
+
+                    <!--/*
+                      Page size is already a request parameter the controller clamps; this just
+                      exposes it. Its own GET form, because the filter form is elsewhere on the
+                      page -- the current filters ride along as hidden fields.
+                    */-->
+                    <form class="size-form count" method="get" th:action="@{/mgmt/articles}">
+                        <input type="hidden" name="q" th:value="${q}">
+                        <input type="hidden" name="category" th:value="${selectedCategory}">
+                        <input type="hidden" name="author" th:value="${selectedAuthor}">
+                        <label for="page-size" th:text="#{articles.c.perPage}">Per page</label>
+                        <select id="page-size" name="size" data-autosubmit>
+                            <option th:each="s : ${ {20, 50, 100} }"
+                                    th:value="${s}" th:text="${s}" th:selected="${s == size}"></option>
+                        </select>
+                        <span th:text="#{articles.c.ofTotal(${articles.totalElements})}">of 0</span>
+                        <noscript><button class="btn btn-sm" type="submit" th:text="#{articles.c.ok}">OK</button></noscript>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

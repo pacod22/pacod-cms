@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*
+  One article, rendered.
+
+  Shared by article.html (/article/{id}) and index.html (/latest and its aliases), so the two
+  pages cannot drift apart the way copies do; the head is shared too, via fragments/head.
+
+  Not used by article-print.html: that page is deliberately bare.
+*/-->
+<th:block th:fragment="articleView(article, lang)">
+
+    <!--/* Categories are @DBRef-loaded on the article already, so the first one costs nothing
+           extra here and gives the reader a way back up. */-->
+    <nav class="breadcrumb" th:with="cat=${article.categories != null and !article.categories.isEmpty() ? article.categories[0] : null}">
+        <a th:href="@{/(lang=${lang})}" th:text="#{nav.home}">Home</a>
+        <th:block th:if="${cat != null}">
+            <span aria-hidden="true">/</span>
+            <a th:href="@{/list/{id}(id=${cat.id}, lang=${lang})}" th:text="${cat.name}"></a>
+        </th:block>
+    </nav>
+
+    <article>
+        <div class="lead__meta">
+            <span class="meta-note" th:text="#{article.date} + ' '">Date: </span>
+            <span class="meta-note" th:text="${article.dateAsText}"></span>
+            <span class="meta-note" aria-hidden="true">·</span>
+            <span class="meta-note">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.8" aria-hidden="true" focusable="false" style="vertical-align:-2px">
+                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>
+                </svg>
+                <span th:text="${article.counter != null ? article.counter : 0}">0</span>
+            </span>
+        </div>
+
+        <h1 class="article-title" id="article-title" th:utext="${article.title}"></h1>
+        <!-- <p class="article-dek" th:if="${!#strings.isEmpty(article.description)}"
+           th:utext="${article.description}"></p> -->
+
+        <div class="byline">
+            <div class="byline__who" th:if="${article.showArticleInfo()}">
+                <span class="byline__name" id="authors" th:text="${article.authorsAsText}"></span>
+                <!--/* hasTranslation is false for the website's own language, so the note
+                       appears only on a translation. */-->
+                <span class="byline__meta" th:if="${article.hasTranslation(lang)}"
+                      th:text="#{article.aiTranslated}">* AI-translated content</span>
+            </div>
+
+            <div class="byline__actions">
+                <!--/* Only once the studio has made it (SitePdfs): linked always, it would be a 404
+                       for every article nobody has exported. */-->
+                <a class="button-ghost button-ghost--small" target="_blank" rel="noopener"
+                   th:if="${pdf != null}" th:href="${pdf}">PDF</a>
+
+                <!--/* The Facebook SDK is loaded by the page template when the website has a
+                       Facebook application id; these are its mount points and must keep their
+                       class names. Without the SDK they would be empty boxes, so they render
+                       under the same condition. */-->
+                <th:block th:if="${site != null and site.facebookAppId() != null}"
+                          th:with="shareUrl=${site.url('/article/' + article.id + '?lang=' + lang)}">
+                    <div class="fb-share-button" th:data-href="${shareUrl}"
+                         data-layout="button_count" data-action="share" data-size="large"></div>
+                    <div class="fb-like" th:data-href="${shareUrl}"
+                         data-width="" data-layout="standard" data-action="like" data-size="large"
+                         data-share="false"></div>
+                </th:block>
+            </div>
+        </div>
+
+        <!--/* What is written here is a scroll-snapped strip that needs no JavaScript at all: one
+               image fills the width and never scrolls, several become a swipeable row.
+
+               site.js then upgrades it to a carousel in place -- arrows, dots, keyboard -- and
+               deliberately builds those controls itself rather than having them written here.
+               Prev/next markup written into the page shows arrows that do nothing wherever its
+               script does not run; controls that outlive their code are the bug, so here they
+               cannot. Nothing in that upgrade hides a slide. */-->
+        <!--/* visibleImages(), not images: the studio can attach an image purely so the operator
+               can reference it from inside the body by URL, and hiding it here is what keeps it
+               out of the strip. Absent hiddenImageIds -- an article that never hid an image -- the
+               two are the same list. */-->
+        <!--/* #strings.isEmpty, not a null test. The studio's textarea posts "" when no video is
+               embedded, so `embedded != null` would be true for any article ever saved without one
+               -- rendering an EMPTY .video-container (that class carries the responsive-iframe
+               padding hack, so it draws as a black box) and suppressing the gallery below, which
+               the same test guards. Exactly the trap ArticleModel.getImage() documents for
+               og:image: "" is not null. */-->
+        <figure class="figure" th:if="${!#strings.isEmpty(article.embedded) or !article.visibleImages().isEmpty()}">
+            <div class="figure__frame" th:if="${!#strings.isEmpty(article.embedded)}">
+                <div class="video-container" th:utext="${article.embedded}"></div>
+            </div>
+            <!--/* The labels site.js gives the controls it builds, in the page's language;
+                   {0} in the last one is the slide number. */-->
+            <div class="gallery" th:if="${#strings.isEmpty(article.embedded)}"
+                 th:data-label-gallery="#{article.gallery}"
+                 th:data-label-previous="#{article.gallery.previous}"
+                 th:data-label-next="#{article.gallery.next}"
+                 th:data-label-image="#{article.gallery.image}">
+                <figure class="gallery__item" th:each="image : ${article.visibleImages()}">
+                    <img th:src="'/assets/img/articles/' + ${image.filename}" th:alt="${image.altFor(lang)}"/>
+                    <!-- <figcaption class="figure__caption" th:if="${!#strings.isEmpty(image.caption)}"
+                                th:text="${image.caption}"></figcaption> -->
+                </figure>
+            </div>
+        </figure>
+
+        <!--/* th:utext: this is stored HTML, hand-written or imported, and may carry older markup.
+               site.css carries the guards that keep it inside the measure -- see the
+               .article-body block there before changing anything. */-->
+        <div class="article-body" id="text" th:utext="${article.text}"></div>
+
+        <div class="tags-block" th:if="${article.hasTags()}">
+            <div class="tags-block__title" th:text="#{article.keywords}">Keywords</div>
+            <div class="tags">
+                <a class="chip" th:each="tag : ${article.translatedTags}"
+                   th:href="@{/list/{id}(id=${tag.name})}" th:text="${tag.translate(lang)}"></a>
+            </div>
+        </div>
+    </article>
+
+</th:block>
+</body>
+</html>

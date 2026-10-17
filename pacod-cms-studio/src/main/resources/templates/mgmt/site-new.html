@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  Creating a website. Offered only in organisations where the person holds website.create; the
+  organisation is still a posted value, so PortalWebsites.create checks it again, with the
+  organisation's website limit, the id and every address.
+
+  The id is permanent: it names the website's database, its folder and every studio address inside
+  it. The first address is automatic, <id>.<site domain>, when a site domain is configured.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{portal.site.new.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('sites')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{portal.site.new.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="card" th:if="${organisations.isEmpty()}">
+                <div class="card-body">
+                    <p class="muted" style="margin:0" th:text="#{portal.site.new.noOrganisation}">You cannot create a website in any organisation.</p>
+                </div>
+                <div class="card-foot" th:if="${canCreateOrganisation}">
+                    <a class="btn btn-primary" th:href="${studioRoot} + '/mgmt/organisations'">
+                        <svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{portal.orgs.new.heading}">New organisation</span>
+                    </a>
+                </div>
+            </div>
+
+            <form class="form-page" method="post" th:if="${!organisations.isEmpty()}"
+                  th:action="${studioRoot} + '/mgmt/sites/new'" th:object="${form}">
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-layout"></use></svg> <span th:text="#{portal.site.new.heading}">The website</span></h2>
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="organisationId" th:text="#{portal.site.field.organisation}">Organisation</label>
+                            <select id="organisationId" th:field="*{organisationId}">
+                                <option th:each="o : ${organisations}" th:value="${o.id}" th:text="${o.name}">Acme</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="name" th:text="#{portal.site.field.name}">Name</label>
+                            <input type="text" id="name" th:field="*{name}" required maxlength="100">
+                            <span class="hint" th:text="#{portal.site.field.name.hint}">What readers see; it can be changed later.</span>
+                        </div>
+                        <div class="field">
+                            <label for="id" th:text="#{portal.site.field.id}">Id</label>
+                            <input type="text" id="id" th:field="*{id}" required minlength="2" maxlength="40"
+                                   pattern="[a-z][a-z0-9\-]{1,39}" autocapitalize="off" spellcheck="false">
+                            <span class="hint" th:text="#{portal.site.field.id.hint}">Lowercase letters, digits and hyphens. It cannot be changed.</span>
+                        </div>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="language" th:text="#{portal.site.field.language}">Language of the content</label>
+                                <input type="text" id="language" th:field="*{language}" required maxlength="3" list="language-codes"
+                                       pattern="[a-z]{2,3}" autocapitalize="off">
+                                <datalist id="language-codes"><option th:each="l : ${languages}" th:value="${l}"></option></datalist>
+                            </div>
+                            <div class="field">
+                                <label for="timezone" th:text="#{portal.site.field.timezone}">Time zone</label>
+                                <input type="text" id="timezone" th:field="*{timezone}" list="timezones" maxlength="60">
+                                <datalist id="timezones"><option th:each="z : ${timezones}" th:value="${z}"></option></datalist>
+                            </div>
+                        </div>
+                        <div class="field" th:if="${templateSets.size() > 1}">
+                            <label for="templateSet" th:text="#{portal.site.field.templateSet}">Template set</label>
+                            <select id="templateSet" th:field="*{templateSet}">
+                                <option th:each="t : ${templateSets}" th:value="${t.id()}"
+                                        th:text="${t.name()} + ' — ' + ${t.description()}">Editorial</option>
+                            </select>
+                            <span class="hint" th:text="#{portal.site.field.templateSet.hint}">How its pages look. It can switch later, under Design.</span>
+                        </div>
+                        <div class="checkline">
+                            <input type="checkbox" id="demo" th:field="*{demo}">
+                            <div>
+                                <label for="demo" th:text="#{portal.site.new.demo}">Start with demo content</label>
+                                <span class="help" th:text="#{portal.site.new.demo.help(${demoLanguages})}">Sample articles, pictures and a link page.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-globe"></use></svg> <span th:text="#{portal.site.domains}">Addresses</span></h2>
+                    <div class="card-body">
+                        <p class="muted" style="margin-top:0" th:if="${!siteDomain.isEmpty()}">
+                            <th:block th:text="#{portal.site.new.automatic}">It answers at</th:block>
+                            <code th:text="'<id>.' + ${siteDomain}">&lt;id&gt;.localhost</code>.
+                        </p>
+                        <div class="field">
+                            <label for="hosts" th:text="#{portal.site.field.hosts}">Further addresses</label>
+                            <textarea id="hosts" th:field="*{hosts}" rows="3" spellcheck="false"></textarea>
+                            <span class="hint" th:text="#{portal.site.field.hosts.hint}">One per line, e.g. news.example.com. Point each at this installation first.</span>
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{portal.site.new.submit}">Create the website</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+# The front door's rules, shared by the production Caddyfile and Caddyfile.dev. Only the site
+# addresses and the certificates differ between the two; everything a request meets is here, so
+# development runs exactly the rules production does. Each one fails silently when dropped:
+#   - Host passes through unchanged (Caddy's default): the site picks the website by it, pacod-id
+#     answers only its issuer's host. X-Forwarded-Host is that Host, port included, so a redirect
+#     the applications build keeps the published port.
+#   - X-Real-IP is the TCP peer: the site believes it only from a proxy on a private address, which
+#     Caddy is, and the crawler log verifies Googlebot by it. X-Forwarded-For is Caddy's own: it
+#     REPLACES a value a client wrote rather than appending to it.
+#   - X-Pacod-Print is removed: only the PDF renderer, on the compose network, may send one;
+#   - request bodies stop at 4 MiB, in step with the studio's multipart limits (Spring's 4MB is
+#     4 MiB; Caddy's MB is decimal, so the unit is MiB), 1 MiB for pacod-id;
+#   - / on the studio's host answers 302 to /mgmt/sites;
+#   - /_internal/ answers 404: those questions are asked on the compose network only.
+
+(forward) {
+	header_up X-Real-IP {remote_host}
+	header_up -X-Pacod-Print
+}
+
+(front) {
+	log
+	encode gzip
+	@internal path /_internal/*
+	respond @internal 404
+}
+
+(studio) {
+	import front
+	request_body {
+		max_size 4MiB
+	}
+	# Relative: the browser keeps the host and port it asked with.
+	redir / /mgmt/sites 302
+	reverse_proxy studio:7443 {
+		import forward
+	}
+}
+
+(id) {
+	import front
+	request_body {
+		max_size 1MiB
+	}
+	reverse_proxy id:8070 {
+		import forward
+	}
+}
+
+# Every host that is neither the studio's nor pacod-id's: the public site, which answers 404 for a
+# host no website claims.
+(site) {
+	import front
+	request_body {
+		max_size 4MiB
+	}
+	reverse_proxy site:8443 {
+		import forward
+	}
+}
+
+# A certificate pair supplied by the deployment (SSL_CERT_FILE, SSL_KEY_FILE), imported only when
+# one is named (compose sets CADDY_SUPPLIED_PAIR). This site is here only to load the pair into
+# Caddy's certificate cache, which every listener shares: a TLS handshake for a name the pair covers
+# finds it there, and automatic HTTPS leaves those names alone ("skipping automatic certificate
+# management" in the log). Every name the pair does not cover gets its certificate the usual way.
+#
+# No hostname, on a port compose does not publish: a site with a name the pair does not cover would
+# have Caddy order a certificate for that name, and keep retrying.
+(supplied-pair) {
+	https://:4443 {
+		tls /etc/caddy/tls/fullchain.pem /etc/caddy/tls/privkey.pem
+		respond 404
+	}
+}

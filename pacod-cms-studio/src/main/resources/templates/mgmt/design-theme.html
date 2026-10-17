@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  The website's theme, as its draft: a value per token (blank: the template set's own), the dark
+  value of each colour, its own CSS. Presets replace the draft's values with one of the current
+  set's. Fields are t_<token> and t_<token>@dark; DesignTheme checks each by its token's type.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{design.theme})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('design-theme')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{design.theme})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <a class="btn btn-ghost" th:href="@{/mgmt/design}">
+                    <svg class="i"><use href="#i-arrow-up"></use></svg> <span th:text="#{design.title}">Design</span>
+                </a>
+                <span class="badge" th:if="${theme.hasUnpublishedChanges()}" th:text="#{design.layout.draft}">draft</span>
+                <span class="spacer" style="margin-left:auto"></span>
+                <a class="btn" th:href="@{/mgmt/design/preview}">
+                    <svg class="i"><use href="#i-eye"></use></svg> <span th:text="#{design.preview}">Preview</span>
+                </a>
+                <form method="post" class="inline-form" th:if="${can != null and can.site('design.publish')}"
+                      th:action="@{/mgmt/design/theme/publish}">
+                    <button class="btn btn-primary" type="submit">
+                        <svg class="i"><use href="#i-check"></use></svg> <span th:text="#{design.publish}">Publish</span>
+                    </button>
+                </form>
+                <form method="post" class="inline-form" th:if="${theme.hasUnpublishedChanges()}"
+                      th:action="@{/mgmt/design/theme/discard}" th:data-confirm="#{design.discard.confirm}">
+                    <button class="btn" type="submit" th:text="#{design.discard}">Discard the draft</button>
+                </form>
+            </div>
+
+            <!--/* Design assist: a theme draft from a few words (DesignAssist). Only the draft changes. */-->
+            <div class="card" th:if="${aiAvailable and can != null and can.site('design.write')}">
+                <h2><svg class="i"><use href="#i-sun"></use></svg> <span th:text="#{design.assist.title}">Describe it</span></h2>
+                <form method="post" th:action="@{/mgmt/design/theme/assist}">
+                    <div class="card-body">
+                        <span class="hint" th:text="#{design.assist.theme.intro}">Describe the look; AI drafts the values.</span>
+                        <textarea name="brief" rows="3" maxlength="1000" th:placeholder="#{design.assist.theme.example}"></textarea>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn" type="submit"><svg class="i"><use href="#i-play"></use></svg> <span th:text="#{design.assist.submit}">Draft it</span></button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card" th:unless="${presets.isEmpty()}">
+                <h2><svg class="i"><use href="#i-sun"></use></svg> <span th:text="#{design.theme.presets}">Start from a preset</span></h2>
+                <form method="post" th:action="@{/mgmt/design/theme/preset}" th:data-confirm="#{design.theme.preset.confirm}">
+                    <div class="card-body">
+                        <div class="checkline" th:each="p : ${presets}">
+                            <input type="radio" name="preset" th:id="'preset-' + ${p.id()}" th:value="${p.id()}"
+                                   th:checked="${p.id() == theme.preset}">
+                            <div>
+                                <label th:for="'preset-' + ${p.id()}" th:text="${p.name()}">Classic</label>
+                                <span class="help preset-swatches">
+                                    <span class="swatch" th:each="k : ${swatchTokens}"
+                                          th:style="'background:' + ${p.tokens().get(k)}" th:if="${p.tokens().get(k) != null}"></span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn" type="submit" th:text="#{design.theme.applyPreset}">Use this preset</button>
+                    </div>
+                </form>
+            </div>
+
+            <form class="form-page" method="post" th:action="@{/mgmt/design/theme}">
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-sun"></use></svg> <span th:text="#{design.theme.colours}">Colours</span></h2>
+                    <div class="card-body">
+                        <span class="hint" th:text="#{design.theme.colours.hint}">Blank keeps the template's colour.</span>
+                        <div class="token-grid">
+                            <div class="token-row" th:each="t : ${tokens}" th:if="${t.kind().name() == 'COLOR'}">
+                                <span class="token-row__name" th:text="${labels.token(t.id())}">Accent</span>
+                                <label class="token-row__value">
+                                    <span class="sr-only" th:text="#{design.theme.light}">Light</span>
+                                    <input type="text" class="colour-input" th:name="'t_' + ${t.id()}" th:value="${theme.draft[t.id()]}"
+                                           pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" maxlength="7" placeholder="#rrggbb">
+                                </label>
+                                <label class="token-row__value">
+                                    <span class="sr-only" th:text="#{design.theme.dark}">Dark</span>
+                                    <input type="text" class="colour-input" th:name="'t_' + ${t.id()} + '@dark'"
+                                           th:value="${theme.draft[t.id() + '@dark']}"
+                                           pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" maxlength="7" placeholder="#rrggbb">
+                                </label>
+                            </div>
+                        </div>
+                        <span class="hint" th:text="#{design.theme.columns}">Left: the light look. Right: the dark look.</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-file-text"></use></svg> <span th:text="#{design.theme.type}">Type and width</span></h2>
+                    <div class="card-body">
+                        <div class="grid-2">
+                            <div class="field" th:each="t : ${tokens}" th:if="${t.kind().name() == 'FONT'}">
+                                <label th:for="'tok-' + ${t.id()}" th:text="${labels.token(t.id())}">Display font</label>
+                                <select th:id="'tok-' + ${t.id()}" th:name="'t_' + ${t.id()}">
+                                    <option value="" th:text="#{design.theme.templates}">The template's</option>
+                                    <option th:each="f : ${fonts}" th:value="${f}" th:text="${labels.font(f)}"
+                                            th:selected="${f == theme.draft[t.id()]}">Georgia</option>
+                                </select>
+                            </div>
+                            <div class="field" th:each="t : ${tokens}" th:if="${t.kind().name() == 'LENGTH'}">
+                                <label th:for="'tok-' + ${t.id()}" th:text="${labels.token(t.id())}">Page width</label>
+                                <input type="number" th:id="'tok-' + ${t.id()}" th:name="'t_' + ${t.id()}"
+                                       th:min="${t.min()}" th:max="${t.max()}" th:value="${theme.draft[t.id()]}">
+                                <span class="hint" th:text="#{design.theme.pixels(${t.min()}, ${t.max()})}">Pixels.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-code"></use></svg> <span th:text="#{design.theme.css}">Your own CSS</span></h2>
+                    <div class="card-body">
+                        <textarea name="css" rows="10" class="code" maxlength="50000" spellcheck="false" th:text="${theme.draftCss}"></textarea>
+                        <span class="hint" th:text="#{design.theme.css.hint}">Loaded after the template's stylesheet.</span>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{design.theme.save}">Save the draft</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

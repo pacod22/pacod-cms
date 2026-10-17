@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*
+  The advertiser column and the leaderboard row, shared by every public page that carries
+  advertising.
+
+  Bookings are data, never markup. Both fragments take a list of Banner documents; the caller
+  decides which page it is rendering and BannerService decides what runs there, so a booking for
+  listings alone is one carrying pages=[LIST]. An empty list renders no boxes at all, which is the
+  correct behaviour and not a broken one.
+
+  Deliberately does NOT include its own wrapping column: the surrounding grid differs between the
+  top and bottom sidebars, so that stays with the layout in the page templates.
+
+  Creative paths are stored whole, in Banner.source: an HTML5 banner points at its folder's
+  index.html, an uploaded image banner at /resources/banners/{id}-{file} -- both under
+  /resources/banners/**, in the website's own folder. The site serves /assets/** and /resources/**
+  itself (MediaController), out of the folder of the website the host names.
+
+  THE EMITTED CLASSES ARE `partner-card` / `partner-row`, NEVER `ad-box` / `ad-row`. EasyList --
+  the default list in uBlock Origin, AdBlock Plus, AdGuard and Brave Shields -- hides every
+  element carrying those on every page through two GENERIC (all-domain) cosmetic filters,
+  `##.ad-box:not(#ad-banner):not(:empty)` and `##.ad-row`. Nothing is wrong on the server when
+  that happens, which is what makes it hard to see: the markup renders, every creative returns
+  200, and the render tests pass. See the block above `.partner-row` in site.css for the full
+  note, including why the /resources/banners/ and /b/{id} paths are NOT renameable and need
+  not be.
+
+  The FRAGMENT names and this FILENAME are deliberately `ad-sidebar` / `adSidebar` / `adBox`:
+  template filenames never reach the browser, so renaming them would be a diff with no effect.
+  Only what lands in the `class` attribute matters.
+
+  `data-partner` ON EACH CREATIVE FRAME IS WHAT site.js MEASURES. It carries the booking id, which
+  is the only way the browser can know it -- the iframe's src names a folder, and several bookings
+  may share one. initPartners() reads it twice over:
+    - viewable impressions: an IntersectionObserver on every [data-partner] frame, one beacon per
+      page view to POST /b/v;
+    - HTML5 clicks: a listener inside the iframe's own document, beaconed to POST /b/{id}/c.
+  The second works ONLY because the iframe is same-origin (/resources/** on this host) and carries
+  NO `sandbox`. Adding `sandbox` without allow-same-origin, or `credentialless`, or pointing a
+  booking off-origin, silently stops HTML5 clicks being counted: the page still renders, the frame
+  still works, and nothing anywhere fails. The name was grepped against EasyList and EasyPrivacy
+  (no rule mentions it); grep both again before renaming it, and rename it in site.js too.
+*/-->
+
+<!--/*
+  One ad box. Extracted because the sidebar and the leaderboard row render banners identically and
+  differ only in their wrapper and in whether the iframe is lazy-loaded.
+
+  `lazy` is a parameter rather than a constant because the leaderboards are above the fold on every
+  page and deferring them would show empty frames on first paint; the sidebar ones are not.
+
+  Note the class is assembled with th:classappend carrying the modifier ALONE. Thymeleaf
+  preprocesses `__...__` inside expressions, so an expression containing two BEM `__` separators
+  fails to parse: the text between them is read as an expression to preprocess. One separator
+  per expression is safe.
+*/-->
+<div th:fragment="adBox(banner, lazy)" class="partner-card">
+    <div th:if="${banner.type.name() == 'HTML5' and preview == null}"
+         class="partner-card__frame" th:classappend="'partner-card__frame--' + ${banner.size.modifier}"
+         th:attr="data-partner=${banner.id}">
+        <iframe th:src="${banner.source}" th:title="${banner.name}"
+                width="100%" height="100%" th:attr="loading=${lazy} ? 'lazy' : null"></iframe>
+    </div>
+    <!--/* The studio's draft preview shows an HTML5 booking's box, never its frame: a creative may
+           load its advertiser's tags, and the preview reloads on every saved draft -- the reason
+           the studio's own banner preview is click-to-load. */-->
+    <div th:if="${banner.type.name() == 'HTML5' and preview != null}"
+         class="partner-card__frame partner-card__stand-in" th:classappend="'partner-card__frame--' + ${banner.size.modifier}"
+         th:text="${banner.name}">Booking</div>
+
+    <!--/* The link goes through /b/{id} so the click can be counted; see BannerClickController. */-->
+    <a th:unless="${banner.type.name() == 'HTML5'}"
+       class="partner-card__frame" th:classappend="'partner-card__frame--' + ${banner.size.modifier}"
+       th:attr="data-partner=${banner.id}"
+       th:href="@{/b/{id}(id=${banner.id})}" th:title="${banner.name}"
+       target="_blank" rel="noopener">
+        <img th:src="${banner.source}" th:alt="${banner.altText}"/>
+    </a>
+
+    <div class="partner-card__caption" th:if="${!#strings.isEmpty(banner.caption)}"
+         th:text="${banner.caption}"></div>
+</div>
+
+<th:block th:fragment="adSidebar(banners)">
+    <th:block th:each="banner : ${banners}">
+        <div th:replace="~{fragments/ad-sidebar :: adBox(${banner}, true)}"></div>
+    </th:block>
+</th:block>
+
+<!--/* ===================================================================================
+       The slots above the main column. Deliberately not lazy-loaded: they are above the fold
+       on every page, so deferring them shows empty frames on first paint.
+
+       The .partner-row wrapper is emitted only when there is something to put in it, so a page with
+       no leaderboard booking gets no empty grid and no stray top padding.
+       =================================================================================== */-->
+<th:block th:fragment="topBanners(banners)">
+    <div class="partner-row" th:if="${banners != null and !banners.isEmpty()}">
+        <th:block th:each="banner : ${banners}">
+            <div th:replace="~{fragments/ad-sidebar :: adBox(${banner}, false)}"></div>
+        </th:block>
+    </div>
+</th:block>
+</body>
+</html>

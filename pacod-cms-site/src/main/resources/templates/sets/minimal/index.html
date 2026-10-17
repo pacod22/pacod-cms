@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  [minimal] One column: this is editorial's template with the aside removed -- see
+  design/sets/minimal.yaml. Keep the two in step when the page's own content changes.
+
+  The latest-article page: GET /latest, with /index, /index/ and /index.html as aliases.
+
+  It renders the same thing as article.html, so both use fragments/article-view and
+  fragments/head rather than copies of them, which drift apart; the only difference is the
+  canonical URL, which is this route rather than the article's own.
+*/-->
+<head th:replace="~{fragments/head :: head(
+        lang=${lang},
+        pageTitle=${article.title},
+        pageDesc=${article.description},
+        ogUrl=${site.url('/latest')},
+        ogImagePath=${article.image},
+        ogImageType=${article.content})}"></head>
+
+<body>
+<th:block th:replace="~{fragments/scripts :: gtmNoscript}"></th:block>
+<th:block th:replace="~{fragments/scripts :: facebookSdk(${lang})}"></th:block>
+
+<th:block th:replace="~{fragments/navbar :: navbar(${lang})}"></th:block>
+
+<div class="shell">
+    <th:block th:replace="~{fragments/ad-sidebar :: topBanners(${topBanners})}"></th:block>
+</div>
+
+<div class="shell shell--narrow">
+    <main class="column">
+        <!--/* The main region: this page's own content where its primary section stands, the
+               layout's other sections around it (PageComposer; sections.html). */-->
+        <th:block th:each="s : ${regions.get('main')}">
+            <th:block th:if="${s.primary}">
+                <th:block th:replace="~{fragments/article-view :: articleView(${article}, ${lang})}"></th:block>
+            </th:block>
+            <th:block th:unless="${s.primary}">
+                <th:block th:replace="~{sections :: ${s.fragment}(s=${s}, lang=${lang})}"></th:block>
+            </th:block>
+        </th:block>
+    </main>
+
+    <!--/* No aside in this set: the sidebar bookings follow the content, in a row. */-->
+    <div class="column-partners">
+        <th:block th:replace="~{fragments/ad-sidebar :: adSidebar(${sidebarBanners})}"></th:block>
+    </div>
+</div>
+
+
+<th:block th:replace="~{fragments/footer :: footer(${lang})}"></th:block>
+<th:block th:replace="~{fragments/scripts :: siteScripts}"></th:block>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<!--/*
+  «Файлове» — the file-level editor.
+
+  This is what makes an advertiser's animation export editable at all. A Google Web Designer or
+  Adobe Animate folder has no frames the console can present: the rotation is a timeline inside a
+  sprite atlas, and the destination is a `clickTag` string in the export's own JavaScript. There is
+  nothing structured there to bind a form field to, so the file itself is the field.
+
+  Deliberately plain textareas, not TinyMCE -- mgmt.js binds the editor to id="text", and this
+  screen must never use that id: an editor configured to preserve stored article bodies would
+  still reformat a banner's markup on every open.
+*/-->
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{banners.files.title})}"></head>
+
+<body>
+
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('layouts')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{banners.files.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <div class="grow">
+                    <code th:text="${layout.id}">Sample_300_250</code>
+                    <span class="badge plain" th:text="${mgmtText.label(layout.origin)}">Imported</span>
+                </div>
+                <a class="btn btn-ghost push"
+                   th:href="@{/mgmt/banners/layouts/{id}(id=${layout.id})}"
+                   th:text="#{banners.files.toLayout}">To the layout</a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <p class="muted" style="margin:0" th:unless="${layout.built}"
+                       th:utext="#{banners.files.intro.imported}">
+                        This layout was exported by the advertiser.
+                    </p>
+                    <p class="muted" style="margin:0" th:if="${layout.built}">
+                        <th:block th:text="#{banners.files.intro.built.before}">This layout is assembled by the console.</th:block>
+                        <code th:text="${layout.entryFile}">index.html</code><th:block th:utext="#{banners.files.intro.built.after}">, css/banner.css and js/banner.js are rewritten on every save.</th:block>
+                    </p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>
+                    <svg class="i"><use href="#i-folder"></use></svg>
+                    <span th:text="#{banners.files.heading}">Files</span>
+                    <span class="hint" th:text="#{banners.files.count(${fileList.size()})}">12</span>
+                </h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{banners.files.col.path}">Path</th>
+                            <th class="shrink" th:text="#{banners.files.col.size}">Size</th>
+                            <th class="shrink" th:text="#{banners.files.col.action}">Action</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="f : ${fileList}">
+                            <td><code th:text="${f.path}">Globex_300_250.js</code></td>
+                            <!--/*
+                              Байтове под килобайт:цялото деление показва „0 KB“ за истински файл,
+                              което се чете като повреден файл. Няколко от спрайтовете тук са
+                              наистина по няколкостотин байта.
+                            */-->
+                            <td th:text="${f.bytes &lt; 1024} ? ${f.bytes} + ' B' : ${f.bytes / 1024} + ' KB'">12 KB</td>
+                            <td class="path-row">
+                                <a class="btn btn-sm" th:if="${f.text}"
+                                   th:href="@{/mgmt/banners/layouts/{id}/files(id=${layout.id},file=${f.path})}">
+                                    <svg class="i"><use href="#i-code"></use></svg> <th:block th:text="#{banners.files.edit}">Edit</th:block>
+                                </a>
+                                <!--/*
+                                  Замяната пази точното име: скриптът на рекламодателя търси
+                                  спрайта си по име, така че ново име би оставило банера да зарежда
+                                  файл, който вече го няма.
+                                */-->
+                                <form th:if="${f.image}" method="post" class="inline-form"
+                                      enctype="multipart/form-data"
+                                      th:action="@{/mgmt/banners/layouts/{id}/files/replace(id=${layout.id})}">
+                                    <input type="hidden" name="path" th:value="${f.path}">
+                                    <span class="slide-swap">
+                                        <input type="file" name="file"
+                                               th:aria-label="#{banners.files.replace.aria(${f.path})}">
+                                        <button class="btn btn-icon btn-sm" type="submit"
+                                                th:title="#{banners.files.replace.title}">
+                                            <svg class="i"><use href="#i-upload"></use></svg>
+                                        </button>
+                                    </span>
+                                </form>
+                                <span class="muted" th:if="${!f.text and !f.image}">—</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${fileList.isEmpty()}">
+                    <svg class="i"><use href="#i-folder"></use></svg>
+                    <span th:text="#{banners.files.empty}">This layout's folder is missing from disk.</span>
+                </div>
+            </div>
+
+            <div class="card" th:if="${editing != null}">
+                <h2>
+                    <svg class="i"><use href="#i-code"></use></svg>
+                    <span th:text="${editing}">Globex_300_250.js</span>
+                    <span class="hint" th:text="#{banners.files.editing.hint}">saved exactly as entered</span>
+                </h2>
+                <div class="card-body">
+                    <p class="muted" style="margin-top:0" th:if="${content == null}"
+                       th:text="#{banners.files.unreadable}">
+                        The file could not be read.
+                    </p>
+                    <form method="post" th:if="${content != null}"
+                          th:action="@{/mgmt/banners/layouts/{id}/files(id=${layout.id})}">
+                        <input type="hidden" name="file" th:value="${editing}">
+                        <div class="field">
+                            <label for="content" th:text="#{banners.files.content}">Content</label>
+                            <textarea id="content" name="content" rows="24" spellcheck="false"
+                                      style="font-family:var(--mono); font-size:12.5px"
+                                      th:text="${content}"></textarea>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-primary" type="submit">
+                                <svg class="i"><use href="#i-save"></use></svg> <th:block th:text="#{banners.files.save}">Save the file</th:block>
+                            </button>
+                            <a class="btn btn-ghost"
+                               th:href="@{/mgmt/banners/layouts/{id}/files(id=${layout.id})}"
+                               th:text="#{banners.files.close}">Close</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

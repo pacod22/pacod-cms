@@ -1,0 +1,56 @@
+# The minimal template set: one quiet column for writing first -- no aside, no widget grids.
+# Templates: pacod-cms-site/src/main/resources/templates/sets/minimal/. It extends editorial: what
+# it does not override (the article view, the social page, the print view, the error page's copy,
+# the navbar and footer markup) comes from there, restyled by minimal.css.
+#
+# It renders fewer section types than editorial: a layout carrying a search box or social links,
+# switched to minimal, keeps them -- flagged, not rendered -- and they come back on a switch back.
+id: minimal
+name: Minimal
+description: One centred column of text; lists instead of grids; nothing beside the content.
+extends: editorial
+sections: [primary, article-list, rich-text, call-to-action]
+pageTypes:
+  HOME:
+    regions: [main]
+    layout:
+      main:
+        - {type: article-list, settings: {source: latest, count: 1, style: hero}}
+        - {type: article-list, settings: {source: latest, count: 10, offset: 1, style: list}}
+  ARTICLE:
+    regions: [main]
+    layout:
+      main: [{type: primary}]
+  CATEGORY:
+    regions: [main]
+    layout:
+      main: [{type: primary}]
+  LATEST:
+    regions: [main]
+    layout:
+      main: [{type: primary}]
+  PAGE:
+    regions: [main]
+    layout:
+      main: [{type: primary}]
+  SEARCH:
+    regions: [main]
+    layout:
+      main: [{type: primary}]
+themes:
+  paper:
+    name: Paper
+    tokens: {bg: "#ffffff", surface: "#ffffff", line: "#e6e6e6", ink: "#111111", muted: "#444444",
+             faint: "#888888", accent: "#111111", highlight: "#c2410c", tint: "#f5f5f4", hover: "#f5f5f4",
+             panel: "#111111", "bg@dark": "#111111", "surface@dark": "#161616", "line@dark": "#2a2a2a",
+             "ink@dark": "#f1f1f1", "muted@dark": "#bdbdbd", "faint@dark": "#7a7a7a", "accent@dark": "#f1f1f1",
+             "highlight@dark": "#fb923c", "tint@dark": "#1b1b1b", "hover@dark": "#1f1f1f", "panel@dark": "#000000",
+             font-display: system-serif, font-text: system-serif, font-label: system-sans, shell: 760}
+  slate:
+    name: Slate
+    tokens: {bg: "#f8fafc", surface: "#ffffff", line: "#e2e8f0", ink: "#0f172a", muted: "#334155",
+             faint: "#64748b", accent: "#4338ca", highlight: "#be123c", tint: "#eef2ff", hover: "#f1f5f9",
+             panel: "#0f172a", "bg@dark": "#0b1120", "surface@dark": "#111827", "line@dark": "#1f2937",
+             "ink@dark": "#e5e7eb", "muted@dark": "#9ca3af", "faint@dark": "#6b7280", "accent@dark": "#818cf8",
+             "highlight@dark": "#fb7185", "tint@dark": "#1e1b4b", "hover@dark": "#1f2937", "panel@dark": "#020617",
+             font-display: system-sans, font-text: system-sans, font-label: system-mono, shell: 820}

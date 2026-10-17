@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  One /social link, for ONE language: its text in that language, and the address, icon, placement
+  and schedule, which are the same in every language.
+
+  The form carries NO id. The link's id is generated, is the key its statistics are filed under and
+  is in every tile URL a reader may still have open, so it comes from the path and nowhere else --
+  see SocialLink. id="article-form" for the save bar, Ctrl/Cmd+S and the unsaved-changes guard,
+  as page-edit.html; never id="text".
+
+  A link is CREATED on /mgmt/social itself, by the add form inside its card, so this screen only
+  ever edits one that exists.
+*/-->
+<head th:replace="~{mgmt/fragments :: head(#{pages.socialLink.title})}"></head>
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('social')}"></th:block>
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{pages.socialLink.title})}"></header>
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <a class="btn btn-ghost" th:href="@{/mgmt/social(lang=${language.code})}">
+                    <svg class="i"><use href="#i-arrow-up"></use></svg> <span th:text="#{pages.socialLink.back}">The social page</span>
+                </a>
+                <a class="btn btn-ghost" th:href="@{/mgmt/social/stats(link=${link.id})}">
+                    <svg class="i"><use href="#i-activity"></use></svg> <span th:text="#{pages.socialLink.stats}">Link statistics</span>
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="chart-legend" style="margin:0">
+                        <th:block th:each="l : ${languages}">
+                            <a class="btn btn-sm"
+                               th:classappend="${l.code == language.code} ? 'btn-primary' : 'btn-ghost'"
+                               th:href="@{/mgmt/social/links/{id}(id=${link.id}, lang=${l.code})}">
+                                <span th:text="${l.displayName()}">Bulgarian</span>
+                                <span th:if="${link.rawTitle(l.code) != null}" th:title="#{pages.hasText}">•</span>
+                            </a>
+                        </th:block>
+                    </div>
+                </div>
+            </div>
+
+            <form id="article-form" method="post" th:object="${form}"
+                  th:action="@{/mgmt/social/links/{id}(id=${link.id})}">
+                <div th:replace="~{mgmt/fragments :: errors}"></div>
+                <input type="hidden" th:field="*{lang}">
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-link"></use></svg>
+                        <span th:text="#{pages.textFor(${language.displayName()})}">Text</span>
+                        <span class="hint" th:if="${language.code != originalCode and link.rawTitle(language.code) == null}"
+                              th:text="#{pages.notTranslated}">not translated</span>
+                    </h2>
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="title"><th:block th:text="#{pages.socialLink.text}">Link text</th:block>
+                                <span class="help" th:text="#{pages.socialLink.text.help}">— for icons it is the tooltip</span></label>
+                            <input type="text" id="title" th:field="*{title}" maxlength="120" th:placeholder="#{pages.placeholder.subscribe}">
+                            <span class="field-error" th:if="${#fields.hasErrors('title')}" th:errors="*{title}"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-shield"></use></svg> <span th:text="#{pages.socialLink.title}">Link</span>
+                        <span class="hint" th:text="#{pages.socialLink.appliesToAll}">applies to all languages</span></h2>
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="url" th:text="#{pages.field.address}">Address</label>
+                            <input type="text" id="url" th:field="*{url}" th:placeholder="#{pages.placeholder.url}">
+                            <span class="help" th:utext="#{pages.socialLink.url.help}">https://</span>
+                            <span class="field-error" th:if="${#fields.hasErrors('url')}" th:errors="*{url}"></span>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="placement" th:text="#{pages.socialLink.placement}">Placement</label>
+                                <select id="placement" th:field="*{placement}">
+                                    <option th:each="p : ${placements}" th:value="${p}"
+                                            th:text="${p.name() == 'ICON'} ? #{pages.socialLink.placement.icon} : ${mgmtText.label(p)}">Link</option>
+                                </select>
+                                <span class="field-error" th:if="${#fields.hasErrors('placement')}" th:errors="*{placement}"></span>
+                            </div>
+                            <div class="field">
+                                <label for="icon"><th:block th:text="#{pages.social.icon}">Icon</th:block> <span class="help" th:text="#{pages.socialLink.icon.help}">— required for the networks row</span></label>
+                                <select id="icon" th:field="*{icon}">
+                                    <option value="" th:text="#{pages.noIcon}">— no icon —</option>
+                                    <option th:each="i : ${socialIcons}" th:value="${i}" th:text="${mgmtText.label(i)}">Instagram</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label class="check">
+                                <input type="checkbox" id="active" th:field="*{active}"> <th:block th:text="#{pages.socialLink.active}">Active</th:block>
+                            </label>
+                            <span class="help" th:text="#{pages.socialLink.active.help}">Switching off hides the link.</span>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="activeFrom"><th:block th:text="#{pages.socialLink.from}">From</th:block> <span class="help" th:text="#{pages.optional}">— optional</span></label>
+                                <input type="datetime-local" id="activeFrom" th:field="*{activeFrom}">
+                                <span class="field-error" th:if="${#fields.hasErrors('activeFrom')}" th:errors="*{activeFrom}"></span>
+                            </div>
+                            <div class="field">
+                                <label for="activeTo"><th:block th:text="#{pages.socialLink.to}">To</th:block> <span class="help" th:text="#{pages.optional}">— optional</span></label>
+                                <input type="datetime-local" id="activeTo" th:field="*{activeTo}">
+                                <span class="field-error" th:if="${#fields.hasErrors('activeTo')}" th:errors="*{activeTo}"></span>
+                            </div>
+                        </div>
+                        <span class="help" th:text="#{pages.socialLink.window.help}">A link with a schedule appears and disappears by itself.</span>
+                    </div>
+                </div>
+
+                <div class="savebar">
+                    <span class="spacer"></span>
+                    <span id="save-status" class="muted"></span>
+                    <button class="btn btn-primary" type="submit">
+                        <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{pages.action.save}">Save</span>
+                    </button>
+                </div>
+            </form>
+
+            <div class="card danger">
+                <h2><svg class="i"><use href="#i-trash"></use></svg> <span th:text="#{pages.socialLink.delete.heading}">Delete the link</span></h2>
+                <div class="card-body">
+                    <p class="muted" th:text="#{pages.socialLink.delete.text}">Deletes the link in every language.</p>
+                </div>
+                <div class="card-foot">
+                    <form method="post" th:data-confirm="#{pages.socialLink.delete.confirm}"
+                          th:action="@{/mgmt/social/links/{id}/delete(id=${link.id})}">
+                        <button class="btn btn-danger" type="submit" th:text="#{pages.socialLink.delete.button}">Delete link</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

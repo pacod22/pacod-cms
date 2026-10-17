@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<!--/*
+  The console's landing page. Every section is the 24-hour reading of a screen one click away,
+  read through that screen's own service -- see MgmtDashboardService -- so the numbers here and
+  there cannot disagree. Each card links to the screen it summarises.
+
+  The two "right now" tiles carry their own ids, dash-readers and dash-admins, and deliberately
+  NOT live-count: that id is what mgmt.js's monitoring poll binds to, and both polls on one page
+  would fetch twice a minute for one number.
+*/-->
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{ops.dash.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('dashboard')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{ops.dash.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <!--/* The one crawler finding worth interrupting for, exactly as /mgmt/crawlers words it. */-->
+            <div class="flash warn" th:if="${!dash.crawlers.watch.stale.isEmpty()}" role="status">
+                <svg class="i"><use href="#i-alert"></use></svg>
+                <span class="flash-text">
+                    <th:block th:each="s, it : ${dash.crawlers.watch.stale}">
+                        <b th:text="${s.bot}">googlebot</b>
+                        <span th:if="${s.lastSeen != null}"
+                              th:text="#{ops.crawl.stale.since(${times.day(s.lastSeen)})}">has not come</span>
+                        <span th:if="${s.lastSeen == null}"
+                              th:text="#{ops.crawl.stale.never(${retentionDays})}">has not come</span>
+                        <br th:unless="${it.last}"/>
+                    </th:block>
+                </span>
+                <a class="btn btn-sm" th:href="@{/mgmt/crawlers(range=${range.key})}" th:text="#{ops.dash.details}">Details</a>
+            </div>
+
+            <!--/*
+              Right now. Both tiles are server-rendered and refreshed by mgmt.js once a minute; with
+              scripting off they are the value as of page load.
+
+              Readers: «—», never 0, when the count failed -- zero readers is a plausible answer.
+              Administrators: anyone who made a console request within the same window, the
+              dashboard's own poll excluded (MgmtPresenceInterceptor). The operator looking at this
+              page is always among them, since loading it was a request.
+            */-->
+            <div class="stat-grid">
+                <div class="stat stat-live">
+                    <span class="stat-label" th:text="#{ops.dash.readers}">Readers on the site now</span>
+                    <span class="stat-value" id="dash-readers"
+                          th:text="${dash.readers.available} ? ${dash.readers.active} : '—'">0</span>
+                    <span class="stat-note" th:if="${dash.readers.available}"
+                          th:text="#{ops.mon.live.note(${dash.readers.windowMinutes})}">readers</span>
+                    <span class="stat-note err" th:unless="${dash.readers.available}"
+                          th:text="#{ops.mon.live.unavailable}">no connection to the database</span>
+                </div>
+
+                <div class="stat stat-live">
+                    <span class="stat-label" th:text="#{ops.dash.admins}">Administrators now</span>
+                    <span class="stat-value" id="dash-admins" th:text="${dash.admins.count()}">0</span>
+                    <!--/* data-none is the empty wording for mgmt.js, so the poll needs no string of its own. */-->
+                    <span class="stat-note" id="dash-admin-names" th:data-none="#{ops.dash.admins.none}"
+                          th:text="${dash.admins.names.isEmpty()} ? #{ops.dash.admins.none} : ${#strings.listJoin(dash.admins.names, ', ')}">names</span>
+                    <span class="stat-note" th:text="#{ops.dash.admins.note(${dash.admins.windowMinutes})}">active in the last 5 min</span>
+                </div>
+
+                <div class="stat">
+                    <span class="stat-label" th:text="#{ops.dash.views}">Views, 24 h</span>
+                    <span class="stat-value" th:text="${dash.traffic.views}">0</span>
+                    <!--/* Signed, against the 24 h before. Nothing to compare with is said, never "+∞ %". */-->
+                    <span class="stat-note" th:if="${dash.traffic.viewsChange != null}"
+                          th:classappend="${dash.traffic.viewsChange > 0} ? 'up' : (${dash.traffic.viewsChange < 0} ? 'down' : '')"
+                          th:text="#{ops.dash.change(|${dash.traffic.viewsChange > 0 ? '+' : ''}${#numbers.formatDecimal(dash.traffic.viewsChange, 1, 1)}|)}">+5 %</span>
+                    <span class="stat-note" th:if="${dash.traffic.viewsChange == null}" th:text="#{ops.dash.change.none}">no earlier data to compare</span>
+                </div>
+
+                <div class="stat">
+                    <span class="stat-label" th:text="#{ops.dash.peak}">Readers, peak hour</span>
+                    <span class="stat-value" th:text="${dash.traffic.peakVisitors}">0</span>
+                    <!--/* Signed, against the 24 h before. Nothing to compare with is said, never "+∞ %". */-->
+                    <span class="stat-note" th:if="${dash.traffic.peakChange != null}"
+                          th:classappend="${dash.traffic.peakChange > 0} ? 'up' : (${dash.traffic.peakChange < 0} ? 'down' : '')"
+                          th:text="#{ops.dash.change(|${dash.traffic.peakChange > 0 ? '+' : ''}${#numbers.formatDecimal(dash.traffic.peakChange, 1, 1)}|)}">+5 %</span>
+                    <span class="stat-note" th:if="${dash.traffic.peakChange == null}" th:text="#{ops.dash.change.none}">no earlier data to compare</span>
+                </div>
+
+                <div class="stat">
+                    <span class="stat-label" th:text="#{ops.dash.clicks}">Ad clicks, 24 h</span>
+                    <span class="stat-value" th:text="${dash.advertising.report.clicks}">0</span>
+                    <span class="stat-note" th:text="#{ops.dash.impressions(${dash.advertising.report.impressions})}">served</span>
+                    <span class="stat-note" th:if="${dash.advertising.report.clickThroughRate != null}"
+                          th:text="|CTR ${#numbers.formatDecimal(dash.advertising.report.clickThroughRate, 1, 2)} %|">CTR</span>
+                </div>
+
+                <div class="stat" th:classappend="${dash.crawlers.totals.spoofed > 0} ? 'stat-warn'">
+                    <span class="stat-label" th:text="#{ops.dash.crawlers}">Crawler visits, 24 h</span>
+                    <span class="stat-value" th:text="${dash.crawlers.totals.hits}">0</span>
+                    <span class="stat-note" th:text="#{ops.crawl.spoofed.count(${dash.crawlers.totals.spoofed})}">fake</span>
+                    <span class="stat-note" th:text="#{ops.dash.crawlErrors(${dash.crawlers.totals.errors})}">errors</span>
+                </div>
+
+                <div class="stat" th:classappend="${dash.jobs.failed > 0} ? 'stat-danger'">
+                    <span class="stat-label" th:text="#{ops.dash.jobs}">Jobs, 24 h</span>
+                    <span class="stat-value" th:text="${dash.jobs.queued}">0</span>
+                    <span class="stat-note" th:text="#{ops.dash.jobs.note(${dash.jobs.running}, ${dash.jobs.failed})}">running · failed</span>
+                </div>
+            </div>
+
+            <p class="result-line">
+                <svg class="i"><use href="#i-calendar"></use></svg>
+                <span th:text="#{ops.dash.window}">Everything below covers the last 24 hours, compared with the 24 before.</span>
+                <a th:href="@{/mgmt/monitoring(range=${range.key})}" th:text="#{ops.dash.toMonitoring}">Full statistics</a>
+            </p>
+
+            <div th:replace="~{mgmt/chart :: chart(${dash.traffic.chart}, #{ops.mon.chart.traffic}, ${mgmtText.label(range)})}"></div>
+
+            <div th:replace="~{mgmt/chart :: chart(${dash.advertising.chart}, #{ops.mon.banners}, ${mgmtText.label(range)})}"></div>
+
+            <div th:replace="~{mgmt/chart :: chart(${dash.crawlers.chart}, #{ops.crawl.chart}, ${mgmtText.label(range)})}"></div>
+
+            <div class="grid-2">
+                <!--/* Only for a page readers can reach: zeroes for an unpublished page say nothing. */-->
+                <div class="card" th:if="${dash.social != null}">
+                    <h2>
+                        <svg class="i"><use href="#i-share"></use></svg> <th:block th:text="#{chrome.nav.socialStats}">Social statistics</th:block>
+                        <span class="hint" th:text="${mgmtText.label(range)}">period</span>
+                    </h2>
+                    <div class="table-wrap">
+                        <table>
+                            <tbody>
+                            <tr>
+                                <td th:text="#{ops.dash.social.views}">Visits</td>
+                                <td class="num" th:text="${dash.social.views}">0</td>
+                            </tr>
+                            <tr>
+                                <td th:text="#{ops.dash.social.clicks}">Clicks</td>
+                                <td class="num" th:text="${dash.social.clicks}">0</td>
+                            </tr>
+                            <tr>
+                                <td>CTR</td>
+                                <td class="num" th:text="${dash.social.clickThroughRate != null}
+                                        ? |${#numbers.formatDecimal(dash.social.clickThroughRate, 1, 1)} %| : '—'">—</td>
+                            </tr>
+                            <tr>
+                                <td th:text="#{ops.dash.social.top}">Top source</td>
+                                <td class="num" th:text="${dash.social.topSource != null} ? ${mgmtText.label(dash.social.topSource)} : '—'">—</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="result-line">
+                        <a th:href="@{/mgmt/social/stats(range=${range.key})}" th:text="#{ops.dash.details}">Details</a>
+                    </p>
+                </div>
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-inbox"></use></svg> <th:block th:text="#{ops.mon.content}">Content</th:block>
+                        <span class="hint" th:text="#{ops.mon.content.hint}">total in the system</span>
+                    </h2>
+                    <div class="table-wrap">
+                        <table>
+                            <tbody>
+                            <tr th:attr="data-href=@{/mgmt/articles}">
+                                <td><a th:href="@{/mgmt/articles}" th:text="#{ops.mon.content.articles}">Articles</a></td>
+                                <td class="num" th:text="${dash.content.totals.articles}">0</td>
+                            </tr>
+                            <tr th:attr="data-href=@{/mgmt/authors}">
+                                <td><a th:href="@{/mgmt/authors}" th:text="#{ops.mon.content.authors}">Authors</a></td>
+                                <td class="num" th:text="${dash.content.totals.authors}">0</td>
+                            </tr>
+                            <tr th:attr="data-href=@{/mgmt/categories}">
+                                <td><a th:href="@{/mgmt/categories}" th:text="#{ops.mon.content.categories}">Categories</a></td>
+                                <td class="num" th:text="${dash.content.totals.categories}">0</td>
+                            </tr>
+                            <tr th:attr="data-href=@{/mgmt/images}">
+                                <td><a th:href="@{/mgmt/images}" th:text="#{ops.mon.content.images}">Images</a></td>
+                                <td class="num" th:text="${dash.content.totals.images}">0</td>
+                            </tr>
+                            <!--/* Images, not articles: an article carries no creation date. */-->
+                            <tr>
+                                <td th:text="#{ops.dash.newImages}">New images, 24 h</td>
+                                <td class="num" th:text="${dash.content.newImages}">0</td>
+                            </tr>
+                            <tr th:attr="data-href=@{/mgmt/banners}">
+                                <td><a th:href="@{/mgmt/banners}" th:text="#{ops.mon.banners}">Advertising</a></td>
+                                <td class="num" th:text="${dash.content.totals.banners}">0</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-eye"></use></svg> <th:block th:text="#{ops.mon.top}">Most read articles</th:block>
+                        <!--/* All-time, NOT the 24 hours above: Article.counter has no date on it. */-->
+                        <span class="hint" th:text="#{ops.mon.top.hint}">total views, all time</span>
+                    </h2>
+                    <div class="table-wrap" th:unless="${dash.topArticles.isEmpty()}">
+                        <table>
+                            <tbody>
+                            <tr th:each="a : ${dash.topArticles}" th:attr="data-href=@{/mgmt/articles/{id}(id=${a.id})}">
+                                <td class="title-cell">
+                                    <a th:href="@{/mgmt/articles/{id}(id=${a.id})}" th:text="${a.title}">Title</a>
+                                </td>
+                                <td class="num" th:text="${a.counter}">0</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="empty" th:if="${dash.topArticles.isEmpty()}">
+                        <svg class="i"><use href="#i-file-text"></use></svg>
+                        <span th:text="#{ops.mon.top.empty}">No articles with recorded views.</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

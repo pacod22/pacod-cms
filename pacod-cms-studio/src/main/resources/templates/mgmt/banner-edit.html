@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{banners.edit.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('banners')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(${isNew} ? #{banners.edit.heading.new} : #{banners.edit.heading.edit})}"></header>
+
+        <main class="content form-page">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <form method="post" th:object="${form}"
+                  th:action="${isNew} ? @{/mgmt/banners} : @{/mgmt/banners/{id}(id=${form.id})}">
+
+                <div th:replace="~{mgmt/fragments :: errors}"></div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-megaphone"></use></svg> <th:block th:text="#{banners.edit.card.data}">Banner details</th:block></h2>
+
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="name">
+                                <th:block th:text="#{banners.edit.name}">Name</th:block>
+                                <span class="help" th:text="#{banners.edit.name.help}">only shown here</span>
+                            </label>
+                            <input type="text" id="name" th:field="*{name}" th:placeholder="#{banners.edit.name.placeholder}">
+                            <span class="field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></span>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="type" th:text="#{banners.edit.type}">Type</label>
+                                <select id="type" th:field="*{type}">
+                                    <option th:each="t : ${types}" th:value="${t}" th:text="${mgmtText.label(t)}">Image</option>
+                                </select>
+                                <span class="help" th:text="#{banners.edit.type.help}">
+                                    HTML5 is shown in an iframe.
+                                </span>
+                                <span class="field-error" th:if="${#fields.hasErrors('type')}" th:errors="*{type}"></span>
+                            </div>
+
+                            <div class="field">
+                                <label for="placement" th:text="#{banners.edit.placement}">Placement</label>
+                                <select id="placement" th:field="*{placement}">
+                                    <option th:each="p : ${placements}" th:value="${p}" th:text="${mgmtText.label(p)}">Sidebar</option>
+                                </select>
+                                <span class="field-error" th:if="${#fields.hasErrors('placement')}" th:errors="*{placement}"></span>
+                            </div>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="size" th:text="#{banners.edit.size}">Frame size</label>
+                                <select id="size" th:field="*{size}">
+                                    <option th:each="s : ${sizes}" th:value="${s}" th:text="${mgmtText.label(s)}">Fit to file</option>
+                                </select>
+                                <span class="help" th:text="#{banners.edit.size.help}">
+                                    An iframe has no height of its own.
+                                </span>
+                                <span class="field-error" th:if="${#fields.hasErrors('size')}" th:errors="*{size}"></span>
+                            </div>
+
+                            <div class="field">
+                                <label for="sortOrder">
+                                    <th:block th:text="#{banners.edit.order}">Order</th:block>
+                                    <span class="help" th:text="#{banners.edit.order.help}">lower comes first</span>
+                                </label>
+                                <input type="number" id="sortOrder" th:field="*{sortOrder}">
+                                <span class="field-error" th:if="${#fields.hasErrors('sortOrder')}" th:errors="*{sortOrder}"></span>
+                            </div>
+                        </div>
+
+                        <!--/*
+                          Bound for both types, but only written back for HTML5 -- an image banner's
+                          source comes from the upload card below, and MgmtBannerService.apply skips
+                          this field so a save cannot blank an uploaded creative.
+                        */-->
+                        <div class="field">
+                            <label for="source">
+                                <th:block th:text="#{banners.edit.source}">Path to the HTML5 banner</th:block>
+                                <span class="help" th:text="#{banners.edit.source.help}">HTML5 only</span>
+                            </label>
+                            <input type="text" id="source" th:field="*{source}"
+                                   th:placeholder="#{banners.edit.source.placeholder}">
+                            <span class="field-error" th:if="${#fields.hasErrors('source')}" th:errors="*{source}"></span>
+                            <!--/*
+                              Null unless the path names a folder the console owns. The link is what
+                              stops an operator editing this field by hand when the layout screen
+                              would do it for them -- and it is also the only place the folder's
+                              files, its slides and its absence from the volume are visible.
+                            */-->
+                            <span class="hint" th:if="${layout != null}">
+                                <th:block th:text="#{banners.edit.source.isLayout}">This path is the layout</th:block>
+                                <a th:href="@{/mgmt/banners/layouts/{id}(id=${layout.id})}"
+                                   th:text="${layout.title}">Acme</a>.
+                            </span>
+                            <span class="hint" th:if="${fromLayout != null}">
+                                <th:block th:text="#{banners.edit.source.fromLayout}">Filled in from the layout</th:block>
+                                <a th:href="@{/mgmt/banners/layouts/{id}(id=${fromLayout.id})}"
+                                   th:text="${fromLayout.title}">Acme</a>.
+                                <th:block th:text="#{banners.edit.source.fromLayout.check}">Check the name, pages and period.</th:block>
+                            </span>
+                        </div>
+
+                        <div class="field">
+                            <label for="targetUrl">
+                                <th:block th:text="#{banners.edit.targetUrl}">Click-through address</th:block>
+                                <span class="help" th:text="#{banners.edit.targetUrl.help}">image only</span>
+                            </label>
+                            <input type="text" id="targetUrl" th:field="*{targetUrl}" placeholder="https://example.com/">
+                            <span class="field-error" th:if="${#fields.hasErrors('targetUrl')}" th:errors="*{targetUrl}"></span>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="altText">
+                                    <th:block th:text="#{banners.edit.altText}">Alternative text</th:block>
+                                    <span class="help" th:text="#{banners.edit.altText.help}">describes the image</span>
+                                </label>
+                                <input type="text" id="altText" th:field="*{altText}">
+                                <span class="field-error" th:if="${#fields.hasErrors('altText')}" th:errors="*{altText}"></span>
+                            </div>
+
+                            <div class="field">
+                                <label for="caption">
+                                    <th:block th:text="#{banners.edit.caption}">Caption</th:block>
+                                    <span class="help" th:text="#{banners.edit.caption.help}">optional</span>
+                                </label>
+                                <input type="text" id="caption" th:field="*{caption}">
+                                <span class="field-error" th:if="${#fields.hasErrors('caption')}" th:errors="*{caption}"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-calendar"></use></svg> <th:block th:text="#{banners.edit.card.display}">Display</th:block></h2>
+
+                    <div class="card-body">
+                        <div class="checkline">
+                            <input type="checkbox" id="active" th:field="*{active}">
+                            <div>
+                                <label for="active" th:text="#{banners.edit.active}">Active</label>
+                                <span class="help" th:text="#{banners.edit.active.help}">Switching off takes the banner off the site.</span>
+                            </div>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="activeFrom">
+                                    <th:block th:text="#{banners.edit.from}">From</th:block>
+                                    <span class="help" th:text="#{banners.edit.optional}">optional</span>
+                                </label>
+                                <input type="datetime-local" id="activeFrom" th:field="*{activeFrom}">
+                                <span class="field-error" th:if="${#fields.hasErrors('activeFrom')}" th:errors="*{activeFrom}"></span>
+                            </div>
+
+                            <div class="field">
+                                <label for="activeTo">
+                                    <th:block th:text="#{banners.edit.to}">To</th:block>
+                                    <span class="help" th:text="#{banners.edit.optional}">optional</span>
+                                </label>
+                                <input type="datetime-local" id="activeTo" th:field="*{activeTo}">
+                                <span class="field-error" th:if="${#fields.hasErrors('activeTo')}" th:errors="*{activeTo}"></span>
+                            </div>
+                        </div>
+
+                        <!--/*
+                          Nothing checked means every page. That is what all but one of the original
+                          bookings did, so it is the useful default rather than a degenerate case --
+                          see Banner.coversPage.
+                        */-->
+                        <div class="field">
+                            <label>
+                                <th:block th:text="#{banners.edit.pages}">Pages</th:block>
+                                <span class="help" th:text="#{banners.edit.pages.help}">none ticked means everywhere</span>
+                            </label>
+                            <div th:each="p : ${pages}" class="checkline">
+                                <input type="checkbox" th:id="'page-' + ${p}" th:field="*{pages}" th:value="${p}">
+                                <div><label th:for="'page-' + ${p}" th:text="${mgmtText.label(p)}">Article</label></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-save"></use></svg> <th:block th:text="#{banners.edit.save}">Save</th:block>
+                        </button>
+                        <a class="btn btn-ghost" th:href="@{/mgmt/banners}" th:text="#{banners.edit.toList}">Back to the list</a>
+                    </div>
+                </div>
+            </form>
+
+            <!--/*
+              Its own form, outside the one above, because the upload must be durable the moment it
+              is accepted -- exactly as article images are. A file input inside the main form would
+              be lost whenever validation sent the operator back.
+            */-->
+            <div class="card" th:if="${!isNew and form.type?.name() == 'IMAGE'}">
+                <h2>
+                    <svg class="i"><use href="#i-image"></use></svg>
+                    <th:block th:text="#{banners.edit.card.file}">Banner file</th:block>
+                    <!--/* From MgmtControllerAdvice, so the help text cannot drift from what is enforced. */-->
+                    <span class="hint" th:text="#{banners.edit.file.max(${bannerRules.maxKilobytes})}"></span>
+                </h2>
+
+                <div class="card-body">
+                    <div th:if="${banner?.source != null}" style="margin-bottom:16px">
+                        <img th:src="@{${banner.source}}" th:alt="${banner.altText}"
+                             style="max-width:100%; display:block; border:1px solid var(--line)">
+                        <p class="muted" style="margin:8px 0 0" th:text="${banner.source}">/resources/banners/…</p>
+                    </div>
+
+                    <div class="empty" th:if="${banner?.source == null}" style="padding:20px 0">
+                        <svg class="i"><use href="#i-image"></use></svg>
+                        <span th:text="#{banners.edit.file.none}">No file uploaded.</span>
+                    </div>
+
+                    <form method="post" enctype="multipart/form-data" id="image-form"
+                          th:action="@{/mgmt/banners/{id}/creative(id=${form.id})}"
+                          style="margin-top:16px">
+                        <div class="dropzone" id="dropzone">
+                            <span class="dz-icon"><svg class="i"><use href="#i-upload"></use></svg></span>
+                            <span class="dz-body">
+                                <span class="dz-title" th:text="#{banners.edit.file.new}">New file</span>
+                                <input type="file" id="image-file" name="file"
+                                       accept="image/jpeg,image/png,image/gif,image/webp" required>
+                                <span class="dz-preview" id="upload-hint"></span>
+                            </span>
+                            <button class="btn" type="submit">
+                                <svg class="i"><use href="#i-upload"></use></svg> <th:block th:text="#{banners.edit.file.upload}">Upload</th:block>
+                            </button>
+                        </div>
+                        <p class="muted" style="margin:10px 0 0" th:text="#{banners.edit.file.replaces}">
+                            Uploading replaces the previous file.
+                        </p>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card" th:unless="${isNew}">
+                <h2><svg class="i"><use href="#i-eye"></use></svg> <th:block th:text="#{banners.edit.card.stats}">Statistics</th:block></h2>
+                <div class="card-body">
+                    <p style="margin-top:0">
+                        <th:block th:text="#{banners.edit.stats.impressions}">Impressions:</th:block> <strong th:text="${banner?.impressions}">0</strong>
+                        &nbsp;·&nbsp;
+                        <th:block th:text="#{banners.edit.stats.clicks}">Clicks:</th:block>
+                        <strong th:if="${banner != null and banner.clickTracked}" th:text="${banner.clicks}">0</strong>
+                        <strong th:unless="${banner != null and banner.clickTracked}">—</strong>
+                    </p>
+                    <!--/*
+                      Three cases. An off-origin HTML5 source is the one the public page cannot
+                      listen inside, so it truly has no click count. A same-origin HTML5 booking's
+                      clicks are counted by site.js. Either way this card divides nothing: the
+                      all-time counts carry no dates and need not have started together, so the
+                      rates live on the monitoring screen, per period, where both counts start
+                      together.
+                    */-->
+                    <p class="muted" th:if="${banner != null and !banner.clickTracked}"
+                       th:text="#{banners.edit.stats.untracked}">
+                        Clicks on this HTML5 banner cannot be counted.
+                    </p>
+                    <p class="muted" th:if="${banner != null and banner.clickTracked and banner.type?.name() == 'HTML5'}"
+                       th:text="#{banners.edit.stats.html5NoCtr}">
+                        No CTR is computed here.
+                    </p>
+                    <p class="muted" style="margin-bottom:0">
+                        <th:block th:text="#{banners.edit.stats.buffered}">Impressions are buffered.</th:block>
+                        <a th:href="@{/mgmt/monitoring#banner-chart(banner=${banner?.id})}"
+                           th:text="#{banners.edit.stats.monitoringLink}">Statistics</a>.
+                    </p>
+                </div>
+            </div>
+
+            <div class="card danger" th:unless="${isNew}">
+                <h2><svg class="i"><use href="#i-trash"></use></svg> <th:block th:text="#{banners.edit.card.delete}">Delete</th:block></h2>
+                <div class="card-body">
+                    <p class="muted" style="margin-top:0" th:text="#{banners.edit.delete.help}">
+                        The banner leaves the site at once.
+                    </p>
+                    <form method="post" th:action="@{/mgmt/banners/{id}/delete(id=${form.id})}"
+                          th:data-confirm="#{banners.edit.delete.confirm}">
+                        <button class="btn btn-danger" type="submit">
+                            <svg class="i"><use href="#i-trash"></use></svg> <th:block th:text="#{banners.edit.delete.submit}">Delete the banner</th:block>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

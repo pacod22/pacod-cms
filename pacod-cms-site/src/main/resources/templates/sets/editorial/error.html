@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:with="notFound=${status != null and status == 404}, lang=${#locale.language}"
+      th:lang="${lang}">
+<!--/*
+  The public site's error page, rendered by Spring Boot's BasicErrorController.
+
+  The two template controllers' "not found" exceptions carry @ResponseStatus, so the status goes
+  through the container's error dispatch and lands here. A client that asks for JSON still gets
+  JSON: BasicErrorController negotiates, and this template is only its text/html branch.
+
+  THREE THINGS ABOUT THIS TEMPLATE ARE DEFENSIVE, because a failure inside an error dispatch
+  re-enters the error dispatch:
+
+  1. The language is the request's Locale -- the `lang` cookie, or the website's own language --
+     because no controller ran to put a `lang` in the model. The chrome follows it through the
+     message bundles like every other page's.
+  2. ${site} is the only model attribute it reads, and every use is null-safe: SiteChromeAdvice
+     covers BasicErrorController, but a render from an empty model must still produce a page.
+  3. NO AD COLUMNS. Impressions are counted per render against real bookings, and nobody bought
+     an error page -- BannerPage has no constant for one.
+
+  BasicErrorController resolves the view name `error` for EVERY status, so the copy branches on
+  ${status} -- hardcoded "the page does not exist" would lie on a 500. `message` is deliberately
+  not rendered and spring.web.error.include-message stays at its default of `never`: it is the
+  exception's own text, which is the site's internals, not the reader's business.
+*/-->
+<head th:replace="~{fragments/head :: head(
+        lang=${lang},
+        pageTitle=${(notFound ? #messages.msg('error.notFound.title') : #messages.msg('error.label'))
+                    + (site != null ? ' | ' + site.name(lang) : '')},
+        pageDesc=${site?.description(lang)},
+        ogUrl=${site != null ? site.url('/') : '/'},
+        ogImagePath=null,
+        ogImageType=null)}"></head>
+
+<body>
+<th:block th:replace="~{fragments/scripts :: gtmNoscript}"></th:block>
+
+<th:block th:replace="~{fragments/navbar :: navbar(${lang})}"></th:block>
+
+<div class="shell">
+    <main class="error-page">
+
+        <div class="page-head">
+            <p class="page-head__kicker"
+               th:text="${#messages.msg('error.label') + (status != null ? ' ' + status : '')}">Error 404</p>
+            <h1 class="page-head__title"
+                th:text="${notFound ? #messages.msg('error.notFound.title') : #messages.msg('error.other.title')}">This page does not exist</h1>
+        </div>
+
+        <p class="error-page__text" th:if="${notFound}" th:text="#{error.notFound.text}">
+            The address you opened does not point to a page on this website.
+        </p>
+        <p class="error-page__text" th:unless="${notFound}" th:text="#{error.other.text}">
+            The request could not be completed.
+        </p>
+
+        <p class="error-page__actions">
+            <a th:href="@{/(lang=${lang})}" th:text="#{error.home}">Go to the home page</a>
+            <a th:href="@{/latest(lang=${lang})}" th:text="#{error.latest}">Latest articles</a>
+        </p>
+
+    </main>
+</div>
+
+<th:block th:replace="~{fragments/footer :: footer(${lang})}"></th:block>
+<th:block th:replace="~{fragments/scripts :: siteScripts}"></th:block>
+</body>
+</html>

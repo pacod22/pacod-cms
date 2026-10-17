@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  One of the website's menus (main, footer): its items, a label per language, what each links to,
+  and one level of items under a group. No draft: saved as edited, live on the site within a minute.
+  An item is addressed by its position (2, or 2.1 inside a group); every form names only its own
+  item's fields -- label_<language>, kind, target.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{design.menus})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('design-menus')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{design.menus})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <a class="btn btn-ghost" th:href="@{/mgmt/design}">
+                    <svg class="i"><use href="#i-arrow-up"></use></svg> <span th:text="#{design.title}">Design</span>
+                </a>
+                <div class="segmented">
+                    <a th:each="k : ${menuKeys}" th:href="@{/mgmt/design/menus/{k}(k=${k})}"
+                       th:classappend="${k == menuKey} ? 'active'" th:text="#{'design.menu.' + ${k}}">Main menu</a>
+                </div>
+            </div>
+            <p class="muted" th:text="#{design.menu.intro}">Saved as you edit; the site shows changes within a minute.</p>
+
+            <!--/* One item: its form, its moves, its removal; and for a top-level item, its group's items. */-->
+            <th:block th:each="item, it : ${menu.items}">
+                <div class="card menu-item">
+                    <th:block th:replace="~{mgmt/design-menu-items :: itemCard(item=${item}, position=${it.index}, first=${it.first}, last=${it.last})}"></th:block>
+                    <div class="menu-children">
+                        <th:block th:each="child, ct : ${item.children}">
+                            <div class="menu-item menu-item--child">
+                                <th:block th:replace="~{mgmt/design-menu-items :: itemCard(item=${child}, position=${it.index + '.' + ct.index}, first=${ct.first}, last=${ct.last})}"></th:block>
+                            </div>
+                        </th:block>
+                        <details class="menu-add">
+                            <summary th:text="#{design.menu.addChild}">Add an item under this one</summary>
+                            <form method="post" th:action="@{/mgmt/design/menus/{k}/items(k=${menuKey})}">
+                                <input type="hidden" name="parent" th:value="${it.index}">
+                                <th:block th:replace="~{mgmt/design-menu-items :: itemFields(item=null, prefix=${'c' + it.index})}"></th:block>
+                                <div class="actions"><button class="btn" type="submit" th:text="#{design.add}">Add</button></div>
+                            </form>
+                        </details>
+                    </div>
+                </div>
+            </th:block>
+
+            <div class="empty card" th:if="${menu.items.isEmpty()}">
+                <span th:text="#{design.menu.empty}">This menu has no items.</span>
+            </div>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{design.menu.add}">Add an item</span></h2>
+                <form method="post" th:action="@{/mgmt/design/menus/{k}/items(k=${menuKey})}">
+                    <div class="card-body">
+                        <th:block th:replace="~{mgmt/design-menu-items :: itemFields(item=null, prefix='new')}"></th:block>
+                    </div>
+                    <div class="card-foot"><button class="btn btn-primary" type="submit" th:text="#{design.add}">Add</button></div>
+                </form>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

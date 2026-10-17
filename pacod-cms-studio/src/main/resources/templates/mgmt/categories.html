@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{articles.c.categories})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('categories')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{articles.c.categories})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <!--/* A GET form, like the article filter: every result is a bookmarkable URL. */-->
+                <form class="toolbar" method="get" th:action="@{/mgmt/categories}" style="flex:1 1 420px; margin:0">
+                    <div class="search">
+                        <svg class="i"><use href="#i-search"></use></svg>
+                        <!--/* id="search-input" is what mgmt.js debounces, auto-submits and binds "/" to. */-->
+                        <input type="search" id="search-input" name="q" th:value="${q}"
+                               th:placeholder="#{articles.categories.search.placeholder}"
+                               th:aria-label="#{articles.categories.search.aria}">
+                        <kbd>/</kbd>
+                    </div>
+
+                    <!--/*
+                      A GET form replaces the whole query string, so without these the first
+                      keystroke in the search box would silently throw the operator's column
+                      ordering away. Same reason the image library carries "size" as a hidden
+                      field, and the same reason "Изчисти" below clears only the term.
+                    */-->
+                    <input type="hidden" name="sort" th:value="${sort}">
+                    <input type="hidden" name="dir" th:value="${dir}">
+
+                    <button class="btn" type="submit" th:text="#{articles.c.search}">Search</button>
+                    <a class="btn btn-ghost" th:href="@{/mgmt/categories(sort=${sort}, dir=${dir})}"
+                       th:if="${!#strings.isEmpty(q)}" th:text="#{articles.c.clear}">Clear</a>
+                </form>
+
+                <a class="btn btn-primary push" th:href="@{/mgmt/categories/new}">
+                    <svg class="i"><use href="#i-plus"></use></svg> <th:block th:text="#{articles.categories.new}">New category</th:block>
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <!--/*
+                          Every header is a real <a> carrying the current search term, as on the
+                          author list: the ordering is a GET parameter and the sorting happens on
+                          the server, so a sorted list is a bookmarkable URL and the header needs
+                          no JavaScript. Dropping "q" here would clear the filter on the first
+                          click and answer 200 with the whole list.
+
+                          «Статии» sorts too, and its values are not on the document -- they are
+                          the aggregation the controller passes to findAll, where a category no
+                          article cites counts as zero exactly as this column renders it.
+
+                          "flip" is the direction the *active* column's link must ask for; an
+                          inactive column always starts ascending.
+                        */-->
+                        <thead>
+                        <tr th:with="flip=${dir == 'desc' ? 'asc' : 'desc'}">
+                            <th class="num shrink"
+                                th:attr="aria-sort=${sort == 'id' ? (dir == 'desc' ? 'descending' : 'ascending') : null}">
+                                <a th:href="@{/mgmt/categories(q=${q}, sort='id', dir=${sort == 'id' ? flip : 'asc'})}"
+                                   th:title="#{articles.c.sortById}">
+                                    <span>№</span>
+                                    <svg class="i sort-mark" th:if="${sort == 'id'}">
+                                        <use th:href="${dir == 'desc' ? '#i-arrow-down' : '#i-arrow-up'}"></use>
+                                    </svg>
+                                </a>
+                            </th>
+                            <th th:attr="aria-sort=${sort == 'name' ? (dir == 'desc' ? 'descending' : 'ascending') : null}">
+                                <a th:href="@{/mgmt/categories(q=${q}, sort='name', dir=${sort == 'name' ? flip : 'asc'})}"
+                                   th:title="#{articles.c.sortByName}">
+                                    <span th:text="#{articles.categories.col.name}">Name</span>
+                                    <svg class="i sort-mark" th:if="${sort == 'name'}">
+                                        <use th:href="${dir == 'desc' ? '#i-arrow-down' : '#i-arrow-up'}"></use>
+                                    </svg>
+                                </a>
+                            </th>
+                            <th class="shrink"
+                                th:attr="aria-sort=${sort == 'lang' ? (dir == 'desc' ? 'descending' : 'ascending') : null}">
+                                <a th:href="@{/mgmt/categories(q=${q}, sort='lang', dir=${sort == 'lang' ? flip : 'asc'})}"
+                                   th:title="#{articles.categories.sortByLang}">
+                                    <span th:text="#{articles.c.lang}">Language</span>
+                                    <svg class="i sort-mark" th:if="${sort == 'lang'}">
+                                        <use th:href="${dir == 'desc' ? '#i-arrow-down' : '#i-arrow-up'}"></use>
+                                    </svg>
+                                </a>
+                            </th>
+                            <th class="num shrink"
+                                th:attr="aria-sort=${sort == 'articles' ? (dir == 'desc' ? 'descending' : 'ascending') : null}">
+                                <a th:href="@{/mgmt/categories(q=${q}, sort='articles', dir=${sort == 'articles' ? flip : 'asc'})}"
+                                   th:title="#{articles.categories.sortByArticles}">
+                                    <span th:text="#{articles.c.articles}">Articles</span>
+                                    <svg class="i sort-mark" th:if="${sort == 'articles'}">
+                                        <use th:href="${dir == 'desc' ? '#i-arrow-down' : '#i-arrow-up'}"></use>
+                                    </svg>
+                                </a>
+                            </th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="c : ${categories}" th:attr="data-href=@{/mgmt/categories/{id}(id=${c.id})}">
+                            <td class="num muted" th:text="${c.id}">1</td>
+                            <td class="title-cell">
+                                <a th:href="@{/mgmt/categories/{id}(id=${c.id})}" th:text="${c.name}">Name</a>
+                            </td>
+                            <td class="muted" th:text="${c.lang}">bg</td>
+                            <!--/* A category no article references is absent from the map, not zero. */-->
+                            <td class="num muted" th:text="${usage.containsKey(c.id)} ? ${usage[c.id]} : 0">0</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!--/* As on the author list: the service treats a blank term as no filter. */-->
+                <div class="empty" th:if="${categories.isEmpty()}">
+                    <svg class="i"><use href="#i-folder"></use></svg>
+                    <span th:text="${#strings.isEmpty(q)}
+                                   ? #{articles.categories.empty}
+                                   : #{articles.categories.noMatch}">No categories yet.</span>
+                    <a class="btn btn-sm" th:href="@{/mgmt/categories/new}" th:if="${#strings.isEmpty(q)}" th:text="#{articles.categories.addFirst}">Add the first one</a>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

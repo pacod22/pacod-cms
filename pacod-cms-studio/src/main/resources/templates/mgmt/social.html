@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  /mgmt/social -- the profile of the link-in-bio page, for ONE language, and its two lists of links.
+
+  The profile form is id="article-form", reused for what page-edit.html reuses it for: the save bar,
+  Ctrl/Cmd+S and the unsaved-changes guard all look for that id. It is NOT id="text" anywhere --
+  that is what TinyMCE binds to, and the bio is plain text.
+
+  The link cards sit AFTER the form, so each of their forms is a form of its own; nothing in them is
+  inside #article-form and nothing in them carries a name the profile save could pick up. Adding a
+  link, ↑/↓ and on/off happen IN PLACE -- see the links-card fragment at the foot of this file.
+  Editing a link's translations or schedule is the link's own screen.
+*/-->
+<head th:replace="~{mgmt/fragments :: head(#{pages.social.title})}"></head>
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('social')}"></th:block>
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{pages.social.title})}"></header>
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <a class="btn btn-ghost" th:href="@{/social}" target="_blank" rel="noopener" th:if="${page.published}">
+                    <svg class="i"><use href="#i-external"></use></svg> <span th:text="#{pages.viewPage}">View page</span>
+                </a>
+                <a class="btn btn-ghost" th:href="@{/mgmt/social/stats}">
+                    <svg class="i"><use href="#i-activity"></use></svg> <span th:text="#{pages.social.stats}">Statistics</span>
+                </a>
+            </div>
+
+            <!--/* Said before anything else: until it is saved and published, /social is a 404. */-->
+            <div class="card" th:unless="${exists and page.published}">
+                <div class="card-body">
+                    <p class="muted" th:unless="${exists}" style="margin:0"
+                       th:text="#{pages.social.notCreated}">The page has not been created yet.</p>
+                    <p class="muted" th:if="${exists and !page.published}" style="margin:0"
+                       th:utext="#{pages.social.unpublished}">The page is not published.</p>
+                </div>
+            </div>
+
+            <!--/* Language tabs: plain links that change ?lang, the page-edit.html arrangement. The
+                   dot marks a language the profile already has a name in, read off the document. */-->
+            <div class="card">
+                <div class="card-body">
+                    <div class="chart-legend" style="margin:0">
+                        <th:block th:each="l : ${languages}">
+                            <a class="btn btn-sm"
+                               th:classappend="${l.code == language.code} ? 'btn-primary' : 'btn-ghost'"
+                               th:href="@{/mgmt/social(lang=${l.code})}">
+                                <span th:text="${l.displayName()}">Bulgarian</span>
+                                <span th:if="${page.rawName(l.code) != null}" th:title="#{pages.hasText}">•</span>
+                            </a>
+                        </th:block>
+                    </div>
+                </div>
+            </div>
+
+            <form id="article-form" method="post" th:action="@{/mgmt/social}" th:object="${form}">
+                <div th:replace="~{mgmt/fragments :: errors}"></div>
+                <input type="hidden" th:field="*{lang}">
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-file-text"></use></svg>
+                        <span th:text="#{pages.social.profileFor(${language.displayName()})}">Profile</span>
+                        <span class="hint" th:if="${language.code != originalCode and page.rawName(language.code) == null}"
+                              th:text="#{pages.notTranslated}">not translated</span>
+                    </h2>
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="name" th:text="#{pages.social.name}">Name</label>
+                            <input type="text" id="name" th:field="*{name}" maxlength="80"
+                                   th:placeholder="#{pages.social.name.placeholder}">
+                            <span class="field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></span>
+                        </div>
+                        <div class="field">
+                            <label for="bio"><th:block th:text="#{pages.social.bio}">Short description</th:block> <span class="help" th:text="#{pages.social.bio.help}">— one or two sentences</span></label>
+                            <textarea id="bio" th:field="*{bio}" rows="3" maxlength="300"></textarea>
+                            <span class="field-error" th:if="${#fields.hasErrors('bio')}" th:errors="*{bio}"></span>
+                        </div>
+                        <div class="field">
+                            <label for="latestHeading"><th:block th:text="#{pages.social.latestHeading}">Heading of the articles block</th:block>
+                                <span class="help" th:text="#{pages.social.latestHeading.help}">— optional</span></label>
+                            <input type="text" id="latestHeading" th:field="*{latestHeading}" maxlength="80">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-shield"></use></svg> <span th:text="#{pages.settings}">Settings</span>
+                        <span class="hint" th:text="#{pages.appliesToAll}">apply to all languages</span></h2>
+                    <div class="card-body">
+                        <div class="field">
+                            <label class="check">
+                                <input type="checkbox" id="published" th:field="*{published}" th:disabled="${can != null and !can.site('content.publish')}"> <th:block th:text="#{pages.status.published}">Published</th:block>
+                            </label>
+                            <span class="hint" th:if="${can != null and !can.site('content.publish')}"
+                                  th:text="#{portal.publish.needed}">Publishing is up to an editor.</span>
+                            <span class="help" th:text="#{pages.social.published.help}">Unticked, /social answers 404.</span>
+                        </div>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="avatarImageId"><th:block th:text="#{pages.social.avatar}">Profile picture</th:block>
+                                    <span class="help" th:text="#{pages.social.avatar.help}">— an image number</span></label>
+                                <input type="number" id="avatarImageId" th:field="*{avatarImageId}" min="1"
+                                       th:placeholder="#{pages.social.avatar.placeholder}">
+                                <span class="field-error" th:if="${#fields.hasErrors('avatarImageId')}"
+                                      th:errors="*{avatarImageId}"></span>
+                                <span class="help">
+                                    <th:block th:text="#{pages.social.avatar.hint.before}">The number is in</th:block>
+                                    <a th:href="@{/mgmt/images}" target="_blank" rel="noopener"
+                                       th:text="#{pages.social.avatar.hint.link}">Images</a><th:block
+                                        th:text="#{pages.social.avatar.hint.after}">.</th:block>
+                                </span>
+                            </div>
+                            <div class="field">
+                                <label th:text="#{pages.social.avatar.now}">Now</label>
+                                <img class="thumb" th:if="${avatar != null}"
+                                     th:src="@{'/assets/img/articles/' + ${avatar.filename}}" alt=""
+                                     style="width:72px;height:72px;border-radius:50%;object-fit:cover">
+                                <span class="muted" th:unless="${avatar != null}" th:text="#{pages.social.avatar.logo}">the logo</span>
+                            </div>
+                        </div>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label class="check">
+                                    <input type="checkbox" id="showLatestArticles" th:field="*{showLatestArticles}"> <th:block th:text="#{pages.social.showLatest}">Show the latest articles</th:block>
+                                </label>
+                                <span class="help" th:text="#{pages.social.showLatest.help}">Counted separately.</span>
+                            </div>
+                            <div class="field">
+                                <label for="latestArticlesCount" th:text="#{pages.social.latestCount}">How many articles</label>
+                                <input type="number" id="latestArticlesCount" th:field="*{latestArticlesCount}"
+                                       min="1" max="10">
+                                <span class="field-error" th:if="${#fields.hasErrors('latestArticlesCount')}"
+                                      th:errors="*{latestArticlesCount}"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="savebar">
+                    <span class="spacer"></span>
+                    <span id="save-status" class="muted"></span>
+                    <button class="btn btn-primary" type="submit">
+                        <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{pages.action.save}">Save</span>
+                    </button>
+                </div>
+            </form>
+
+            <!--/* The two lists of links, icons first: the order the page shows them in. Each card is
+                   the links-card fragment at the foot of this file, which is also what the in-place
+                   answers render -- see there. */-->
+            <th:block th:each="cardGroup : ${placements}">
+                <div th:replace="~{mgmt/social :: links-card}"></div>
+            </th:block>
+
+            <!--/*
+              The addresses to paste. ?src= is the only attribution that is always right -- the
+              in-app browser's User-Agent and the referrer are good guesses and nothing more -- so
+              this card exists to make tagging the bio link the easy thing to do. Read-only inputs,
+              outside every form and with no name, and no inline script: the console has none anywhere.
+            */-->
+            <div class="card">
+                <h2><svg class="i"><use href="#i-copy"></use></svg> <span th:text="#{pages.social.addresses}">Addresses to publish</span>
+                    <span class="hint" th:text="#{pages.social.addresses.hint}">paste into the profile</span></h2>
+                <div class="card-body">
+                    <p class="muted" style="margin-top:0" th:utext="#{pages.social.addresses.intro}">?src=</p>
+                    <div class="table-wrap">
+                        <table>
+                            <tbody>
+                            <tr>
+                                <td class="shrink" th:text="#{pages.social.untagged}">Untagged</td>
+                                <td><input type="text" readonly th:value="${publicUrl}" th:aria-label="#{pages.social.untagged.aria}"
+                                           style="width:100%"></td>
+                            </tr>
+                            <tr th:each="t : ${taggedUrls}">
+                                <td class="shrink" th:text="${mgmtText.label(t.source)}">Instagram</td>
+                                <td><input type="text" readonly th:value="${t.url}" th:aria-label="#{pages.social.taggedFor.aria(${mgmtText.label(t.source)})}"
+                                           style="width:100%"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<!--/*
+  ONE LINK CARD -- the icons or the buttons, chosen by ${cardGroup}. Rendered by the loop above and,
+  on its own, by MgmtSocialController.card(): mgmt.js posts this card's forms with the
+  X-Mgmt-Fragment header and swaps the card for the answer. That is the whole reason it is a
+  fragment: a card replaced in place is drawn by the same markup a reload would draw, so there is no
+  client-side copy of a row to drift from the server's.
+
+  NOTHING HERE LEAVES THE PAGE. «Нов линк» is a <details>: it opens the add form inside the card,
+  with scripting off too, and the form, ↑/↓ and on/off are posted by fetch. A link to a screen of
+  its own would leave this page -- which holds the profile form -- and with an unsaved bio raise
+  the browser's leave-page prompt; declining it looks like a dead button. With scripting off
+  every form here still works as a plain POST answered by a redirect back to this card.
+
+  The add form posts its text under `lang` = the website's original language whatever tab is open,
+  because the text a new button needs is the ORIGINAL's: every language falls back to it, and a
+  German-only add would be refused. `tab` only brings the operator back to the tab they were on. Translations, the schedule and switching off are on the
+  link's own screen. No ids inside the card are fixed strings -- there are two cards on the page.
+*/-->
+<th:block th:if="${false}">
+    <div class="card" th:fragment="links-card" data-social-card th:id="|links-${cardGroup}|"
+         th:with="icon=${cardGroup.name() == 'ICON'}, rows=${cardGroup.name() == 'ICON' ? icons : buttons},
+                  adding=${addFor != null and addFor == cardGroup}">
+        <h2>
+            <svg class="i"><use th:href="${icon ? '#i-share' : '#i-link'}" href="#i-link"></use></svg>
+            <span th:text="${icon} ? #{pages.social.card.icons} : #{pages.social.card.links}">Links</span>
+            <span class="hint" th:text="${icon} ? #{pages.social.card.icons.hint} : #{pages.social.card.links.hint}"></span>
+            <span class="social-status" data-social-status role="status" th:text="${cardNote}"></span>
+        </h2>
+        <div class="table-wrap" th:unless="${rows.isEmpty()}">
+            <table>
+                <thead>
+                <tr>
+                    <th th:text="#{pages.field.text}">Text</th>
+                    <th th:text="#{pages.field.address}">Address</th>
+                    <th class="shrink" th:text="#{pages.field.status}">Status</th>
+                    <th class="num shrink" th:title="#{pages.social.col.clicks30.title}" th:text="#{pages.social.col.clicks30}">Clicks, 30 days</th>
+                    <th class="shrink"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="l, it : ${rows}" th:attr="data-href=@{/mgmt/social/links/{id}(id=${l.id})}">
+                    <!--/* A link to one of the website's articles shows that article's cover beside its
+                           name: the first visible image, the one the site uses as the article's share
+                           card. Read on every render (MgmtSocialService.articleThumbs), so a new cover
+                           shows here without the link being touched. */-->
+                    <td class="title-cell">
+                        <div class="social-link-name" th:with="thumb=${articleThumbs[l.id]}">
+                            <th:block th:if="${thumb != null}">
+                                <img class="thumb" alt="" loading="lazy" th:if="${thumb.imagePath != null}"
+                                     th:src="@{${thumb.imagePath}}" th:title="#{pages.social.article(${thumb.articleId})}">
+                                <span class="thumb-empty" th:if="${thumb.imagePath == null}"
+                                      th:title="#{pages.social.article.noImage(${thumb.articleId})}">
+                                    <svg class="i"><use href="#i-image"></use></svg>
+                                </span>
+                            </th:block>
+                            <div>
+                                <a th:href="@{/mgmt/social/links/{id}(id=${l.id})}" th:text="${l.label(labelChain)}">Subscribe</a>
+                                <span class="muted" th:if="${l.icon != null and l.title(labelChain) != null}" th:text="|· ${mgmtText.label(l.icon)}|"></span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="muted" style="max-width:320px;overflow-wrap:anywhere" th:text="${l.url}">https://…</td>
+                    <td>
+                        <span class="badge published" th:if="${l.isLive(now)}" th:text="#{pages.social.badge.visible}">visible</span>
+                        <span class="badge off" th:unless="${l.active}" th:text="#{pages.social.badge.off}">off</span>
+                        <span class="badge draft" th:if="${l.active and !l.withinWindow(now)}"
+                              th:text="${l.activeFrom != null and now.isBefore(l.activeFrom)} ? #{pages.social.badge.upcoming} : #{pages.social.badge.expired}">expired</span>
+                    </td>
+                    <td class="num" th:text="${clicks.getOrDefault(l.id, 0L)}">0</td>
+                    <td>
+                        <div class="row-actions">
+                            <form class="inline-form" method="post" data-social-links
+                                  th:action="@{/mgmt/social/links/{id}/move(id=${l.id})}">
+                                <input type="hidden" name="delta" value="-1">
+                                <input type="hidden" name="lang" th:value="${language.code}">
+                                <button class="btn btn-ghost btn-icon btn-sm" type="submit" th:title="#{pages.social.up}"
+                                        th:disabled="${it.first}">
+                                    <svg class="i"><use href="#i-arrow-up"></use></svg>
+                                    <span class="sr-only" th:text="#{pages.social.up}">Up</span>
+                                </button>
+                            </form>
+                            <form class="inline-form" method="post" data-social-links
+                                  th:action="@{/mgmt/social/links/{id}/move(id=${l.id})}">
+                                <input type="hidden" name="delta" value="1">
+                                <input type="hidden" name="lang" th:value="${language.code}">
+                                <button class="btn btn-ghost btn-icon btn-sm" type="submit" th:title="#{pages.social.down}"
+                                        th:disabled="${it.last}">
+                                    <svg class="i"><use href="#i-arrow-down"></use></svg>
+                                    <span class="sr-only" th:text="#{pages.social.down}">Down</span>
+                                </button>
+                            </form>
+                            <form class="inline-form" method="post" data-social-links
+                                  th:action="@{/mgmt/social/links/{id}/toggle(id=${l.id})}">
+                                <input type="hidden" name="lang" th:value="${language.code}">
+                                <button class="btn btn-ghost btn-icon btn-sm" type="submit"
+                                        th:title="${l.active} ? #{pages.social.turnOff} : #{pages.social.turnOn}">
+                                    <svg class="i"><use th:href="${l.active} ? '#i-eye' : '#i-eye-off'" href="#i-eye"></use></svg>
+                                    <span class="sr-only" th:text="${l.active} ? #{pages.social.turnOff} : #{pages.social.turnOn}">Turn off</span>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="empty" th:if="${rows.isEmpty()}">
+            <svg class="i"><use href="#i-link"></use></svg>
+            <span th:text="${icon} ? #{pages.social.card.noIcons} : #{pages.social.card.noLinks}">No links.</span>
+        </div>
+
+        <details class="social-add" th:open="${adding}">
+            <summary class="btn btn-sm btn-ghost">
+                <svg class="i"><use href="#i-plus"></use></svg>
+                <span th:text="${icon} ? #{pages.social.card.newIcon} : #{pages.social.card.newLink}">New link</span>
+            </summary>
+            <form method="post" th:action="@{/mgmt/social/links}" data-social-links class="social-add-form">
+                <input type="hidden" name="placement" th:value="${cardGroup}">
+                <input type="hidden" name="lang" th:value="${originalCode}">
+                <input type="hidden" name="tab" th:value="${language.code}">
+                <input type="hidden" name="active" value="true">
+                <div class="flash err" th:if="${adding and addError != null}" role="alert">
+                    <svg class="i"><use href="#i-alert"></use></svg>
+                    <span class="flash-text" th:text="${addError}">The address is required.</span>
+                </div>
+                <div class="grid-2">
+                    <div class="field">
+                        <label th:for="|add-title-${cardGroup}|"><th:block th:text="#{pages.social.add.titleOriginal}">Text in the original language</th:block>
+                            <span class="help" th:text="${icon} ? #{pages.social.add.titleOriginal.iconHelp} : #{pages.social.add.titleOriginal.linkHelp}"></span></label>
+                        <input type="text" th:id="|add-title-${cardGroup}|" name="title" maxlength="120"
+                               th:value="${adding ? addForm.title : null}"
+                               th:placeholder="${icon} ? 'Instagram' : #{pages.placeholder.subscribe}">
+                    </div>
+                    <div class="field">
+                        <label th:for="|add-url-${cardGroup}|" th:text="#{pages.field.address}">Address</label>
+                        <input type="text" th:id="|add-url-${cardGroup}|" name="url" required
+                               th:value="${adding ? addForm.url : null}" th:placeholder="#{pages.placeholder.url}">
+                    </div>
+                </div>
+                <div class="field">
+                    <label th:for="|add-icon-${cardGroup}|"><th:block th:text="#{pages.social.icon}">Icon</th:block>
+                        <span class="help" th:text="${icon} ? #{pages.social.icon.required} : #{pages.optional}"></span></label>
+                    <select th:id="|add-icon-${cardGroup}|" name="icon">
+                        <option value="" th:text="#{pages.noIcon}">— no icon —</option>
+                        <option th:each="i : ${socialIcons}" th:value="${i}" th:text="${mgmtText.label(i)}"
+                                th:selected="${adding and addForm.icon == i}">Instagram</option>
+                    </select>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-primary btn-sm" type="submit">
+                        <svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{pages.action.add}">Add</span>
+                    </button>
+                    <span class="help" th:text="#{pages.social.add.help}">Translations and schedule from the link row.</span>
+                </div>
+            </form>
+        </details>
+    </div>
+</th:block>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

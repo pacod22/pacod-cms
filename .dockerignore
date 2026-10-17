@@ -1,0 +1,14 @@
+# Keep the build context small and never ship secrets or host state into an image.
+.git
+.idea
+.local
+config
+docs
+target
+*/target
+**/*.p12
+**/*.jks
+**/*.pem
+**/*.key
+*.md
+!README.md

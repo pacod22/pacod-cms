@@ -1,0 +1,404 @@
+{
+  "categories": [
+    { "id": 1, "names": { "en": "Technology", "de": "Technik", "es": "Tecnología" } },
+    { "id": 2, "names": { "en": "Travel", "de": "Reisen", "es": "Viajes" } },
+    { "id": 3, "names": { "en": "Food", "de": "Essen", "es": "Cocina" } },
+    { "id": 4, "names": { "en": "Culture", "de": "Kultur", "es": "Cultura" } },
+    { "id": 5, "names": { "en": "Science", "de": "Wissenschaft", "es": "Ciencia" } },
+    { "id": 6, "names": { "en": "Opinion", "de": "Meinung", "es": "Opinión" } }
+  ],
+  "authors": [
+    {
+      "id": 1, "firstname": "Mara", "lastname": "Ellison",
+      "descriptions": {
+        "en": "Writes about technology and science. Before journalism she spent ten years as a systems engineer.",
+        "de": "Schreibt über Technik und Wissenschaft. Vor dem Journalismus war sie zehn Jahre lang Systemingenieurin.",
+        "es": "Escribe sobre tecnología y ciencia. Antes del periodismo trabajó diez años como ingeniera de sistemas."
+      }
+    },
+    {
+      "id": 2, "firstname": "Teo", "lastname": "Varga",
+      "descriptions": {
+        "en": "Travel writer who prefers trains to planes and small towns to capitals.",
+        "de": "Reiseautor, der Züge dem Flugzeug und Kleinstädte den Hauptstädten vorzieht.",
+        "es": "Escritor de viajes que prefiere el tren al avión y los pueblos a las capitales."
+      }
+    },
+    {
+      "id": 3, "firstname": "Ines", "lastname": "Halloran",
+      "descriptions": {
+        "en": "Food columnist and an enthusiastic, untidy home cook.",
+        "de": "Kolumnistin für Essen und begeisterte, unordentliche Hobbyköchin.",
+        "es": "Columnista gastronómica y cocinera casera entusiasta y desordenada."
+      }
+    },
+    {
+      "id": 4, "firstname": "Ravi", "lastname": "Okafor",
+      "descriptions": {
+        "en": "Culture editor. Writes the opinion column every other week.",
+        "de": "Kulturredakteur. Schreibt alle zwei Wochen die Meinungskolumne.",
+        "es": "Editor de cultura. Escribe la columna de opinión cada dos semanas."
+      }
+    }
+  ],
+  "tags": {
+    "explainer": { "de": "Erklärt", "es": "Explicado" },
+    "how-to": { "de": "Anleitung", "es": "Cómo hacerlo" },
+    "weekend": { "de": "Wochenende", "es": "Fin de semana" },
+    "recipes": { "de": "Rezepte", "es": "Recetas" },
+    "cities": { "de": "Städte", "es": "Ciudades" },
+    "privacy": { "de": "Datenschutz", "es": "Privacidad" },
+    "space": { "de": "Weltraum", "es": "Espacio" },
+    "books": { "de": "Bücher", "es": "Libros" },
+    "trains": { "de": "Züge", "es": "Trenes" },
+    "repair": { "de": "Reparieren", "es": "Reparación" },
+    "habits": { "de": "Gewohnheiten", "es": "Hábitos" },
+    "work": { "de": "Arbeit", "es": "Trabajo" }
+  },
+  "images": [
+    { "key": "phone-battery", "motif": "grid", "colours": ["#13293d", "#1d4e6f", "#f2c14e"],
+      "captions": { "en": "A grid of dark blue tiles, a few of them lit." },
+      "alts": { "en": "Abstract illustration: a grid of dark blue tiles, a few lit in amber.", "de": "Abstrakte Illustration: ein Raster dunkelblauer Kacheln, einige leuchten bernsteinfarben.", "es": "Ilustración abstracta: una cuadrícula de baldosas azul oscuro, algunas encendidas en ámbar." } },
+    { "key": "password-vault", "motif": "grid", "colours": ["#2b2d42", "#4a4e69", "#9ad1d4"],
+      "captions": { "en": "Slate tiles with a handful picked out in pale teal." },
+      "alts": { "en": "Abstract illustration: slate-grey tiles, a handful picked out in pale teal." } },
+    { "key": "data-hall", "motif": "grid", "colours": ["#0b132b", "#1c2541", "#5bc0be"],
+      "captions": { "en": "Rows of tiles in midnight blue, some glowing teal." },
+      "alts": { "en": "Abstract illustration: rows of midnight-blue tiles, some glowing teal like server lights." } },
+    { "key": "data-hall-2", "motif": "stripes", "colours": ["#1c2541", "#3a506b", "#5bc0be"],
+      "captions": { "en": "Diagonal bands of blue and teal." },
+      "alts": { "en": "Abstract illustration: diagonal bands of deep blue with one teal stripe." } },
+    { "key": "laptop-repair", "motif": "grid", "colours": ["#3d405b", "#81b29a", "#f2cc8f"],
+      "captions": { "en": "Muted green and grey tiles with sand-coloured highlights." },
+      "alts": { "en": "Abstract illustration: muted green and grey tiles with sand-coloured highlights." } },
+    { "key": "port-alder", "motif": "waves", "colours": ["#023e8a", "#48cae4", "#ffd166"],
+      "captions": { "en": "Layered blue waves under a warm yellow band." },
+      "alts": { "en": "Abstract illustration: layered blue waves with one band of warm yellow, like a harbour at dusk.", "de": "Abstrakte Illustration: geschichtete blaue Wellen mit einem warmgelben Band, wie ein Hafen in der Abenddämmerung.", "es": "Ilustración abstracta: olas azules superpuestas con una franja amarilla cálida, como un puerto al atardecer." } },
+    { "key": "port-alder-2", "motif": "peaks", "colours": ["#ffb703", "#fb8500", "#fff3b0"],
+      "captions": { "en": "Orange ridges beneath a pale sun." },
+      "alts": { "en": "Abstract illustration: orange ridges beneath a pale sun.", "de": "Abstrakte Illustration: orangefarbene Hügelketten unter einer blassen Sonne.", "es": "Ilustración abstracta: crestas naranjas bajo un sol pálido." } },
+    { "key": "port-alder-3", "motif": "circles", "colours": ["#264653", "#2a9d8f", "#e9c46a"],
+      "captions": { "en": "Overlapping discs in teal and gold." },
+      "alts": { "en": "Abstract illustration: overlapping discs in teal and gold.", "de": "Abstrakte Illustration: sich überlappende Scheiben in Petrol und Gold.", "es": "Ilustración abstracta: discos superpuestos en verde azulado y dorado." } },
+    { "key": "night-train", "motif": "peaks", "colours": ["#10002b", "#3c096c", "#ffd6ff"],
+      "captions": { "en": "Violet ridges under a pale pink moon." },
+      "alts": { "en": "Abstract illustration: dark violet ridges under a pale pink moon." } },
+    { "key": "one-bag", "motif": "stripes", "colours": ["#6d597a", "#b56576", "#eaac8b"],
+      "captions": { "en": "Plum and rose stripes with one peach band." },
+      "alts": { "en": "Abstract illustration: plum and rose diagonal stripes with one peach band." } },
+    { "key": "lemon-pasta", "motif": "circles", "colours": ["#fefae0", "#faedcd", "#e9c46a"],
+      "captions": { "en": "Cream and butter-yellow discs." },
+      "alts": { "en": "Abstract illustration: cream and butter-yellow discs on a light background.", "de": "Abstrakte Illustration: creme- und buttergelbe Scheiben auf hellem Grund.", "es": "Ilustración abstracta: discos color crema y amarillo mantequilla sobre fondo claro." } },
+    { "key": "bread-loaf", "motif": "circles", "colours": ["#7f5539", "#b08968", "#ede0d4"],
+      "captions": { "en": "Warm brown discs with pale highlights." },
+      "alts": { "en": "Abstract illustration: warm brown discs with pale highlights." } },
+    { "key": "sandwich", "motif": "stripes", "colours": ["#bc6c25", "#dda15e", "#fefae0"],
+      "captions": { "en": "Layered bands of ochre and cream." },
+      "alts": { "en": "Abstract illustration: layered diagonal bands of ochre and cream." } },
+    { "key": "library", "motif": "stripes", "colours": ["#22223b", "#4a4e69", "#c9ada7"],
+      "captions": { "en": "Tall stripes in ink blue and dusty pink." },
+      "alts": { "en": "Abstract illustration: tall stripes in ink blue and dusty pink, like shelves of books." } },
+    { "key": "reading-habit", "motif": "circles", "colours": ["#355070", "#6d597a", "#e56b6f"],
+      "captions": { "en": "Discs of coral on a blue-violet ground." },
+      "alts": { "en": "Abstract illustration: coral discs on a blue-violet ground." } },
+    { "key": "film-days", "motif": "stripes", "colours": ["#14213d", "#000000", "#fca311"],
+      "captions": { "en": "Black and navy bands with one bright orange stripe." },
+      "alts": { "en": "Abstract illustration: black and navy bands with one bright orange stripe." } },
+    { "key": "film-days-2", "motif": "circles", "colours": ["#000000", "#14213d", "#e5e5e5"],
+      "captions": { "en": "Pale discs floating on black." },
+      "alts": { "en": "Abstract illustration: pale grey discs floating on black, like stage lights." } },
+    { "key": "cloud-weight", "motif": "circles", "colours": ["#a2d2ff", "#bde0fe", "#ffffff"],
+      "captions": { "en": "White discs on a sky-blue ground." },
+      "alts": { "en": "Abstract illustration: soft white discs on a sky-blue ground.", "de": "Abstrakte Illustration: weiche weiße Scheiben auf himmelblauem Grund.", "es": "Ilustración abstracta: discos blancos suaves sobre un fondo azul cielo." } },
+    { "key": "sky-blue", "motif": "waves", "colours": ["#00b4d8", "#ff7b54", "#ffe5b4"],
+      "captions": { "en": "A blue sky turning to orange." },
+      "alts": { "en": "Abstract illustration: a gradient from bright blue to sunset orange, crossed by pale waves." } },
+    { "key": "tides", "motif": "waves", "colours": ["#03045e", "#0077b6", "#caf0f8"],
+      "captions": { "en": "Deep blue waves with one pale crest." },
+      "alts": { "en": "Abstract illustration: deep blue waves with one pale crest." } },
+    { "key": "night-sky", "motif": "orbit", "colours": ["#03071e", "#1b263b", "#f4a261"],
+      "captions": { "en": "A planet and its rings among small stars." },
+      "alts": { "en": "Abstract illustration: an orange planet circled by thin rings, among small white stars." } },
+    { "key": "agenda", "motif": "grid", "colours": ["#e9ecef", "#adb5bd", "#e63946"],
+      "captions": { "en": "Grey tiles with a few marked in red." },
+      "alts": { "en": "Abstract illustration: light grey tiles with a few marked in red, like a calendar." } },
+    { "key": "walkable-city", "motif": "grid", "colours": ["#2d6a4f", "#40916c", "#ffe66d"],
+      "captions": { "en": "Green tiles with yellow squares, like a city seen from above." },
+      "alts": { "en": "Abstract illustration: a grid of green tiles with yellow squares, like city blocks seen from above.", "de": "Abstrakte Illustration: ein Raster grüner Kacheln mit gelben Quadraten, wie Häuserblöcke von oben.", "es": "Ilustración abstracta: una cuadrícula de baldosas verdes con cuadrados amarillos, como manzanas vistas desde arriba." } },
+    { "key": "inbox", "motif": "stripes", "colours": ["#f1faee", "#a8dadc", "#457b9d"],
+      "captions": { "en": "Pale stripes with one steel-blue band." },
+      "alts": { "en": "Abstract illustration: pale diagonal stripes with one steel-blue band." } }
+  ],
+  "articles": [
+    {
+      "id": 1, "daysAgo": 18, "hour": 20, "counter": 241, "categories": [5], "authors": [1],
+      "images": ["night-sky"], "tags": ["space", "how-to"],
+      "titles": { "en": "A beginner's map of the night sky" },
+      "descriptions": { "en": "No telescope needed. Five things anyone can find on a clear night, and how to find them." },
+      "bodies": {
+        "en": "<p>You do not need a telescope to enjoy the night sky, only a clear evening, a place away from street lights and twenty minutes for your eyes to adjust to the dark.</p>\n<h2>Five things to find</h2>\n<ol>\n<li><strong>The moon.</strong> Binoculars show its craters best along the line between light and shadow.</li>\n<li><strong>A planet.</strong> Planets shine steadily, while stars twinkle. The brightest “star” near the horizon after sunset is often one.</li>\n<li><strong>A constellation you can name.</strong> Start with one bright, easy pattern and use it to find its neighbours.</li>\n<li><strong>A satellite.</strong> A steady point of light crossing the sky in a few minutes, without blinking.</li>\n<li><strong>A meteor.</strong> Lie back and be patient. On an ordinary night you may see a few an hour.</li>\n</ol>\n<p>A free star-chart app helps, but turn the screen to its red night mode: white light undoes twenty minutes of dark adaptation in a second.</p>"
+      }
+    },
+    {
+      "id": 2, "daysAgo": 16, "hour": 11, "counter": 96, "categories": [4], "authors": [2],
+      "images": ["film-days", "film-days-2"], "tags": ["cities", "weekend"],
+      "titles": { "en": "Inside the Valdoro Film Days" },
+      "descriptions": { "en": "A town of four thousand people, a disused cinema and a festival that now fills every room in the valley." },
+      "bodies": {
+        "en": "<p>For most of the year Valdoro is a quiet hill town. For one week in autumn its population doubles, and its only cinema, closed for twenty years before the festival began, sells out every screening.</p>\n<h2>How it started</h2>\n<p>A group of friends borrowed a projector, cleaned the old cinema and showed six films over a weekend. Word spread. Eleven years later the Valdoro Film Days show more than eighty films, in the cinema, the church hall and, on warm nights, the town square.</p>\n<h2>No red carpet</h2>\n<p>The festival has no competition and no prizes. Directors introduce their own films and then sit in the audience. Afterwards, everyone goes to the same two bars.</p>\n<blockquote>“We wanted a festival where you could talk to the person who made the film,” says one of the founders. “That is still the only rule.”</blockquote>"
+      }
+    },
+    {
+      "id": 3, "daysAgo": 14, "hour": 13, "counter": 122, "categories": [3], "authors": [3],
+      "images": ["sandwich"], "tags": ["explainer"],
+      "titles": { "en": "A short history of the sandwich" },
+      "descriptions": { "en": "Something between two pieces of bread is as old as bread itself. How the most portable meal conquered the world." },
+      "bodies": {
+        "en": "<p>People have put food between pieces of bread for as long as there has been bread. Flatbreads wrapped around fillings appear in the oldest cookbooks we have. What changed over the centuries was not the idea but the occasion.</p>\n<h2>From travel food to lunch break</h2>\n<p>For a long time, bread with something inside was the food of travellers, workers and anyone who had to eat with one hand. Sliced bread and the office lunch break made it the everyday meal it is now.</p>\n<h2>Every country has its own</h2>\n<p>Toasted, pressed, open-faced, rolled or stacked to an improbable height: almost every food culture has a favourite version, and an argument about the right way to make it.</p>\n<blockquote>The best sandwich is the one you make with whatever is left in the kitchen.</blockquote>"
+      }
+    },
+    {
+      "id": 4, "daysAgo": 13, "hour": 12, "counter": 189, "categories": [6], "authors": [3],
+      "images": ["inbox"], "tags": ["work", "habits"],
+      "titles": { "en": "Email is not urgent. Let us stop pretending it is" },
+      "descriptions": { "en": "Answering within minutes has become a habit nobody chose. A modest proposal for checking the inbox three times a day." },
+      "bodies": {
+        "en": "<p>E-mail was invented as a slow medium: a letter that arrives faster, read when convenient. Somewhere along the way we started treating every message as a phone call that must be answered at once.</p>\n<h2>The cost of always being available</h2>\n<p>Every glance at the inbox interrupts whatever we were doing, and getting back into deep work takes far longer than the glance itself. A day of constant checking is a day of shallow, fragmented attention.</p>\n<h2>A modest proposal</h2>\n<ol>\n<li>Check e-mail three times a day, at times you choose.</li>\n<li>Turn off notifications for it entirely.</li>\n<li>If something is truly urgent, agree with colleagues that it calls for a phone call.</li>\n</ol>\n<p>Try it for a week. The world, in my experience, does not end. It mostly does not notice.</p>"
+      }
+    },
+    {
+      "id": 5, "daysAgo": 12, "hour": 15, "counter": 147, "categories": [1], "authors": [4],
+      "images": ["laptop-repair"], "tags": ["repair", "how-to"],
+      "titles": { "en": "Repair, don't replace: the case for fixing your laptop" },
+      "descriptions": { "en": "A new keyboard, a fresh battery and more memory can add years to a laptop. What is worth repairing, and what is not." },
+      "bodies": {
+        "en": "<p>A laptop rarely dies all at once. A key stops working, the battery lasts an hour, the fan gets loud. Each of those is usually a repair, not a reason to buy a new machine.</p>\n<h2>Worth fixing</h2>\n<ul>\n<li><strong>The battery.</strong> Often the cheapest repair with the biggest effect.</li>\n<li><strong>The storage.</strong> Moving from an old spinning disk to a solid-state drive makes an old laptop feel new.</li>\n<li><strong>The keyboard and the fan.</strong> Both wear out, both can be replaced.</li>\n</ul>\n<h2>Probably not worth it</h2>\n<p>A broken main board on an old model can cost more than the laptop is worth. Ask for a quote first.</p>\n<p>Repair cafés, where volunteers help you fix things yourself, now meet in many towns. Bring the laptop, the charger and patience.</p>"
+      }
+    },
+    {
+      "id": 6, "daysAgo": 11, "hour": 8, "counter": 175, "categories": [5], "authors": [1],
+      "images": ["tides"], "tags": ["explainer", "space"],
+      "titles": { "en": "The moon, the sea and the twice-daily tide" },
+      "descriptions": { "en": "Why most coasts see two high tides a day, not one, and why some tides are much bigger than others." },
+      "bodies": {
+        "en": "<p>The moon's gravity pulls on the whole Earth, but not equally: it pulls hardest on the side facing it and most weakly on the far side. That difference stretches the oceans into two bulges, one towards the moon and one away from it.</p>\n<h2>Two bulges, two tides</h2>\n<p>As the Earth turns, a coast passes through both bulges every day. That is why most places see two high tides and two low tides, a little under twenty-five hours apart, as the moon moves along its orbit.</p>\n<h2>Spring and neap</h2>\n<p>The sun raises tides too, about half as strong as the moon's. When sun and moon line up, at new moon and full moon, their effects add up and the tides are largest. When they pull at right angles, the tides are smallest.</p>\n<p>The shape of the coast does the rest: in some narrow bays the difference between high and low water is more than ten metres.</p>"
+      }
+    },
+    {
+      "id": 7, "daysAgo": 10, "hour": 10, "counter": 198, "categories": [2], "authors": [2],
+      "images": ["one-bag"], "tags": ["how-to", "habits"],
+      "titles": { "en": "One bag, seven days: a packing list that works" },
+      "descriptions": { "en": "Travelling with only a carry-on is easier than it sounds. The list, the tricks and the things to leave at home." },
+      "bodies": {
+        "en": "<p>Every trip with too much luggage teaches the same lesson: you carry it everywhere and use half of it. A week with one small bag is not about sacrifice. It is about choosing well.</p>\n<h2>The list</h2>\n<ul>\n<li>Three tops and two bottoms that all go together</li>\n<li>One warm layer and one waterproof jacket</li>\n<li>Comfortable shoes, worn on the journey</li>\n<li>Underwear and socks for four days, washed once</li>\n<li>A small bag of toiletries and a charger with several ports</li>\n</ul>\n<h2>The tricks</h2>\n<p>Roll clothes instead of folding them. Wear the bulkiest items while travelling. Pack a light tote bag for day trips and markets.</p>\n<p>And leave the “just in case” items at home. Almost anything you forget can be bought on arrival.</p>"
+      }
+    },
+    {
+      "id": 8, "daysAgo": 9, "hour": 19, "counter": 214, "categories": [4], "authors": [4],
+      "images": ["reading-habit"], "tags": ["books", "habits"],
+      "titles": { "en": "How to build a reading habit that lasts" },
+      "descriptions": { "en": "Twenty pages a day adds up to a shelf of books a year. Small, practical ways to read more without trying harder." },
+      "bodies": {
+        "en": "<p>Many people would like to read more and somehow never do. The problem is rarely time. It is that reading has to compete with a phone that is always closer than a book.</p>\n<h2>Make it small</h2>\n<p>Aim for twenty pages a day, not a book a week. Twenty pages takes about half an hour and adds up to more than twenty books a year.</p>\n<h2>Make it easy</h2>\n<ul>\n<li>Keep a book where you usually reach for your phone: by the bed, in your bag, on the sofa.</li>\n<li>Read at the same time every day, after something you already do.</li>\n<li>Give yourself permission to stop reading a book you do not enjoy.</li>\n</ul>\n<h2>Make it social</h2>\n<p>A book club, a friend reading the same novel, or simply telling someone what you are reading makes it far more likely that you will finish.</p>"
+      }
+    },
+    {
+      "id": 9, "daysAgo": 8, "hour": 16, "counter": 301, "categories": [3], "authors": [3],
+      "images": ["bread-loaf"], "tags": ["recipes", "how-to"],
+      "titles": { "en": "Flour, water, salt and time: your first loaf" },
+      "descriptions": { "en": "A simple, forgiving bread for beginners. No special equipment, mostly waiting." },
+      "bodies": {
+        "en": "<p>Bread has a reputation for being difficult. This one is not. It asks for four ingredients, ten minutes of work and a day of patience, most of which you spend doing something else.</p>\n<h2>You will need</h2>\n<ul>\n<li>500 g strong white flour</li>\n<li>350 ml lukewarm water</li>\n<li>10 g salt</li>\n<li>5 g dried yeast</li>\n</ul>\n<h2>Method</h2>\n<ol>\n<li>Mix everything in a large bowl until no dry flour is left. Cover and leave for an hour.</li>\n<li>With wet hands, stretch the dough up and fold it over itself four times. Repeat twice more, half an hour apart.</li>\n<li>Cover the bowl and leave it in the fridge overnight.</li>\n<li>The next day, shape it into a ball, let it rise for an hour and bake in a hot oven for 40 minutes.</li>\n</ol>\n<p>It is done when the bottom sounds hollow when tapped. Let it cool before cutting, however hard that is.</p>"
+      }
+    },
+    {
+      "id": 10, "daysAgo": 7, "hour": 9, "counter": 518, "categories": [1], "authors": [1],
+      "images": ["data-hall", "data-hall-2"], "tags": ["explainer"],
+      "titles": { "en": "Where the cloud lives: a morning inside a data centre" },
+      "descriptions": { "en": "Behind every photo backup is a building full of humming machines. We spent a morning in one outside the town of Fennick Vale." },
+      "bodies": {
+        "en": "<p>From the road it looks like a warehouse: grey walls, a fence, a car park with a dozen cars. Inside, it is loud. Thousands of fans move air through rows of cabinets, each holding dozens of computers stacked like books.</p>\n<h2>Cold aisles and hot aisles</h2>\n<p>The cabinets face each other in pairs. Cool air is pushed into the aisle between their fronts and the warm air leaves from the back, where it is collected and cooled again. Our guide, the site's operations lead, says that half of the building's engineering is about moving heat.</p>\n<h2>Nothing is allowed to stop</h2>\n<p>Power arrives on two separate lines. Batteries take over within milliseconds if both fail, and diesel generators start within a minute. Every disk is copied to at least one other machine, often in another building.</p>\n<blockquote>“People imagine the cloud is weightless. It weighs about four thousand tonnes here,” the guide says.</blockquote>\n<p>When we leave, the car park has not changed. That is the point: a good data centre is one nobody needs to think about.</p>"
+      }
+    },
+    {
+      "id": 11, "daysAgo": 6, "hour": 9, "counter": 336, "categories": [6], "authors": [4],
+      "images": ["walkable-city"], "tags": ["cities"],
+      "titles": {
+        "en": "Build cities for walking, and everything else follows",
+        "de": "Baut Städte für Fußgänger, und der Rest ergibt sich",
+        "es": "Construyamos ciudades para caminar y lo demás vendrá solo"
+      },
+      "descriptions": {
+        "en": "Shops, cafés, safer streets and healthier people: most of what we want from a city starts with a pavement.",
+        "de": "Läden, Cafés, sicherere Straßen und gesündere Menschen: Das meiste, was wir uns von einer Stadt wünschen, beginnt mit einem Gehweg.",
+        "es": "Tiendas, cafés, calles más seguras y gente más sana: casi todo lo que queremos de una ciudad empieza en una acera."
+      },
+      "bodies": {
+        "en": "<p>Ask people what they love about the cities they visit on holiday and they rarely mention the roads. They talk about squares, narrow streets, cafés with chairs outside and the pleasure of walking from one neighbourhood to the next.</p>\n<h2>Walking is the foundation</h2>\n<p>A street where people walk is a street where small shops survive, because passers-by stop. It is safer, because there are eyes on it. It is healthier, because a walk to the bakery is exercise nobody has to schedule.</p>\n<h2>Small changes, quickly</h2>\n<ul>\n<li>Wider pavements and benches every few hundred metres</li>\n<li>Crossings where people actually cross</li>\n<li>Trees for shade and slower traffic near schools</li>\n</ul>\n<blockquote>None of this is expensive compared with another lane of road. It only requires deciding who the street is for.</blockquote>",
+        "de": "<p>Fragen Sie Menschen, was sie an den Städten lieben, die sie im Urlaub besuchen, erwähnen sie selten die Straßen. Sie sprechen von Plätzen, engen Gassen, Cafés mit Stühlen vor der Tür und der Freude, von einem Viertel ins nächste zu spazieren.</p>\n<h2>Zu Fuß gehen ist das Fundament</h2>\n<p>Eine Straße, auf der Menschen gehen, ist eine Straße, auf der kleine Läden überleben, weil Passanten stehen bleiben. Sie ist sicherer, weil jemand hinschaut. Sie ist gesünder, weil der Weg zur Bäckerei Bewegung ist, die niemand einplanen muss.</p>\n<h2>Kleine Änderungen, schnell</h2>\n<ul>\n<li>Breitere Gehwege und alle paar hundert Meter eine Bank</li>\n<li>Übergänge dort, wo Menschen tatsächlich die Straße queren</li>\n<li>Bäume für Schatten und langsamerer Verkehr vor Schulen</li>\n</ul>\n<blockquote>Nichts davon ist teuer im Vergleich zu einer weiteren Fahrspur. Es verlangt nur die Entscheidung, für wen die Straße da ist.</blockquote>",
+        "es": "<p>Pregunta a la gente qué le gusta de las ciudades que visita en vacaciones y rara vez mencionará las carreteras. Hablará de plazas, calles estrechas, cafés con sillas en la acera y el placer de pasear de un barrio a otro.</p>\n<h2>Caminar es la base</h2>\n<p>Una calle por la que la gente camina es una calle donde sobreviven las tiendas pequeñas, porque los transeúntes se detienen. Es más segura, porque hay ojos en ella. Es más sana, porque ir andando a la panadería es ejercicio que nadie tiene que programar.</p>\n<h2>Cambios pequeños y rápidos</h2>\n<ul>\n<li>Aceras más anchas y bancos cada pocos cientos de metros</li>\n<li>Pasos de peatones donde la gente realmente cruza</li>\n<li>Árboles para dar sombra y tráfico más lento junto a los colegios</li>\n</ul>\n<blockquote>Nada de esto es caro comparado con otro carril. Solo exige decidir para quién es la calle.</blockquote>"
+      }
+    },
+    {
+      "id": 12, "daysAgo": 6, "hour": 14, "counter": 288, "categories": [5], "authors": [1],
+      "images": ["sky-blue"], "tags": ["explainer"],
+      "titles": { "en": "Why the sky is blue and sunsets are red" },
+      "descriptions": { "en": "Sunlight contains every colour. The air scatters some of them more than others, and that one fact explains both." },
+      "bodies": {
+        "en": "<p>Sunlight looks white, but it is a mixture of every colour of the rainbow. On its way through the atmosphere, that light keeps bumping into the molecules of the air.</p>\n<h2>Blue bounces more</h2>\n<p>Those molecules are far smaller than the wavelength of light, and they scatter short wavelengths — blue and violet — much more strongly than long ones like red. The scattered blue light reaches your eyes from every direction of the sky, so the whole sky looks blue.</p>\n<h2>Why not violet?</h2>\n<p>Sunlight contains less violet than blue to begin with, some of it is absorbed high in the atmosphere, and our eyes are less sensitive to it.</p>\n<h2>And the sunset?</h2>\n<p>When the sun is low, its light crosses much more air to reach you. By the time it arrives, most of the blue has been scattered away to the sides, and what is left is orange and red.</p>"
+      }
+    },
+    {
+      "id": 13, "daysAgo": 5, "hour": 18, "counter": 276, "categories": [2], "authors": [2],
+      "images": ["night-train"], "tags": ["trains", "how-to"],
+      "titles": { "en": "Night trains are back. Here is how to sleep on one" },
+      "descriptions": { "en": "Fall asleep in one country, wake up in another. A practical guide to choosing a berth and actually getting some rest." },
+      "bodies": {
+        "en": "<p>There is something old-fashioned and wonderful about going to bed in one city and waking up in another. After years of decline, sleeper trains are running again on many long routes.</p>\n<h2>Seat, couchette or sleeper?</h2>\n<ul>\n<li><strong>A reclining seat</strong> is the cheapest and the least restful.</li>\n<li><strong>A couchette</strong> is a bunk in a shared compartment of four or six, with sheets and a pillow.</li>\n<li><strong>A sleeper</strong> is a private compartment with real beds, often with a small washbasin.</li>\n</ul>\n<h2>Sleeping well</h2>\n<p>Bring earplugs and an eye mask: the train stops at stations in the night and the corridor lights stay on. Keep valuables in a small bag at the head of your bunk. A bottle of water and a light snack save a trip to the dining car.</p>\n<p>Book early. The private compartments on popular routes sell out weeks in advance, especially at weekends.</p>"
+      }
+    },
+    {
+      "id": 14, "daysAgo": 4, "hour": 10, "counter": 167, "categories": [4], "authors": [4],
+      "images": ["library"], "tags": ["books", "cities"],
+      "titles": { "en": "The library that never closes" },
+      "descriptions": { "en": "In the city of Lindmark, the central library stays open around the clock. Who comes at three in the morning, and why." },
+      "bodies": {
+        "en": "<p>At three in the morning the reading room of Lindmark's central library is not empty. A nurse at the end of her shift reads a detective novel. Two students revise for an exam. A man in a raincoat studies a map of a city he is moving to.</p>\n<h2>An experiment that stayed</h2>\n<p>The library started opening through the night as a one-month trial. Staff expected a handful of visitors. They counted more than two hundred on the first night, and the trial was never ended.</p>\n<h2>A warm, quiet room</h2>\n<p>“People need somewhere to be that is not home, not work and does not cost anything,” says the head librarian. At night that need is greater, not smaller.</p>\n<p>The night shift is staffed by two librarians and a security guard. Books can be borrowed at any hour, and the coffee machine in the lobby is the busiest in the building.</p>"
+      }
+    },
+    {
+      "id": 15, "daysAgo": 3, "hour": 11, "counter": 233, "categories": [1], "authors": [1],
+      "images": ["password-vault"], "tags": ["privacy", "how-to"],
+      "titles": { "en": "A plain-language guide to password managers" },
+      "descriptions": { "en": "One strong password to remember, a different one for every website. How a password manager works, and how to start." },
+      "bodies": {
+        "en": "<p>Most people reuse a handful of passwords. When one website leaks its list of accounts, every other account with the same password is open too. A password manager is the simplest way out.</p>\n<h2>How it works</h2>\n<p>The manager keeps an encrypted vault of your passwords. You remember one long passphrase that opens it; the manager remembers everything else and fills it in for you. Because you never type the others, they can be long and random.</p>\n<h2>Getting started in an afternoon</h2>\n<ol>\n<li>Choose a manager that works on all your devices.</li>\n<li>Pick a passphrase of four or five unrelated words. Write it down once and keep the paper somewhere safe.</li>\n<li>Start with your e-mail account: it is the key to resetting every other password.</li>\n<li>Change the rest as you log in to them over the following weeks.</li>\n</ol>\n<p>Turn on two-step sign-in wherever it is offered. A stolen password is far less useful to anyone without the second step.</p>"
+      }
+    },
+    {
+      "id": 16, "daysAgo": 3, "hour": 17, "counter": 158, "categories": [6], "authors": [4],
+      "images": ["agenda"], "tags": ["work", "habits"],
+      "titles": { "en": "In praise of the boring meeting agenda" },
+      "descriptions": { "en": "Three lines written the day before can save an hour of everyone's time. The case for the least exciting document at work." },
+      "bodies": {
+        "en": "<p>Nobody has ever been thanked for writing a meeting agenda. Yet a few lines sent the day before are the difference between a meeting that decides something and one that only schedules another meeting.</p>\n<h2>What an agenda does</h2>\n<p>It tells people why they are there, what they should read beforehand and what the meeting has to produce. It lets people who are not needed politely decline. And it gives the chair permission to say: “That is not on the agenda.”</p>\n<h2>A good one is short</h2>\n<ul>\n<li>The question to be decided, in one sentence</li>\n<li>What to read, with links</li>\n<li>Who decides, if it is not obvious</li>\n</ul>\n<p>If you cannot write those three lines, you probably do not need the meeting. Send an e-mail instead, and give everyone their hour back.</p>"
+      }
+    },
+    {
+      "id": 17, "daysAgo": 2, "hour": 9, "counter": 367, "categories": [5], "authors": [1],
+      "images": ["cloud-weight"], "tags": ["explainer"],
+      "titles": {
+        "en": "How much does a cloud weigh?",
+        "de": "Wie viel wiegt eine Wolke?",
+        "es": "¿Cuánto pesa una nube?"
+      },
+      "descriptions": {
+        "en": "An ordinary fair-weather cloud holds hundreds of tonnes of water. So why does it not fall?",
+        "de": "Eine gewöhnliche Schönwetterwolke enthält Hunderte Tonnen Wasser. Warum fällt sie dann nicht herunter?",
+        "es": "Una nube corriente de buen tiempo contiene cientos de toneladas de agua. Entonces, ¿por qué no se cae?"
+      },
+      "bodies": {
+        "en": "<p>Look up on a sunny afternoon and you may see a small white cumulus cloud drifting by. It looks light as a feather. It is not.</p>\n<h2>A rough calculation</h2>\n<p>A typical small cloud is about a kilometre across. Each cubic metre of it holds roughly half a gram of liquid water in tiny droplets. A cube a kilometre on each side contains a billion cubic metres, so the cloud carries around five hundred tonnes of water — about the weight of a hundred elephants.</p>\n<h2>So why does it float?</h2>\n<p>Because the water is spread out into droplets so small that air resistance almost balances their weight. They fall, but extremely slowly, and the rising warm air that formed the cloud keeps lifting them. The cloud as a whole is also slightly less dense than the dry air around it.</p>\n<blockquote>A cloud does not float like a balloon. It is falling, very slowly, on a lift of rising air.</blockquote>\n<p>When droplets collide and grow, they become too heavy for the rising air to hold. That is when the cloud turns into rain.</p>",
+        "de": "<p>Schauen Sie an einem sonnigen Nachmittag nach oben, sehen Sie vielleicht eine kleine weiße Haufenwolke vorbeiziehen. Sie wirkt federleicht. Das ist sie nicht.</p>\n<h2>Eine grobe Rechnung</h2>\n<p>Eine typische kleine Wolke ist etwa einen Kilometer breit. Jeder Kubikmeter enthält ungefähr ein halbes Gramm flüssiges Wasser in winzigen Tröpfchen. Ein Würfel mit einem Kilometer Kantenlänge umfasst eine Milliarde Kubikmeter, die Wolke trägt also rund fünfhundert Tonnen Wasser — etwa so viel wie hundert Elefanten wiegen.</p>\n<h2>Warum schwebt sie dann?</h2>\n<p>Weil das Wasser auf so kleine Tröpfchen verteilt ist, dass der Luftwiderstand ihr Gewicht fast aufhebt. Sie fallen, aber extrem langsam, und die aufsteigende warme Luft, aus der die Wolke entstanden ist, hebt sie immer wieder an. Außerdem ist die Wolke insgesamt etwas weniger dicht als die trockene Luft um sie herum.</p>\n<blockquote>Eine Wolke schwebt nicht wie ein Ballon. Sie fällt, sehr langsam, auf einem Aufzug aus steigender Luft.</blockquote>\n<p>Stoßen Tröpfchen zusammen und wachsen, werden sie zu schwer für die aufsteigende Luft. Dann wird aus der Wolke Regen.</p>",
+        "es": "<p>Mira hacia arriba una tarde soleada y quizá veas pasar un pequeño cúmulo blanco. Parece ligero como una pluma. No lo es.</p>\n<h2>Un cálculo aproximado</h2>\n<p>Una nube pequeña típica mide alrededor de un kilómetro de ancho. Cada metro cúbico contiene aproximadamente medio gramo de agua líquida en gotitas diminutas. Un cubo de un kilómetro de lado tiene mil millones de metros cúbicos, así que la nube lleva unas quinientas toneladas de agua: más o menos lo que pesan cien elefantes.</p>\n<h2>Entonces, ¿por qué flota?</h2>\n<p>Porque el agua está repartida en gotas tan pequeñas que la resistencia del aire casi compensa su peso. Caen, pero muy despacio, y el aire cálido que asciende, el mismo que formó la nube, las vuelve a elevar. Además, la nube en conjunto es algo menos densa que el aire seco que la rodea.</p>\n<blockquote>Una nube no flota como un globo. Está cayendo, muy despacio, sobre un ascensor de aire que sube.</blockquote>\n<p>Cuando las gotas chocan y crecen, se vuelven demasiado pesadas para el aire ascendente. Entonces la nube se convierte en lluvia.</p>"
+      }
+    },
+    {
+      "id": 18, "daysAgo": 2, "hour": 12, "counter": 455, "categories": [3], "authors": [3],
+      "images": ["lemon-pasta"], "tags": ["recipes", "weekend"],
+      "titles": {
+        "en": "A five-ingredient pasta for tired weeknights",
+        "de": "Pasta mit fünf Zutaten für müde Abende",
+        "es": "Una pasta de cinco ingredientes para las noches de cansancio"
+      },
+      "descriptions": {
+        "en": "Lemon, garlic, butter, cheese and pasta. Fifteen minutes, one pot, and a dinner that tastes like more effort than it was.",
+        "de": "Zitrone, Knoblauch, Butter, Käse und Pasta. Fünfzehn Minuten, ein Topf und ein Abendessen, das nach mehr Mühe schmeckt, als es war.",
+        "es": "Limón, ajo, mantequilla, queso y pasta. Quince minutos, una olla y una cena que sabe a más esfuerzo del que costó."
+      },
+      "bodies": {
+        "en": "<p>This is the dinner I make when the day has been long and the cupboard is nearly empty. It needs one pot, fifteen minutes and five things you probably already have.</p>\n<h2>Ingredients (for two)</h2>\n<ul>\n<li>200 g spaghetti or linguine</li>\n<li>2 cloves of garlic, finely sliced</li>\n<li>40 g butter</li>\n<li>1 lemon, zest and juice</li>\n<li>50 g hard cheese, finely grated</li>\n</ul>\n<h2>Method</h2>\n<ol>\n<li>Cook the pasta in well-salted water until just tender. Keep a cup of the cooking water.</li>\n<li>Meanwhile, melt the butter in a pan over a low heat and soften the garlic for two minutes without letting it brown.</li>\n<li>Add the drained pasta, the lemon zest and half the juice, and a splash of the cooking water.</li>\n<li>Off the heat, stir in the cheese until glossy. Taste, add more lemon, pepper and a little more water if needed.</li>\n</ol>\n<blockquote>The cooking water is the secret: its starch turns butter and cheese into a sauce.</blockquote>",
+        "de": "<p>Dieses Abendessen koche ich, wenn der Tag lang war und der Schrank fast leer ist. Es braucht einen Topf, fünfzehn Minuten und fünf Dinge, die Sie wahrscheinlich schon im Haus haben.</p>\n<h2>Zutaten (für zwei)</h2>\n<ul>\n<li>200 g Spaghetti oder Linguine</li>\n<li>2 Knoblauchzehen, fein geschnitten</li>\n<li>40 g Butter</li>\n<li>1 Zitrone, Schale und Saft</li>\n<li>50 g Hartkäse, fein gerieben</li>\n</ul>\n<h2>Zubereitung</h2>\n<ol>\n<li>Die Pasta in gut gesalzenem Wasser bissfest kochen. Eine Tasse Kochwasser aufheben.</li>\n<li>Inzwischen die Butter bei schwacher Hitze schmelzen und den Knoblauch zwei Minuten darin weich werden lassen, ohne dass er bräunt.</li>\n<li>Die abgetropfte Pasta, die Zitronenschale, die Hälfte des Safts und einen Schuss Kochwasser dazugeben.</li>\n<li>Vom Herd nehmen und den Käse unterrühren, bis alles glänzt. Abschmecken, nach Bedarf mehr Zitrone, Pfeffer und etwas Wasser zugeben.</li>\n</ol>\n<blockquote>Das Kochwasser ist das Geheimnis: Seine Stärke macht aus Butter und Käse eine Soße.</blockquote>",
+        "es": "<p>Esta es la cena que preparo cuando el día ha sido largo y la despensa está casi vacía. Necesita una olla, quince minutos y cinco cosas que probablemente ya tienes.</p>\n<h2>Ingredientes (para dos)</h2>\n<ul>\n<li>200 g de espaguetis o linguine</li>\n<li>2 dientes de ajo, en láminas finas</li>\n<li>40 g de mantequilla</li>\n<li>1 limón, la ralladura y el zumo</li>\n<li>50 g de queso curado, rallado fino</li>\n</ul>\n<h2>Preparación</h2>\n<ol>\n<li>Cuece la pasta en agua con bastante sal hasta que esté al dente. Guarda una taza del agua de cocción.</li>\n<li>Mientras tanto, derrite la mantequilla a fuego suave y deja que el ajo se ablande dos minutos sin que se dore.</li>\n<li>Añade la pasta escurrida, la ralladura de limón, la mitad del zumo y un chorrito del agua de cocción.</li>\n<li>Fuera del fuego, incorpora el queso hasta que brille. Prueba y añade más limón, pimienta y un poco más de agua si hace falta.</li>\n</ol>\n<blockquote>El agua de cocción es el secreto: su almidón convierte la mantequilla y el queso en una salsa.</blockquote>"
+      }
+    },
+    {
+      "id": 19, "daysAgo": 1, "hour": 7, "counter": 389, "categories": [2], "authors": [2],
+      "images": ["port-alder", "port-alder-2", "port-alder-3"], "tags": ["weekend", "cities"],
+      "titles": {
+        "en": "Forty-eight hours in Port Alder",
+        "de": "Achtundvierzig Stunden in Port Alder",
+        "es": "Cuarenta y ocho horas en Port Alder"
+      },
+      "descriptions": {
+        "en": "A harbour town of steep lanes, ferries and fish soup. How to spend a weekend there without a car.",
+        "de": "Eine Hafenstadt mit steilen Gassen, Fähren und Fischsuppe. So verbringen Sie dort ein Wochenende ohne Auto.",
+        "es": "Un pueblo portuario de callejones empinados, transbordadores y sopa de pescado. Cómo pasar allí un fin de semana sin coche."
+      },
+      "bodies": {
+        "en": "<p>Port Alder sits where a narrow river meets the sea, its houses stacked up the hillside in pale blues and yellows. It is small enough to cross on foot in twenty minutes and steep enough that you will feel it the next day.</p>\n<h2>Saturday</h2>\n<p>Arrive by the morning train and leave your bag at the station. Walk down to the harbour for breakfast at one of the cafés facing the boats. Take the little ferry across the river mouth to the lighthouse, then follow the coastal path back as the tide goes out.</p>\n<p>In the evening, the fish soup at the harbour-front restaurants is the town's pride. Every cook claims a secret; most of them involve a lot of saffron and a long afternoon.</p>\n<h2>Sunday</h2>\n<p>The covered market opens early. Afterwards, climb the stairs behind the town hall to the old fort for the best view of the bay. The town museum, in a former rope works, tells the story of the port in two small rooms.</p>\n<blockquote>Port Alder rewards the slow visitor. Sit, watch the ferries, and let the town come to you.</blockquote>\n<p><strong>Getting there:</strong> direct trains run every two hours; the last one back leaves just after eight.</p>",
+        "de": "<p>Port Alder liegt dort, wo ein schmaler Fluss ins Meer mündet, die Häuser in Hellblau und Gelb den Hang hinaufgestapelt. Die Stadt ist klein genug, um sie in zwanzig Minuten zu Fuß zu durchqueren, und steil genug, dass man es am nächsten Tag spürt.</p>\n<h2>Samstag</h2>\n<p>Kommen Sie mit dem Morgenzug an und lassen Sie Ihr Gepäck am Bahnhof. Gehen Sie zum Hafen hinunter und frühstücken Sie in einem der Cafés mit Blick auf die Boote. Nehmen Sie die kleine Fähre über die Flussmündung zum Leuchtturm und folgen Sie bei ablaufendem Wasser dem Küstenweg zurück.</p>\n<p>Am Abend ist die Fischsuppe der Restaurants am Hafen der Stolz der Stadt. Jeder Koch behauptet, ein Geheimnis zu haben; meist gehören viel Safran und ein langer Nachmittag dazu.</p>\n<h2>Sonntag</h2>\n<p>Die Markthalle öffnet früh. Steigen Sie danach die Treppen hinter dem Rathaus zur alten Festung hinauf, von dort hat man den schönsten Blick über die Bucht. Das Stadtmuseum in einer ehemaligen Seilerei erzählt die Geschichte des Hafens in zwei kleinen Räumen.</p>\n<blockquote>Port Alder belohnt langsame Besucher. Setzen Sie sich, schauen Sie den Fähren zu und lassen Sie die Stadt zu sich kommen.</blockquote>\n<p><strong>Anreise:</strong> Direkte Züge fahren alle zwei Stunden; der letzte zurück fährt kurz nach acht.</p>",
+        "es": "<p>Port Alder se asienta donde un río estrecho se encuentra con el mar, con sus casas apiladas en la ladera en azules y amarillos pálidos. Es lo bastante pequeño para cruzarlo a pie en veinte minutos y lo bastante empinado para notarlo al día siguiente.</p>\n<h2>Sábado</h2>\n<p>Llega en el tren de la mañana y deja la maleta en la estación. Baja al puerto a desayunar en uno de los cafés frente a los barcos. Toma el pequeño transbordador que cruza la desembocadura hasta el faro y vuelve por el sendero de la costa mientras baja la marea.</p>\n<p>Por la noche, la sopa de pescado de los restaurantes del puerto es el orgullo del pueblo. Cada cocinero dice tener un secreto; casi todos incluyen mucho azafrán y una tarde larga.</p>\n<h2>Domingo</h2>\n<p>El mercado cubierto abre temprano. Después, sube las escaleras detrás del ayuntamiento hasta el viejo fuerte, que tiene la mejor vista de la bahía. El museo local, en una antigua cordelería, cuenta la historia del puerto en dos salas pequeñas.</p>\n<blockquote>Port Alder recompensa al visitante sin prisa. Siéntate, mira los transbordadores y deja que el pueblo venga a ti.</blockquote>\n<p><strong>Cómo llegar:</strong> hay trenes directos cada dos horas; el último de vuelta sale poco después de las ocho.</p>"
+      }
+    },
+    {
+      "id": 20, "daysAgo": 0, "hour": 8, "counter": 412, "categories": [1], "authors": [1],
+      "images": ["phone-battery"], "tags": ["explainer", "repair"],
+      "titles": {
+        "en": "Why your phone slows down after two years — and what actually helps",
+        "de": "Warum Ihr Telefon nach zwei Jahren langsamer wird — und was wirklich hilft",
+        "es": "Por qué tu teléfono se vuelve lento a los dos años y qué ayuda de verdad"
+      },
+      "descriptions": {
+        "en": "Batteries age, storage fills up and apps grow. Three causes, and the fixes that are worth your time.",
+        "de": "Akkus altern, der Speicher füllt sich, Apps wachsen. Drei Ursachen und die Abhilfen, die sich lohnen.",
+        "es": "Las baterías envejecen, el almacenamiento se llena y las aplicaciones crecen. Tres causas y los arreglos que valen la pena."
+      },
+      "bodies": {
+        "en": "<p>Almost every phone feels slower after a couple of years. It is rarely one thing, and it is rarely the conspiracy people suspect. Three ordinary causes account for most of it.</p>\n<h2>1. The battery is tired</h2>\n<p>A lithium-ion battery loses capacity with every charge cycle. When an aged battery cannot deliver a sudden burst of power, the phone lowers its speed to avoid shutting down. A replacement battery often brings back most of the lost speed, for a fraction of the price of a new phone.</p>\n<h2>2. The storage is nearly full</h2>\n<p>Flash storage slows down when it has little free space left to work with. Keep at least a tenth of it free. Old videos and the downloads folder are the usual culprits.</p>\n<h2>3. The apps have grown</h2>\n<p>Apps get bigger with every update, while the phone stays the same. Remove the ones you no longer open, and check which ones run in the background.</p>\n<blockquote>A new battery and some free space fix more slow phones than a new phone does.</blockquote>\n<p>If all three are in order and the phone is still slow, a full backup and a factory reset is the last step before shopping.</p>",
+        "de": "<p>Fast jedes Telefon fühlt sich nach ein paar Jahren langsamer an. Selten liegt es an einer einzigen Sache, und selten an der Verschwörung, die viele vermuten. Drei gewöhnliche Ursachen erklären das meiste.</p>\n<h2>1. Der Akku ist müde</h2>\n<p>Ein Lithium-Ionen-Akku verliert mit jedem Ladezyklus an Kapazität. Kann ein gealterter Akku einen plötzlichen Leistungsbedarf nicht mehr decken, drosselt das Telefon sein Tempo, um nicht abzuschalten. Ein neuer Akku bringt oft den Großteil der Geschwindigkeit zurück, zu einem Bruchteil des Preises eines neuen Geräts.</p>\n<h2>2. Der Speicher ist fast voll</h2>\n<p>Flash-Speicher wird langsamer, wenn ihm kaum freier Platz zum Arbeiten bleibt. Lassen Sie mindestens ein Zehntel frei. Alte Videos und der Download-Ordner sind die üblichen Verdächtigen.</p>\n<h2>3. Die Apps sind gewachsen</h2>\n<p>Apps werden mit jedem Update größer, das Telefon bleibt gleich. Entfernen Sie die, die Sie nicht mehr öffnen, und prüfen Sie, welche im Hintergrund laufen.</p>\n<blockquote>Ein neuer Akku und etwas freier Speicher retten mehr langsame Telefone als ein neues Telefon.</blockquote>\n<p>Ist alles in Ordnung und das Telefon trotzdem langsam, sind eine vollständige Sicherung und ein Zurücksetzen der letzte Schritt vor dem Einkauf.</p>",
+        "es": "<p>Casi todos los teléfonos parecen más lentos al cabo de un par de años. Pocas veces es una sola cosa, y pocas veces es la conspiración que se sospecha. Tres causas corrientes explican casi todo.</p>\n<h2>1. La batería está cansada</h2>\n<p>Una batería de iones de litio pierde capacidad con cada ciclo de carga. Cuando una batería envejecida no puede dar un pico repentino de energía, el teléfono reduce su velocidad para no apagarse. Una batería nueva suele devolver casi toda la velocidad perdida, por una fracción del precio de un teléfono nuevo.</p>\n<h2>2. El almacenamiento está casi lleno</h2>\n<p>La memoria flash se ralentiza cuando le queda poco espacio libre para trabajar. Deja libre al menos una décima parte. Los vídeos antiguos y la carpeta de descargas son los culpables habituales.</p>\n<h2>3. Las aplicaciones han crecido</h2>\n<p>Las aplicaciones crecen con cada actualización y el teléfono sigue siendo el mismo. Elimina las que ya no abres y revisa cuáles funcionan en segundo plano.</p>\n<blockquote>Una batería nueva y algo de espacio libre arreglan más teléfonos lentos que un teléfono nuevo.</blockquote>\n<p>Si todo está en orden y el teléfono sigue lento, una copia de seguridad completa y un restablecimiento de fábrica son el último paso antes de ir de compras.</p>"
+      }
+    }
+  ],
+  "menu": {
+    "labels": { "en": "Sections", "de": "Rubriken", "es": "Secciones" },
+    "columns": 2,
+    "categories": [1, 2, 3, 4, 5, 6]
+  },
+  "social": {
+    "bios": {
+      "en": "Stories about technology, travel, food, culture and science — a pacod-cms demonstration website.",
+      "de": "Geschichten über Technik, Reisen, Essen, Kultur und Wissenschaft — eine Demonstrations-Website von pacod-cms.",
+      "es": "Historias sobre tecnología, viajes, cocina, cultura y ciencia: un sitio de demostración de pacod-cms."
+    },
+    "latestHeadings": { "en": "Just published", "de": "Neu erschienen", "es": "Recién publicado" },
+    "latestCount": 3,
+    "links": [
+      { "titles": { "en": "About this journal", "de": "Über dieses Journal", "es": "Sobre esta revista" }, "url": "/p/about" },
+      { "titles": { "en": "The latest stories", "de": "Die neuesten Geschichten", "es": "Las últimas historias" }, "url": "/latest" },
+      { "titles": { "en": "Forty-eight hours in Port Alder", "de": "Achtundvierzig Stunden in Port Alder", "es": "Cuarenta y ocho horas en Port Alder" }, "url": "/article/19" },
+      { "titles": { "en": "Technology", "de": "Technik", "es": "Tecnología" }, "url": "/list/1" },
+      { "placement": "ICON", "icon": "WEB", "titles": { "en": "Website", "de": "Website", "es": "Sitio web" }, "url": "/" }
+    ]
+  },
+  "promotions": {
+    "image": {
+      "name": "{name}: the weekend reading",
+      "key": "weekend-reading", "motif": "waves", "colours": ["#1d3557", "#457b9d", "#f1faee"],
+      "width": 300, "height": 250, "path": "/latest",
+      "alts": { "en": "The weekend reading from {name}" }
+    },
+    "rotator": {
+      "id": "journal-sections", "title": "{name}: sections", "skeleton": "sidebar", "rotationMs": 6000,
+      "slides": [
+        { "key": "travel", "motif": "peaks", "colours": ["#264653", "#2a9d8f", "#e9c46a"], "path": "/list/2",
+          "titles": { "en": "Travel" }, "alts": { "en": "Travel stories in {name}" } },
+        { "key": "food", "motif": "circles", "colours": ["#9c6644", "#ddb892", "#ede0d4"], "path": "/list/3",
+          "titles": { "en": "Food" }, "alts": { "en": "Food and recipes in {name}" } },
+        { "key": "science", "motif": "orbit", "colours": ["#03071e", "#1b263b", "#f4a261"], "path": "/list/5",
+          "titles": { "en": "Science" }, "alts": { "en": "Science explained in {name}" } }
+      ]
+    }
+  }
+}

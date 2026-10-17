@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  The organisations the signed-in person may see (org.read there; every one for a platform admin),
+  and creating one. Whether creating is offered -- and why not -- is PortalOrganisations.allowance():
+  the policy, the person's limit, a missing provisioner. The create action checks it again.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{portal.orgs.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('organisations')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{portal.orgs.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{portal.orgs.col.name}">Organisation</th>
+                            <th class="shrink" th:text="#{portal.orgs.col.websites}">Websites</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="o : ${organisations}" th:data-href="${studioRoot} + '/mgmt/organisations/' + ${o.id}">
+                            <td class="title-cell">
+                                <a th:href="${studioRoot} + '/mgmt/organisations/' + ${o.id}" th:text="${o.name}">Acme</a>
+                                <span class="cell-sub" th:text="${o.id}">org_…</span>
+                            </td>
+                            <td class="muted" th:text="${o.websites}">2</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${organisations.isEmpty()}">
+                    <svg class="i"><use href="#i-building"></use></svg>
+                    <span th:text="#{portal.orgs.empty}">You belong to no organisation yet.</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{portal.orgs.new.heading}">New organisation</span></h2>
+                <div class="card-body" th:unless="${allowance.allowed()}">
+                    <p class="muted" style="margin:0" th:text="${mgmtText.msg(allowance.refusal(), allowance.args())}">Only platform admins can create organisations.</p>
+                </div>
+                <form method="post" th:if="${allowance.allowed()}" th:action="${studioRoot} + '/mgmt/organisations'">
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="org-name" th:text="#{portal.orgs.new.name}">Name</label>
+                            <input type="text" id="org-name" name="name" required maxlength="100" autocomplete="organization">
+                            <span class="hint" th:text="#{portal.orgs.new.hint}">You become its admin. Websites are created inside it.</span>
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{portal.orgs.new.submit}">Create the organisation</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

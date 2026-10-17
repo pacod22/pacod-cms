@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  A chrome-free rendering of one article: GET /article-print/{id}. No navigation, no sidebar,
+  no share buttons -- it exists to be read or printed on its own, and it is what the studio's PDF
+  export renders (Gotenberg's Chromium, with the X-Pacod-Print header: PrintFilter), where only
+  this website's own origin is reachable: the web fonts below never load there.
+
+  It gets site.css's type and tokens but NOT fragments/head, on purpose: that fragment
+  carries the theme snippet, and this page must come out light whatever the reader's stored
+  preference is, because it is what gets printed.
+*/-->
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="${article.title}"></title>
+    <meta http-equiv="expires" content="2592000"/>
+    <meta http-equiv="cache-control" content="max-age=2592000"/>
+    <meta name="author" th:if="${site != null}" th:content="${site.name(lang)}"/>
+    <meta name="description" th:content="${article.description}"/>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta http-equiv="CONTENT-LANGUAGE" th:content="${site != null ? site.ogLocale(lang) : lang}"/>
+
+    <link rel="icon" type="image/svg+xml" th:href="${site?.favicon() ?: '/site-assets/favicon.svg'}"
+          href="/site-assets/favicon.svg"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"/>
+    <link rel="stylesheet" href="/site-assets/site.css"/>
+    <!--/* The website's theme, as on every page: its colours and fonts reach its PDFs too. */-->
+    <link rel="stylesheet" th:if="${theme != null and theme.present}" th:href="${theme.href()}"/>
+</head>
+
+<body>
+<div class="shell page-narrow">
+
+    <h1 class="article-title measure-full" id="article-title" th:utext="${article.title}"></h1>
+
+    <div class="byline" th:if="${article.showArticleInfo()}">
+        <div class="byline__who">
+            <span class="byline__name" id="authors" th:text="${article.authorsAsText}"></span>
+            <span class="byline__meta">
+                <span th:text="#{article.date} + ' '">Date: </span>
+                <span th:text="${article.dateAsText}"></span>
+                <span aria-hidden="true">·</span>
+                <span th:text="#{article.issue} + ' '">Issue: </span>
+                <span th:text="${article.issue}"></span>
+            </span>
+        </div>
+    </div>
+
+    <!--/* One image, not the strip fragments/article-view.html renders. This page is deliberately
+           bare -- it loads no site.js, so nothing ever adds .is-carousel -- and .gallery without
+           that class is a scroll container with a visible scrollbar and images beyond the edge
+           that a printed page has no way to reach. A plain .figure__frame has neither, and needs
+           no CSS of its own: the video branch below is built exactly the same way.
+
+           visibleImages()[0], so it is the same image as ArticleModel.getImage() puts on the share
+           card -- an image the studio has hidden is not the cover here either. Bound once with
+           th:with rather than called three times; visibleImages() re-filters hiddenImageIds on
+           every call. The th:with is on a th:block and not on the figure itself: th:if has the
+           higher precedence of the two and would evaluate against an undefined `images`. */-->
+    <!--/* #strings.isEmpty rather than a null test, for the reason fragments/article-view.html
+           spells out: the studio posts "" for an absent video. */-->
+    <th:block th:with="images=${article.visibleImages()}">
+        <figure class="figure" th:if="${!#strings.isEmpty(article.embedded) or !images.isEmpty()}">
+            <div class="figure__frame" th:if="${!#strings.isEmpty(article.embedded)}">
+                <div class="video-container" th:utext="${article.embedded}"></div>
+            </div>
+            <div class="figure__frame" th:if="${#strings.isEmpty(article.embedded) and !images.isEmpty()}">
+                <img th:src="'/assets/img/articles/' + ${images[0].filename}" th:alt="${images[0].altFor(lang)}"/>
+            </div>
+        </figure>
+    </th:block>
+
+    <div class="article-body measure-full" id="text" th:utext="${article.text}"></div>
+</div>
+
+</body>
+</html>

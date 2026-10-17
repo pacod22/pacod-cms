@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  One job (MgmtJobController): where it stands, its log, and what may still be done to it. While
+  it runs mgmt.js polls …/status and appends to the log; "Refresh" is the same without scripting.
+  The log is a <pre> filled with textContent, never markup: it holds what the job wrote.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{jobs.job.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('jobs')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{jobs.job.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <a class="btn btn-ghost" th:href="@{/mgmt/jobs}">
+                    <svg class="i"><use href="#i-arrow-up"></use></svg> <span th:text="#{jobs.job.back}">All jobs</span>
+                </a>
+            </div>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-play"></use></svg> <span th:text="${mgmtText.label(job.type)}">PDFs of articles</span></h2>
+                <div class="card-body">
+                    <div class="grid-2">
+                        <div class="field">
+                            <label th:text="#{jobs.col.status}">Status</label>
+                            <div>
+                                <span class="badge" id="job-badge" th:classappend="${job.status.badgeClass}"
+                                      th:text="${mgmtText.label(job.status)}">queued</span>
+                                <span class="help" th:if="${job.cancelRequested and !job.status.terminal}"
+                                      th:text="#{jobs.job.cancel.pending}">Asked to stop.</span>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label th:text="#{jobs.col.progress}">Progress</label>
+                            <div class="muted" th:text="${job.total > 0} ? #{jobs.progress(${job.done}, ${job.total})} : '—'">—</div>
+                        </div>
+                        <div class="field">
+                            <label th:text="#{jobs.job.params}">Parameters</label>
+                            <div class="muted"
+                                 th:text="${job.params.isEmpty()} ? '—' : ${#strings.listJoin(job.params.values(), ' · ')}">12</div>
+                        </div>
+                        <div class="field">
+                            <label th:text="#{jobs.col.by}">By</label>
+                            <div class="muted" th:text="${job.queuedBy}">someone</div>
+                        </div>
+                        <div class="field">
+                            <label th:text="#{jobs.job.startedFinished}">Started / finished</label>
+                            <div class="muted"
+                                 th:text="(${job.startedOn != null} ? ${#temporals.format(job.startedOn.atZone(zone), 'dd.MM.yyyy HH:mm:ss')} : '—')
+                                        + ' – '
+                                        + (${job.finishedOn != null} ? ${#temporals.format(job.finishedOn.atZone(zone), 'HH:mm:ss')} : '—')">—</div>
+                        </div>
+                        <div class="field" th:if="${job.attempt > 1}">
+                            <label th:text="#{jobs.job.attempt}">Attempt</label>
+                            <div class="muted" th:text="${job.attempt}">2</div>
+                        </div>
+                        <div class="field" th:if="${job.costMicros > 0}">
+                            <label th:text="#{jobs.job.cost}">Cost of AI calls</label>
+                            <div class="muted" th:text="'$' + ${#numbers.formatDecimal(job.costMicros / 1000000.0, 1, 4)}">$0.0012</div>
+                        </div>
+                    </div>
+                    <div class="field" th:if="${job.error != null}">
+                        <label th:text="#{jobs.job.error}">What went wrong</label>
+                        <div class="field-error" th:text="${job.error}">…</div>
+                    </div>
+                </div>
+                <div class="card-foot" th:if="${!job.status.terminal and can != null and can.site('content.write')}">
+                    <form method="post" class="inline-form" th:if="${job.status.name() == 'QUEUED' and job.priority < 10}"
+                          th:action="@{/mgmt/jobs/{id}/promote(id=${job.id})}">
+                        <button class="btn" type="submit">
+                            <svg class="i"><use href="#i-arrow-up"></use></svg> <span th:text="#{jobs.job.promote}">Run it next</span>
+                        </button>
+                    </form>
+                    <form method="post" class="inline-form" th:if="${!job.cancelRequested}"
+                          th:action="@{/mgmt/jobs/{id}/cancel(id=${job.id})}" th:data-confirm="#{jobs.job.cancel.confirm}">
+                        <button class="btn btn-danger" type="submit">
+                            <svg class="i"><use href="#i-alert"></use></svg> <span th:text="#{jobs.job.cancel}">Cancel</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-code"></use></svg> <span th:text="#{jobs.job.log}">Log</span></h2>
+                <div class="card-body">
+                    <div class="log-head">
+                        <span class="library-note" id="job-note"></span>
+                        <a class="btn btn-sm btn-ghost" th:href="@{/mgmt/jobs/{id}(id=${job.id})}" th:unless="${job.status.terminal}">
+                            <svg class="i"><use href="#i-undo"></use></svg> <span th:text="#{jobs.job.refresh}">Refresh</span>
+                        </a>
+                    </div>
+                    <pre id="job-log" th:data-job="${job.id}" th:data-since="${job.logChars}"
+                         th:data-terminal="${job.status.terminal}" th:text="${job.log}">…</pre>
+                    <span class="help" th:if="${job.log == null or job.log.isEmpty()}" th:text="#{jobs.job.log.empty}">Nothing yet.</span>
+                    <span class="help" th:if="${job.log != null and job.logChars > job.log.length()}"
+                          th:text="#{jobs.job.log.truncated(${job.logChars})}">The log is long.</span>
+                </div>
+            </div>
+
+            <div class="card danger" th:if="${job.status.terminal and can != null and can.site('content.write')}">
+                <div class="card-body">
+                    <form method="post" th:action="@{/mgmt/jobs/{id}/delete(id=${job.id})}" th:data-confirm="#{jobs.job.delete.confirm}">
+                        <button class="btn btn-danger" type="submit">
+                            <svg class="i"><use href="#i-trash"></use></svg> <span th:text="#{jobs.job.delete}">Delete the record</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

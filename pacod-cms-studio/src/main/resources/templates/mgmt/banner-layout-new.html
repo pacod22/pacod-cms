@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<!--/*
+  Creating a layout: pick a look, name the folder, and the console writes it.
+
+  No th:object here, the shape page-new.html uses: these three values are not fields of the layout
+  being edited, they are the decision of which layout to start. Everything else is edited on the
+  builder, which this redirects to.
+*/-->
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+
+<head th:replace="~{mgmt/fragments :: head(#{banners.layoutNew.title})}"></head>
+
+<body>
+
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('layouts')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{banners.layoutNew.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <form class="form-page" method="post" th:action="@{/mgmt/banners/layouts}">
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-layout"></use></svg> <span th:text="#{banners.layoutNew.title}">New layout</span></h2>
+                    <div class="card-body">
+
+                        <div class="field">
+                            <label for="skeleton" th:text="#{banners.layoutNew.skeleton}">Template</label>
+                            <select id="skeleton" name="skeleton" required>
+                                <option value="" disabled th:selected="${skeleton == null}"
+                                        th:text="#{banners.layoutNew.skeleton.choose}">— choose —</option>
+                                <option th:each="s : ${skeletons}"
+                                        th:value="${s.id}"
+                                        th:selected="${s.id == skeleton}"
+                                        th:text="${s.title} + (${s.width != null and s.height != null}
+                                                ? ' · ' + ${s.width} + '×' + ${s.height} : ' · ' + #{banners.layoutNew.byFrame})">
+                                    Sidebar 300x250
+                                </option>
+                            </select>
+                            <span class="hint" th:text="#{banners.layoutNew.skeleton.hint}">
+                                The template gives the look and the frame.
+                            </span>
+                            <span class="hint" th:if="${skeletons.isEmpty()}" th:utext="#{banners.layoutNew.skeleton.none}">
+                                There are no templates.
+                            </span>
+                        </div>
+
+                        <div class="field">
+                            <label for="id" th:text="#{banners.layoutNew.id}">Folder name</label>
+                            <input type="text" id="id" name="id" required maxlength="64"
+                                   th:value="${id}" placeholder="acme-2026">
+                            <span class="hint" th:utext="#{banners.layoutNew.id.hint}">
+                                Lowercase Latin letters, digits and hyphens.
+                            </span>
+                        </div>
+
+                        <div class="field">
+                            <label for="title" th:text="#{banners.layoutNew.titleField}">Title</label>
+                            <input type="text" id="title" name="title" maxlength="128"
+                                   th:value="${title}" th:placeholder="#{banners.layoutNew.titleField.placeholder}">
+                            <span class="hint" th:text="#{banners.layoutNew.titleField.hint}">For the console only. Not shown on the site.</span>
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-plus"></use></svg> <th:block th:text="#{banners.layoutNew.create}">Create</th:block>
+                        </button>
+                        <a class="btn btn-ghost" th:href="@{/mgmt/banners/layouts}" th:text="#{banners.layoutNew.cancel}">Cancel</a>
+                    </div>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

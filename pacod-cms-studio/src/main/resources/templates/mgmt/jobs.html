@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  The website's background jobs (MgmtJobController): newest first, filtered by status, and the
+  form that queues PDFs of articles. Everything is a link or a form POST; nothing needs scripting.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{jobs.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('jobs')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{jobs.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <p class="muted" th:text="#{jobs.intro}">Work the studio does in the background.</p>
+
+            <div class="card">
+                <div class="card-body">
+                    <nav class="chips" th:aria-label="#{jobs.filter.label}">
+                        <a class="chip" th:classappend="${statusFilter == null} ? 'active'" th:href="@{/mgmt/jobs}"
+                           th:text="#{jobs.filter.all}">All</a>
+                        <a class="chip" th:each="s : ${statuses}" th:classappend="${s == statusFilter} ? 'active'"
+                           th:href="@{/mgmt/jobs(status=${#strings.toLowerCase(s.name())})}"
+                           th:text="${mgmtText.label(s)}">queued</a>
+                    </nav>
+                </div>
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th th:text="#{jobs.col.job}">Job</th>
+                            <th class="shrink" th:text="#{jobs.col.status}">Status</th>
+                            <th class="shrink" th:text="#{jobs.col.progress}">Progress</th>
+                            <th class="shrink" th:text="#{jobs.col.queuedOn}">Queued</th>
+                            <th class="shrink" th:text="#{jobs.col.by}">By</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="j : ${jobs.content}">
+                            <td>
+                                <a th:href="@{/mgmt/jobs/{id}(id=${j.id})}" th:text="${mgmtText.label(j.type)}">PDFs of articles</a>
+                                <div class="cell-sub muted"
+                                     th:text="${j.params.isEmpty()} ? '' : ${#strings.listJoin(j.params.values(), ' · ')}">12, 14</div>
+                            </td>
+                            <td class="shrink"><span class="badge" th:classappend="${j.status.badgeClass}"
+                                                     th:text="${mgmtText.label(j.status)}">queued</span></td>
+                            <td class="shrink muted" th:text="${j.total > 0} ? #{jobs.progress(${j.done}, ${j.total})} : '—'">—</td>
+                            <td class="shrink muted"
+                                th:text="${#temporals.format(j.queuedOn.atZone(zone), 'dd.MM.yyyy HH:mm')}">—</td>
+                            <td class="shrink muted" th:text="${j.queuedBy}">someone</td>
+                        </tr>
+                        <tr th:if="${jobs.content.isEmpty()}">
+                            <td colspan="5" class="muted" th:text="#{jobs.empty}">No jobs yet.</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pager" th:if="${jobs.totalPages > 1}">
+                    <a th:if="${!jobs.first}" th:href="@{/mgmt/jobs(status=${statusFilter == null ? null : #strings.toLowerCase(statusFilter.name())},page=${jobs.number - 1})}">&larr;</a>
+                    <span class="page current" th:text="${jobs.number + 1}">1</span>
+                    <a th:if="${!jobs.last}" th:href="@{/mgmt/jobs(status=${statusFilter == null ? null : #strings.toLowerCase(statusFilter.name())},page=${jobs.number + 1})}">&rarr;</a>
+                </div>
+            </div>
+
+            <div class="card" th:if="${can != null and can.site('content.write')}">
+                <h2><svg class="i"><use href="#i-globe"></use></svg> <span th:text="#{jobs.translate.title}">Translate articles</span></h2>
+                <p class="card-body muted" th:if="${aiRefusal != null}" th:text="${mgmtText.label(aiRefusal)}">AI is off.</p>
+                <form method="post" th:if="${aiRefusal == null}" th:action="@{/mgmt/jobs/translate}">
+                    <div class="card-body">
+                        <span class="hint" th:text="#{jobs.translate.intro}">Title, summary and body, in the background.</span>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="tr-ids" th:text="#{jobs.pdf.ids}">Article numbers</label>
+                                <input type="text" id="tr-ids" name="ids" inputmode="numeric" autocomplete="off">
+                                <span class="hint" th:text="#{jobs.pdf.ids.hint}">Numbers separated by commas.</span>
+                            </div>
+                            <div class="field">
+                                <label th:text="#{jobs.translate.languages}">Into</label>
+                                <p class="muted" th:if="${translateLanguages.isEmpty()}" th:text="#{jobs.translate.none}">No other language.</p>
+                                <div class="checkline" th:each="l : ${translateLanguages}">
+                                    <input type="checkbox" name="languages" th:id="'trl-' + ${l.code}" th:value="${l.code}">
+                                    <label th:for="'trl-' + ${l.code}" th:text="${l.adminName ?: l.code}">Deutsch</label>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label for="tr-from" th:text="#{jobs.pdf.from}">From number</label>
+                                <input type="number" id="tr-from" name="from" min="1">
+                            </div>
+                            <div class="field">
+                                <label for="tr-to" th:text="#{jobs.pdf.to}">To number</label>
+                                <input type="number" id="tr-to" name="to" min="1">
+                            </div>
+                        </div>
+                        <div class="checkline">
+                            <input type="checkbox" id="tr-mode" name="mode" value="all">
+                            <label for="tr-mode" th:text="#{jobs.translate.mode.all}">Translate again where a translation exists</label>
+                        </div>
+                        <div class="checkline">
+                            <input type="checkbox" id="tr-next" name="next" value="true">
+                            <label for="tr-next" th:text="#{jobs.pdf.next}">Run it next</label>
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-play"></use></svg> <span th:text="#{jobs.pdf.submit}">Queue</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card" th:if="${can != null and can.site('content.write')}">
+                <h2><svg class="i"><use href="#i-globe"></use></svg> <span th:text="#{jobs.site.title}">Translate the rest of the website</span></h2>
+                <p class="card-body muted" th:if="${aiRefusal != null}" th:text="${mgmtText.label(aiRefusal)}">AI is off.</p>
+                <form method="post" th:if="${aiRefusal == null}" th:action="@{/mgmt/jobs/translate-site}">
+                    <div class="card-body">
+                        <span class="hint" th:text="#{jobs.site.intro}">Pages, section names, tags, menus, social page.</span>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label th:text="#{jobs.site.parts}">What</label>
+                                <div class="checkline">
+                                    <input type="checkbox" name="parts" id="ts-pages" value="pages" checked>
+                                    <label for="ts-pages" th:text="#{jobs.site.part.pages}">Standing pages</label>
+                                </div>
+                                <div class="checkline">
+                                    <input type="checkbox" name="parts" id="ts-categories" value="categories" checked>
+                                    <label for="ts-categories" th:text="#{jobs.site.part.categories}">Section names</label>
+                                </div>
+                                <div class="checkline">
+                                    <input type="checkbox" name="parts" id="ts-tags" value="tags">
+                                    <label for="ts-tags" th:text="#{jobs.site.part.tags}">Tags</label>
+                                </div>
+                                <div class="checkline">
+                                    <input type="checkbox" name="parts" id="ts-menus" value="menus" checked>
+                                    <label for="ts-menus" th:text="#{jobs.site.part.menus}">Menus</label>
+                                </div>
+                                <div class="checkline">
+                                    <input type="checkbox" name="parts" id="ts-social" value="social" checked>
+                                    <label for="ts-social" th:text="#{jobs.site.part.social}">Social page</label>
+                                </div>
+                                <span class="hint" th:text="#{jobs.site.limit(${maxSiteCalls})}">At most 2000 translations a run.</span>
+                            </div>
+                            <div class="field">
+                                <label th:text="#{jobs.translate.languages}">Into</label>
+                                <p class="muted" th:if="${translateLanguages.isEmpty()}" th:text="#{jobs.translate.none}">No other language.</p>
+                                <div class="checkline" th:each="l : ${translateLanguages}">
+                                    <input type="checkbox" name="languages" th:id="'tsl-' + ${l.code}" th:value="${l.code}">
+                                    <label th:for="'tsl-' + ${l.code}" th:text="${l.adminName ?: l.code}">Deutsch</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="checkline">
+                            <input type="checkbox" id="ts-mode" name="mode" value="all">
+                            <label for="ts-mode" th:text="#{jobs.translate.mode.all}">Translate again where a translation exists</label>
+                        </div>
+                        <div class="checkline">
+                            <input type="checkbox" id="ts-next" name="next" value="true">
+                            <label for="ts-next" th:text="#{jobs.pdf.next}">Run it next</label>
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-play"></use></svg> <span th:text="#{jobs.pdf.submit}">Queue</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card" th:if="${can != null and can.site('content.write')}">
+                <h2><svg class="i"><use href="#i-file-text"></use></svg> <span th:text="#{jobs.pdf.title}">PDFs of articles</span></h2>
+                <p class="card-body muted" th:unless="${pdfEnabled}" th:text="#{jobs.pdf.off}">PDF export is off.</p>
+                <form method="post" th:if="${pdfEnabled}" th:action="@{/mgmt/jobs/pdf}">
+                    <div class="card-body">
+                        <span class="hint" th:text="#{jobs.pdf.intro}">One PDF per language.</span>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="pdf-ids" th:text="#{jobs.pdf.ids}">Article numbers</label>
+                                <input type="text" id="pdf-ids" name="ids" inputmode="numeric" autocomplete="off">
+                                <span class="hint" th:text="#{jobs.pdf.ids.hint}">Numbers separated by commas.</span>
+                            </div>
+                            <div class="field">
+                                <label for="pdf-languages" th:text="#{jobs.pdf.languages}">Only these languages</label>
+                                <input type="text" id="pdf-languages" name="languages" autocomplete="off">
+                                <span class="hint" th:text="#{jobs.pdf.languages.hint}">Blank for every language.</span>
+                            </div>
+                            <div class="field">
+                                <label for="pdf-from" th:text="#{jobs.pdf.from}">From number</label>
+                                <input type="number" id="pdf-from" name="from" min="1">
+                            </div>
+                            <div class="field">
+                                <label for="pdf-to" th:text="#{jobs.pdf.to}">To number</label>
+                                <input type="number" id="pdf-to" name="to" min="1">
+                            </div>
+                        </div>
+                        <div class="checkline">
+                            <input type="checkbox" id="pdf-next" name="next" value="true">
+                            <label for="pdf-next" th:text="#{jobs.pdf.next}">Run it next</label>
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-play"></use></svg> <span th:text="#{jobs.pdf.submit}">Queue</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>
