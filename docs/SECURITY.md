@@ -66,7 +66,8 @@ navigate the studio's page.
   nothing, loads no third-party script, and is `noindex`, `no-store` and `no-referrer`.
 - **The PDF renderer** proves itself with a five-minute token of its own purpose, sent only to the
   site's internal address. The front door (Caddy) removes that header from every incoming
-  request.
+  request. A journal issue's print front page shows drafts and answers that token alone; to
+  anyone else it is a 404.
 - **Gotenberg is locked down**: its Chromium may reach the site's internal address and nothing else,
   runs no JavaScript, and publishes no port. An article body that frames an internal service
   renders a blocked frame.
@@ -90,7 +91,11 @@ Every answer from the gateway is treated as hostile input:
 
 ## Public pages
 
-- **Only published articles reach a reader**, on every route, list, feed, sitemap and PDF.
+- **Only published articles reach a reader**, on every route, list, feed, sitemap and PDF; only
+  published journal issues are listed, and a draft issue's PDF is kept outside every public folder
+  and downloaded only through the studio, as an attachment.
+- **What an AI gateway writes for a PDF is text**, checked as if typed: an abstract, keywords and a
+  running title, stripped of markup. The article's body is never sent back to the site changed.
 - **No third-party script runs unless the website configured it**, and every third-party id is
   checked against its vendor's shape before it is rendered.
 - **The site never sends `X-Frame-Options: DENY`** (it would blank the website's own banners), but

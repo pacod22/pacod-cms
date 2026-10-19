@@ -9,10 +9,10 @@ its own — people sign in through **pacod-id**, and what they may do at each we
 feed, decided by a Java port of its rules engine. The studio's portal creates organisations and
 websites and manages who works on them. Each website renders with a template set, its pages composed
 from layouts of sections and styled by a theme, all edited as drafts in the studio and previewed
-before they are published. Long work runs as jobs in the studio, and AI features go through
-**pacod-gw**. Most of this file records a lesson some code
-already paid for — a setting that looks redundant, an order that looks arbitrary — so read the
-relevant section before tidying anything it describes. The overviews for people are
+before they are published. Long work runs as jobs in the studio -- PDFs of articles, standard or a
+two-column scientific paper, and whole journal issues -- and AI features go through **pacod-gw**.
+Most of this file records a lesson some code already paid for — a setting that looks redundant, an
+order that looks arbitrary — so read the relevant section before tidying anything it describes. The overviews for people are
 `docs/ARCHITECTURE.md`, `docs/TEMPLATES.md` (writing a template set) and `docs/SECURITY.md`; keep
 them true when the code they describe changes.
 
@@ -258,7 +258,9 @@ its id.
   database to empty settings and no menus. **`SiteChromeAdvice`** puts `${site}`, a
   **`SiteChrome`**, into every template controller's model *and* `BasicErrorController`'s — scoped
   by `assignableTypes`, not package, because the error controller is outside the application's
-  packages and the `/web/v1` JSON controllers need no chrome. It never throws: a failure inside an
+  packages and the `/web/v1` JSON controllers need no chrome. **A new template controller goes
+  into that list** (`IssueController` and `IssuePrintController` did), or its pages render without
+  `${site}` and `${theme}`. It never throws: a failure inside an
   error dispatch re-enters the error dispatch, so it falls back to `SiteChrome.empty(origin)`.
 - **`SiteChrome` validates every third-party id against its vendor's shape** and returns null
   otherwise; GTM (script and `noscript`), the Facebook SDK and `fb:app_id`, the verification metas
@@ -1524,7 +1526,8 @@ anything outside, no embed of any third party, nothing near the old subject.
 ### Jobs
 
 `/mgmt/jobs` (`MgmtJobController`, `content.read`/`content.write`) is the website's background
-work, run by the studio itself: PDFs of articles now, AI translations next. It replaced an external
+work, run by the studio itself: PDFs of articles (*PDF export*) and of journal issues (*Journal
+issues*), and AI translations. It replaced an external
 Python runner and its `/mgmt/tools` queue.
 
 - **A `Job` lives in the control plane** (`core.control.data`, collection `job`), not the website's
@@ -1563,7 +1566,35 @@ Python runner and its `/mgmt/tools` queue.
 `PDF_ARTICLES` (`PdfArticlesHandler`) renders each article's print view through **Gotenberg**,
 once per language the article is written in: `original()` and `translatedIn()`. It writes
 `resources/pdfs/articles/<lang>/article-<id>.pdf` into the website's folder
-(`SiteStorage.articlePdf`), whole: a temporary file, then an atomic move.
+(`SiteStorage.articlePdf`), whole: a temporary file, then an atomic move (`PdfRenderer.write`).
+
+- **Two formats, two modes, and the defaults are data.** `PdfFormat` (`STANDARD`, the print view
+  as it was; `SCIENTIFIC`, a full-width head with abstract and keywords over the body in two
+  columns) and `PdfMode` (`CODE`; `LLM`, *AI* below). **`PdfSettings`** (`pdfSettings`, id `pdf`,
+  edited at `/mgmt/pdf`: read `content.read`, write `website.manage`) holds the defaults, the
+  paper (`PaperSize`), margins, the journal's name per language and ISSN, the running head and
+  page numbers, and what the gateway is asked for. **A job's blank format and mode are resolved
+  against the settings when it is queued** and stored in its parameters, so a queued job does what
+  its form said; paper, margins and headers are read when it runs. The cards on `/mgmt/jobs`, the
+  article editor and the issue editor share `fragments :: pdfChoices` (the default named first,
+  the AI mode `disabled` with a hint where `AiAccess.refusalHere()` refuses; the controller checks
+  again).
+- **The print view picks its template from the enum** (`?format=` → `article-print` or
+  `article-print-scientific`, anything else standard) and its abstract and keywords from
+  **`PrintExtras`**: in `CODE` the article's `descriptionIn(lang)` -- never
+  `ArticleModel.getDescription()`, which makes a line up -- and its translated tags; in `LLM` the
+  `PdfEnrichment` only while its `sourceHash` matches the current title and body, else the code
+  mode's. **One PDF per article and language whatever the format: the latest render wins.**
+- **Header and footer are Gotenberg's `header.html`/`footer.html` files** (`RenderOptions`),
+  built by `PdfHeaders` from data alone: every value escaped, an explicit `8pt` and Noto/DejaVu
+  (Chromium renders them apart from the page, at a near-zero default size, loading nothing), and
+  **no translated word** -- a PDF is in the content's language, which the studio's four bundles
+  need not cover; month names come from the JDK. `PdfRenderer.options` widens a margin that holds
+  one. `GotenbergClient.inches` writes `0.6`, never a locale's `0,6`.
+- **`print.css`** (`/site-assets/print.css`, linked by the print templates only): unconditional
+  rules, font stacks that ship in Gotenberg's image (the web fonts never load there), `.sci-body`'s
+  columns with guards for legacy inline widths and `<font>`, frames hidden (JavaScript is off),
+  the issue's cover and contents. Hyphenation follows `<html lang>`.
 
 - **Gotenberg reads the site on the compose network** (`pacod.pdf.site-url`, `http://site:8443`),
   where no host names a website.
@@ -1589,17 +1620,72 @@ once per language the article is written in: `original()` and `translatedIn()`. 
   - A body framing `http://studio:7443/…` or `http://id:8071/…` renders a blocked frame; that was
     checked on the stack. The print view's web fonts never load there.
 - **The print view is `/article-print/{id}`**, renamed from `/article-clean/{id}`. It links the
-  website's published theme.
+  website's published theme. **A token is minted for every render** (`PdfRenderer`): it lasts five
+  minutes, and an issue job renders for longer.
 - **The site links a PDF only once it exists** (`SitePdfs`, one file check per article view); it
   used to link one for every article, a 404 for each never exported.
 - `pacod.pdf.gotenberg-url` blank, or no shared key, means PDF export is off: `pdfEnabled`
   (`MgmtControllerAdvice`) hides the forms. The article editor's PDF card queues that article,
   next.
 - **Tests:**
-  - `GotenbergClientTest` runs against a local stand-in;
-  - `PdfArticlesHandlerTest` runs on a temporary folder;
+  - `GotenbergClientTest` runs against a local stand-in (paper, margins, the header and footer
+    files);
+  - `PdfArticlesHandlerTest` runs on a temporary folder (format, mode, the AI refusal, an
+    enrichment failure failing its item unrendered); `PdfHeadersTest`;
   - `PrintIT` checks a render uncounted, a reader counted, and bad tokens refused;
+  - `PrintExtrasTest`, `ArticleTemplateControllerTest.printFormatPicksTheTemplate`,
+    `PublicTemplateRenderTest.printViewsShowTheFrontMatter`/`scientificPrintView`;
   - `CrawlerTrafficFilterTest.uncountedRequestsAreSkipped`.
+
+### Journal issues
+
+A **`JournalIssue`** (`core.data`, collection `issue`; not `Issue`, which is `LayoutResolver`'s) is
+a cover, an editorial and an ordered list of articles, generated into one PDF per language and, once
+`PUBLISHED`, listed at `/issues`. Edited at `/mgmt/issues` (`MgmtIssueController`,
+`MgmtIssueService`; `content.read`/`content.write`, publishing `content.publish`, deleting
+`content.delete`).
+
+- **`articleIds` is the content.** "Fill from the month" (`fillMonth`) replaces it once with the
+  published articles dated in the issue's month (`findPublishedIdsBetween`, a closed-open range,
+  oldest first); it is then reordered and trimmed by hand, at most `MAX_ARTICLES` (100). A
+  published issue never changes because an article was redated.
+- **Two writers, two sets of fields, never a whole save**: the form `$set`s its own fields
+  (`MongoTemplate.updateFirst`), the job only `renditions.<lang>` (`recordRendition`, the code
+  checked before it becomes a field path). Ids are max-plus-one, **inserted**, so a race is a
+  duplicate key; `{volume, number}` is unique.
+- **`PDF_ISSUE` (`PdfIssueHandler`)**: the issue's published articles in its order (others logged
+  and left out), each rendered on its own with the issue's running head (`PdfHeaders.issueLine`)
+  and no footer, its pages counted with **PDFBox**; then the site's **`/issue-print/{id}/front`**
+  (cover, editorial, contents) with each article's first page in its address
+  (`?ids=…&pages=…`). The front's length depends on what it prints, so the numbers are recomputed
+  until it holds -- first guess cover + editorial + one page, at most `MAX_FRONT_RENDERS` -- and
+  **the printed numbers are the PDF's own page numbers**. `IssuePdfAssembler` merges, adds a
+  bookmark per article, titles the document and stamps the page number on every page but the
+  cover: **digits only, in the Standard 14 Helvetica** (no font file, no Cyrillic); every word is
+  laid out by Chromium, bookmarks are PDF strings.
+- **Whole or nothing per language**: pieces in a temporary folder deleted in `finally`; a failed
+  article fails its language, never a partial issue. Every PDF is written to
+  **`private/pdfs/issues/<lang>/issue-<id>.pdf`** (`SiteStorage.issueDraftPdf`), which no address
+  names (`MediaController` serves `assets/` and `resources/` only); while the issue is published,
+  also to `resources/pdfs/issues/…` (`issuePdf`), read back fresh after the render.
+- **Publishing copies, unpublishing deletes**: `publish` sets the status and copies every private
+  PDF to its public address; `unpublish` deletes the public copies; both idempotent. The studio
+  downloads the private one (`/mgmt/issues/{id}/pdf/{lang}`) as an `attachment` with `nosniff` and
+  a sandbox CSP -- never inline on the studio's origin.
+- **`/issue-print/{id}/front` answers only behind a valid print token** (`SitePrint`, else 404):
+  it reads drafts. `ids` and `pages` must be number lists of one length. The contents list
+  published articles only (`IssueReader.contents`, `findPublishedOutlineByIdIn`).
+- **The public pages** (`IssueController`): `/issues` and `/issues/{id}`, published issues only
+  (`JournalIssueRepository`'s public block), `?lang` then the cookie then `original()`, no
+  `/{lang}/` prefix, counted and advertised as `BannerPage.LIST`. A PDF is linked once its public
+  file exists (`SitePdfs.issue`). Both are in the sitemap; robots disallows `/issue-print/`. The
+  content is `fragments/issues :: list`/`:: detail`, each set's page around it.
+- **Tests:** `IssuePdfAssemblerTest` (real PDFBox documents: order, bookmarks, digits from page
+  2), `PdfIssueHandlerTest` (the front settling, draft vs published files, a failed language,
+  refusals), `MgmtScreenRenderTest.issueScreens`/`pdfSettingsScreen`, `IssueRolesTest` (an author
+  neither publishes, deletes nor changes the defaults; an editor publishes), `MgmtSecurityTest`,
+  `IssueControllerTest`, `SitePdfsIssueTest`, `PublicTemplateRenderTest.issuePages`/
+  `issuePrintFront`, and `JournalIssuesIT`.
 
 ### AI (pacod-gw)
 
@@ -1672,6 +1758,21 @@ feature's model is `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, 
     but the original). The card is its own form, outside `#article-form`, because a `name` inside
     that form would be bound by `save()`; pinned in `MgmtScreenRenderTest.editorTranslateCard`.
   - `POST /mgmt/jobs/translate` re-checks AI and keeps only languages the website offers.
+- **PDF front matter** (`PdfEnricher`, the PDF jobs' `mode=llm`; feature `pdf-enrich`, model
+  `pacod.ai.models.pdf`). The title and the body **as plain text** go alone into the user message;
+  the strict schema asks for `abstract`, `keywords` and `runningTitle` in the article's language.
+  - **The body is never sent back or changed**: the answer is front matter, laid out above the
+    author's own text.
+  - Checked as typed: `HtmlSafety.text` on every string, the abstract non-blank and bounded,
+    keywords trimmed, comma-free, deduplicated ignoring case and capped at `keywordLimit()`.
+  - **A `PdfEnrichment` row** (`pdfEnrichment`, id `<article>:<lang>`) is written whole after a
+    checkpoint, never on `Article` (serialised raw by `/web/v1`, saved whole by the editor).
+    `sourceHash` ties it to the title and body: a matching row is reused unless `refresh`, and the
+    site ignores a stale one. An article's rows go with it (`ArticleService.deleteArticle`).
+  - An article with no body in a language gets no call: a fallback body is never summarised as
+    another language's. At most `MAX_CALLS` (500) calls a run; the run then ends saying so.
+  - `JobType.usesAi(params)` is true for a PDF job in `mode=llm`; the job checks `AiAccess` at its
+    start, the forms through `refusalHere()`.
 - **Alt text** (`/mgmt/ai/alt`, `WritingAssist.alt`). The model looks at the picture itself. The
   file is read through `MgmtImageService.bytesOf`, which keeps it inside the image folder.
   - The picture is sent inline as a `data:` URL: a JPEG at most 1024 px on its longer side, drawn
@@ -1762,7 +1863,8 @@ in.
 - **The default is `pacod.studio.default-language` (default `en`), validated at startup;
   `MgmtLocaleResolver` never reads `Accept-Language`** (MockMvc's English default would decide every
   render test). The cookie is an allow-list: `fr` resolves to the default, not `Locale("fr")`.
-- **Bundles are `i18n/{common,articles,banners,pages,ops,portal}{,_bg,_de,_ru}.properties`**, English base.
+- **Bundles are `i18n/{common,articles,banners,pages,ops,portal,design,jobs,pdf}{,_bg,_de,_ru}.properties`**
+  (`MgmtText.BASENAMES`), English base.
   **A new key goes into all four.** Values go through `MessageFormat` (`alwaysUseMessageFormat`):
   an apostrophe is always `''`, ids and years are `{0,number,#}`, markup only in keys without
   arguments (`th:utext`), counts as "Label: {0}" (Russian plurals defeat `ChoiceFormat`).
@@ -2126,6 +2228,8 @@ renders `message`.
   sets, layouts and themes*); it resolves `?lang`, the cookie, then `original()`. **No template may load the old `main.min.js`**, which would refetch the widgets
   over `/web/v1` and overwrite them. `/latest` (`/index`, `/index/`, `/index.html`) renders
   `index.html`.
+- **`/issues` and `/issues/{id}`** list the published journal issues (*Journal issues*); like
+  `/search` they take no language prefix. `/issue-print/{id}/front` answers a print token only.
 - **The three reader routes answer bare and under a language prefix** — `/article/{id}`,
   `/list/{id}`, `/p/{slug}`, `/{lang}/…` — as **one mapping with two patterns**, never a second
   handler (which would silently drop `pageRendered`: the ad columns and the traffic mark).
@@ -2142,10 +2246,11 @@ renders `message`.
     prefix (`/{lang}` alone would swallow every single-segment path).
 - **`/robots.txt` and `/sitemap.xml` are answered per website** (`SitemapController`), from its own
   database — no file in any folder, so no website's list names another's.
-  - robots disallows `/article-print/`, `/b/`, `/social/go/`, `/social/read/`, `/search` (and so
-    `/search-google`) and `/web/v1/`, and names the sitemap absolutely.
+  - robots disallows `/article-print/`, `/issue-print/`, `/b/`, `/social/go/`, `/social/read/`,
+    `/search` (and so `/search-google`) and `/web/v1/`, and names the sitemap absolutely.
   - The sitemap lists `/`, `/latest`, every published standing page, every category with a
-    published article (`existsByCategoriesAndStatus`) and the newest 45,000 published articles,
+    published article (`existsByCategoriesAndStatus`), `/issues` and every published journal issue
+    while there is one, and the newest 45,000 published articles,
     through a projection (`findPublishedForSitemap`: no row resolves its `@DBRef`s). Bare
     addresses, `lastmod` a date alone.
   - Absolute addresses come from `baseUrl`, else the request's origin, like `og:url`. A database

@@ -68,8 +68,10 @@ website's data into another's.
   and banner layouts, menus, settings, layouts, the theme, the social page, the traffic and crawler
   buckets. Ids are per website; two websites can both have article 1.
 - **Files**, under the storage root: `sites/<id>/assets/…` (article images) and
-  `sites/<id>/resources/…` (banner creatives and HTML5 folders, PDFs), served by the site at the
-  same paths, each website's out of its own folder. The studio is the only writer.
+  `sites/<id>/resources/…` (banner creatives and HTML5 folders, PDFs of articles and published
+  journal issues), served by the site at the same paths, each website's out of its own folder;
+  `sites/<id>/private/…` (every generated issue PDF, drafts included) is served by nothing but the
+  studio's download. The studio is the only writer.
 - **People** live in pacod-id. The CMS stores no accounts; what someone may do comes from pacod-id's
   feed of role bindings, evaluated by the rules engine against `authz/cms.yaml`.
 
@@ -101,7 +103,10 @@ preview is counted or tracked, and drafts are read past every cache.
 
 - **Jobs** (`/mgmt/jobs`) run in the studio: a queue in the control plane, claimed with a lease and
   fenced writes, one organisation's jobs at a time. PDF export renders the site's print view through
-  Gotenberg; translation jobs call pacod-gw.
+  Gotenberg, in a website's chosen format (standard, or a two-column scientific paper) and mode
+  (code, or an abstract and keywords written by pacod-gw); a journal issue renders each article,
+  has the site lay out its cover and contents with the page numbers the studio computed, and is
+  merged and numbered with PDFBox. Translation jobs call pacod-gw.
 - **Counters** (page views, readers, banner impressions, crawler visits) are buffered in the site per
   website and flushed into that website's database; the studio reads them for its dashboard,
   monitoring and crawler screens.

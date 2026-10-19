@@ -55,7 +55,8 @@ themes:
 Each set gets its own template engine, whose resolvers look in the set, then each parent in turn,
 then the shared `_base`. A set therefore overrides only what it changes: `minimal` provides its
 page templates, `sections.html` and `fragments/stylesheets.html`, and takes the article view, the
-navbar, the footer, the social page, the print view and the error page from `editorial`.
+navbar, the footer, the social page, the print views, the issue pages' content and the error page
+from `editorial`.
 
 The page templates, by view name:
 
@@ -68,8 +69,18 @@ The page templates, by view name:
 | `page` | `/p/{slug}`, a standing page (`PAGE`) | `page`, `languages`, `regions` |
 | `search`, `search-google` | `/search`, `/search-google` (`SEARCH`) | `q`, `results`, `searched`, `regions` |
 | `social` | `/social`, the link page | its own head; no regions |
-| `article-print` | `/article-print/{id}`, what PDFs are made of | the article; always light |
+| `article-print` | `/article-print/{id}`, what PDFs are made of | the article, `printMeta` (abstract, keywords); always light |
+| `article-print-scientific` | `/article-print/{id}?format=scientific`: a full-width head, the body in two columns | as `article-print` |
+| `issue-print-front` | `/issue-print/{id}/front`, a journal issue's cover, editorial and contents; behind a print token | `view`, `entries` (with pages) |
+| `issues`, `issue` | `/issues`, `/issues/{id}`, the published journal issues | `views`/`issues`; `view`, `entries`, `pdfs` |
 | `error` | every error page of a known host | `site` and the request's locale only |
+
+The print views link `/site-assets/print.css` after the theme: unconditional rules (Gotenberg
+renders with the print media type), font stacks that exist in Gotenberg's image (web fonts never
+load there), the scientific format's two columns with guards for legacy bodies, and the issue's
+cover and contents. They load no `fragments/head`, so they always print light. The issue pages'
+content is `fragments/issues :: list` and `:: detail`, shared by every set's `issues.html` and
+`issue.html`.
 
 Every page also has `site` (the website's identity, menus and validated third-party ids), `lang`
 (the content language in force) and the advertising lists `topBanners` and `sidebarBanners`.
