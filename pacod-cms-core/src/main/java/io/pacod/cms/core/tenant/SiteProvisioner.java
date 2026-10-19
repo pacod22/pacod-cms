@@ -36,7 +36,7 @@ public class SiteProvisioner {
      * The website-database layout this release expects. Raise it when a release needs every
      * existing website re-provisioned -- a new index, a new seed -- and {@link #reconcile()} will.
      */
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
 
     private final OrganisationRepository organisations;
     private final WebsiteRepository websites;

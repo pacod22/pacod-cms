@@ -36,10 +36,31 @@ public final class SiteStorage {
      * The studio writes it; the site links it only once it exists.
      */
     public static String articlePdf(int articleId, String lang) {
+        return "resources/pdfs/articles/" + code(lang) + "/article-" + articleId + ".pdf";
+    }
+
+    /**
+     * Where a published journal issue's PDF in one language lives: public, like
+     * {@link #articlePdf}. Written when the issue is published (or generated while it is).
+     */
+    public static String issuePdf(int issueId, String lang) {
+        return "resources/pdfs/issues/" + code(lang) + "/issue-" + issueId + ".pdf";
+    }
+
+    /**
+     * Where every generated issue PDF is kept, published or not. Under {@code private/}, which no
+     * address names: {@code MediaController} serves the {@code assets} and {@code resources} trees
+     * only, so a draft issue is downloaded through the studio and nowhere else.
+     */
+    public static String issueDraftPdf(int issueId, String lang) {
+        return "private/pdfs/issues/" + code(lang) + "/issue-" + issueId + ".pdf";
+    }
+
+    private static String code(String lang) {
         if (lang == null || !lang.matches("[a-z]{2,3}")) {
             throw new IllegalArgumentException("Not a language code: " + lang);
         }
-        return "resources/pdfs/articles/" + lang + "/article-" + articleId + ".pdf";
+        return lang;
     }
 
     /** The bound website's own folder under {@code storageRoot}. */

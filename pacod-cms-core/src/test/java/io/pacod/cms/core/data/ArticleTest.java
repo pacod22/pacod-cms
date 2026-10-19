@@ -240,4 +240,32 @@ class ArticleTest {
         assertThat(article.titleIn("de")).isNull();
         assertThat(article.titleIn(null)).isNull();
     }
+
+    @Test
+    @DisplayName("textIn and descriptionIn follow titleIn's rule: exact language, the scalar for the original")
+    void textAndDescriptionInAreExact() {
+        Article article = new Article(1);
+        article.setText("<p>Тяло</p>");
+        article.setDescription("Описание");
+        article.setTexts(List.of(TextItem.builder().lang("de").text("<p>Text</p>").build()));
+        article.setDescriptions(List.of(TextItem.builder().lang("de").text(" ").build()));
+
+        assertThat(article.textIn("bg")).isEqualTo("<p>Тяло</p>");
+        assertThat(article.textIn("de")).isEqualTo("<p>Text</p>");
+        assertThat(article.textIn("en")).isNull();
+        assertThat(article.descriptionIn("bg")).isEqualTo("Описание");
+        assertThat(article.descriptionIn("de")).isNull();
+    }
+
+    @Test
+    @DisplayName("textIn and descriptionIn add nothing to the public JSON")
+    void textInIsNotSerialized() throws Exception {
+        Article article = new Article(3);
+        article.setText("<p>Тяло</p>");
+        String json = JsonMapper.builder()
+                .disable(MapperFeature.REQUIRE_HANDLERS_FOR_JAVA8_TIMES)
+                .build()
+                .writeValueAsString(article);
+        assertThat(json).doesNotContain("textIn").doesNotContain("descriptionIn");
+    }
 }
