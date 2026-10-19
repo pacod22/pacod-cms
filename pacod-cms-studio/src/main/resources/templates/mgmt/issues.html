@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  The website's journal issues (MgmtIssueController): newest first, each with its status, its
+  article count and the languages it has a PDF in.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{issues.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('issues')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{issues.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <p class="muted" style="margin:0; flex:1 1 420px" th:text="#{issues.intro}">An issue gathers articles into one PDF.</p>
+                <a class="btn btn-primary push" th:if="${can != null and can.site('content.write')}" th:href="@{/mgmt/issues/new}">
+                    <svg class="i"><use href="#i-plus"></use></svg> <th:block th:text="#{issues.new}">New issue</th:block>
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th th:text="#{issues.col.issue}">Issue</th>
+                            <th class="shrink" th:text="#{issues.col.month}">Month</th>
+                            <th class="shrink" th:text="#{issues.col.status}">Status</th>
+                            <th class="shrink" th:text="#{issues.col.articles}">Articles</th>
+                            <th class="shrink" th:text="#{issues.col.pdfs}">PDFs</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="i : ${issues.content}">
+                            <td>
+                                <a th:href="@{/mgmt/issues/{id}(id=${i.id})}" th:text="#{issues.label(${i.volume}, ${i.number})}">Volume 1, number 1</a>
+                                <!--/* th:with on a block of its own: th:if outranks it on one element. */-->
+                                <th:block th:with="t=${i.rawTitle(original)}">
+                                    <div class="cell-sub muted" th:if="${t != null}" th:text="${t}">Autumn</div>
+                                </th:block>
+                            </td>
+                            <td class="shrink muted" th:text="${i.year} + '-' + (${i.month lt 10} ? '0' : '') + ${i.month}">2026-10</td>
+                            <td class="shrink"><span class="badge" th:classappend="${i.published()} ? 'published' : 'draft'"
+                                                     th:text="${mgmtText.label(i.status)}">draft</span></td>
+                            <td class="shrink muted" th:text="${i.articleIds.size()}">12</td>
+                            <td class="shrink muted" th:text="${i.renditions.isEmpty()} ? '—' : ${#strings.listJoin(i.renditions.keySet(), ', ')}">bg, en</td>
+                        </tr>
+                        <tr th:if="${issues.content.isEmpty()}">
+                            <td colspan="5" class="muted" th:text="#{issues.empty}">No issue yet.</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pager" th:if="${issues.totalPages > 1}">
+                    <a th:if="${!issues.first}" th:href="@{/mgmt/issues(page=${issues.number - 1})}">&larr;</a>
+                    <span class="page current" th:text="${issues.number + 1}">1</span>
+                    <a th:if="${!issues.last}" th:href="@{/mgmt/issues(page=${issues.number + 1})}">&rarr;</a>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

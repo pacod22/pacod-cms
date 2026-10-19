@@ -28,6 +28,10 @@ public class ArticleService {
     @Autowired
     private ArticleRepository articleRepository;
 
+    /** Optional, so the hand-built tests need none. */
+    @Autowired(required = false)
+    private io.pacod.cms.core.repository.PdfEnrichmentRepository pdfEnrichments;
+
 
     @Autowired
     private ImageService imageService;
@@ -149,6 +153,10 @@ public class ArticleService {
             // document that is gone.
             articleRepository.deleteById(article.getId());
             cleanArticle(article);
+            // Its PDF abstracts: written for its text, read by nothing once it is gone.
+            if (pdfEnrichments != null && article.getId() != null) {
+                pdfEnrichments.deleteByArticleId(article.getId());
+            }
         }
     }
 

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  [minimal] One column: editorial's template with the aside removed.
+  The journal's issues: GET /issues (IssueController), published only, newest first. The list
+  itself is fragments/issues :: list, shared by every set.
+*/-->
+<head th:replace="~{fragments/head :: head(
+        lang=${lang},
+        pageTitle=${#messages.msg('issues.title') + ' | ' + site.name(lang)},
+        pageDesc=${#messages.msg('issues.intro')},
+        ogUrl=${site.url('/issues')},
+        ogImagePath=null,
+        ogImageType=null)}"></head>
+
+<body>
+<th:block th:replace="~{fragments/scripts :: gtmNoscript}"></th:block>
+<th:block th:replace="~{fragments/navbar :: navbar(${lang})}"></th:block>
+
+<div class="shell">
+    <th:block th:replace="~{fragments/ad-sidebar :: topBanners(${topBanners})}"></th:block>
+</div>
+
+<div class="shell shell--narrow">
+    <main class="column">
+        <th:block th:replace="~{fragments/issues :: list(${views}, ${issues}, ${lang})}"></th:block>
+    </main>
+</div>
+
+<th:block th:replace="~{fragments/footer :: footer(${lang})}"></th:block>
+<th:block th:replace="~{fragments/scripts :: siteScripts}"></th:block>
+</body>
+</html>

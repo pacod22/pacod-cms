@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  One published journal issue: GET /issues/{id} (IssueController). Its cover, editorial and
+  contents, and a PDF per language once the studio has generated one (SitePdfs.issue). The body is
+  fragments/issues :: detail, shared by every set.
+*/-->
+<head th:replace="~{fragments/head :: head(
+        lang=${lang},
+        pageTitle=${#messages.msg('issues.volumeNumber', view.issue().volume, view.issue().number) + ' | ' + site.name(lang)},
+        pageDesc=${#strings.isEmpty(view.title()) ? #messages.msg('issues.title') : view.title()},
+        ogUrl=${site.url('/issues/' + view.issue().id)},
+        ogImagePath=${view.coverPath()},
+        ogImageType=null)}"></head>
+
+<body>
+<th:block th:replace="~{fragments/scripts :: gtmNoscript}"></th:block>
+<th:block th:replace="~{fragments/navbar :: navbar(${lang})}"></th:block>
+
+<div class="shell">
+    <th:block th:replace="~{fragments/ad-sidebar :: topBanners(${topBanners})}"></th:block>
+</div>
+
+<div class="shell layout">
+    <main class="layout__main">
+        <th:block th:replace="~{fragments/issues :: detail(${view}, ${entries}, ${pdfs}, ${lang})}"></th:block>
+    </main>
+
+    <aside class="layout__aside">
+        <th:block th:replace="~{fragments/ad-sidebar :: adSidebar(${sidebarBanners})}"></th:block>
+    </aside>
+</div>
+
+<th:block th:replace="~{fragments/footer :: footer(${lang})}"></th:block>
+<th:block th:replace="~{fragments/scripts :: siteScripts}"></th:block>
+</body>
+</html>

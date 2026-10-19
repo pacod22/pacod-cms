@@ -1,5 +1,6 @@
 package io.pacod.cms.studio;
 
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -364,6 +365,37 @@ class MgmtSecurityTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(post(job + "/delete"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("the PDF settings and the issue screens are not readable anonymously, every route of them")
+    @WithAnonymousUser
+    void pdfAndIssueScreensRequireAuthentication() throws Exception {
+        // Pinned route by route, as the layouts are: a literal (`new`) must keep beating /{id}, and
+        // the private PDF download must never be reachable without a session.
+        for (String path : List.of("/mgmt/pdf", "/mgmt/issues", "/mgmt/issues/new", "/mgmt/issues/3",
+                "/mgmt/issues/3/pdf/bg")) {
+            mockMvc.perform(get(path))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/mgmt/login"));
+        }
+        for (String path : List.of("/mgmt/pdf", "/mgmt/issues", "/mgmt/issues/3", "/mgmt/issues/3/generate",
+                "/mgmt/issues/3/publish", "/mgmt/issues/3/unpublish", "/mgmt/issues/3/delete",
+                "/mgmt/issues/3/fill-month")) {
+            mockMvc.perform(post(path).with(csrf()))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/mgmt/login"));
+        }
+    }
+
+    @Test
+    @DisplayName("every issue and PDF-settings write requires CSRF")
+    @WithMockUser(roles = "MGMT")
+    void pdfAndIssuePostsRequireCsrf() throws Exception {
+        for (String path : List.of("/mgmt/pdf", "/mgmt/issues", "/mgmt/issues/3", "/mgmt/issues/3/generate",
+                "/mgmt/issues/3/publish", "/mgmt/issues/3/delete")) {
+            mockMvc.perform(post(path)).andExpect(status().isForbidden());
+        }
     }
 
     @Test

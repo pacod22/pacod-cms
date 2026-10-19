@@ -351,7 +351,9 @@ class PublicTemplateRenderTest {
                 "search", render("search", Map.of("lang", "en", "q", "x", "searched", true,
                         "results", ArticleListPageable.builder().page(org.springframework.data.domain.Page.empty()).build())),
                 "search-google", render("search-google", Map.of("lang", "en", "q", "")),
-                "error", renderBare("error", Map.of("status", 404, "lang", "en")));
+                "error", renderBare("error", Map.of("status", 404, "lang", "en")),
+                "issues", render("issues", issuesModel("en")),
+                "issue", render("issue", issueModel("en")));
         views.forEach((view, html) -> {
             assertThat(html).as("%s on %s", view, set).doesNotContain("??").contains("/site-assets/site.css");
             if (!view.equals("error") && !view.equals("search-google")) {
@@ -363,6 +365,56 @@ class PublicTemplateRenderTest {
             }
         });
         assertThat(views.get("landing")).contains("/article/7?lang=en", "/article/8?lang=en");
+    }
+
+    private static io.pacod.cms.site.services.IssueReader.IssueView issueView() {
+        io.pacod.cms.core.data.JournalIssue issue = new io.pacod.cms.core.data.JournalIssue();
+        issue.setId(3);
+        issue.setVolume(2);
+        issue.setNumber(5);
+        issue.setYear(2026);
+        issue.setMonth(10);
+        return new io.pacod.cms.site.services.IssueReader.IssueView(issue, "Есенен брой", "<p>Уводни думи.</p>",
+                "Вестник", "1234-567X", "Октомври", "/assets/img/articles/cover.jpg");
+    }
+
+    private static Map<String, Object> issuesModel(String lang) {
+        return Map.of("lang", lang, "views", List.of(issueView()),
+                "issues", new org.springframework.data.domain.PageImpl<>(List.of(issueView().issue())));
+    }
+
+    private static Map<String, Object> issueModel(String lang) {
+        return Map.of("lang", lang, "view", issueView(),
+                "entries", List.of(new io.pacod.cms.site.services.IssueReader.Entry(12, "Първа <em>статия</em>", "Иван Петров", 0)),
+                "pdfs", Map.of("bg", "/resources/pdfs/issues/bg/issue-3.pdf"));
+    }
+
+    @Test
+    @DisplayName("The issue pages show the archive, one issue's contents and its PDFs, in every language")
+    void issuePages() {
+        for (String lang : List.of("bg", "en", "de", "fr", "es", "it")) {
+            assertThat(render("issues", issuesModel(lang))).as(lang).doesNotContain("??").contains("href=\"/issues/3?lang=" + lang + "\"");
+            assertThat(render("issue", issueModel(lang))).as(lang).doesNotContain("??");
+        }
+        String issue = render("issue", issueModel("bg"));
+        assertThat(issue).contains("Том 2, брой 5", "Есенен брой", "ISSN 1234-567X", "Уводни думи.",
+                "href=\"/article/12?lang=bg\"", "Първа <em>статия</em>", "href=\"/resources/pdfs/issues/bg/issue-3.pdf\"");
+        String empty = render("issues", Map.of("lang", "en", "views", List.of(),
+                "issues", org.springframework.data.domain.Page.empty()));
+        assertThat(empty).contains("empty-note").doesNotContain("pager__item");
+    }
+
+    @Test
+    @DisplayName("An issue's printed front: the cover, the editorial, and the contents with the pages it is given")
+    void issuePrintFront() {
+        String html = render("issue-print-front", Map.of("lang", "bg", "view", issueView(),
+                "entries", List.of(new io.pacod.cms.site.services.IssueReader.Entry(12, "Първа", "Иван Петров", 3),
+                        new io.pacod.cms.site.services.IssueReader.Entry(14, "Втора", "", 9))));
+        assertThat(html).contains("class=\"issue-cover\"", "Вестник", "ISSN 1234-567X", "Том 2, брой 5", "Октомври 2026",
+                        "class=\"issue-editorial\"", "Съдържание", "/site-assets/print.css")
+                .doesNotContain("??").doesNotContain("pacod-theme").doesNotContain("site-nav__items")
+                .doesNotContain("partner-card");
+        assertThat(html).containsSubsequence("Първа", ">3<", "Втора", ">9<");
     }
 
     @Test
@@ -1091,6 +1143,41 @@ class PublicTemplateRenderTest {
         // .gallery is the scroll container; without the class there is nothing to scroll.
         assertThat(html).doesNotContain("class=\"gallery\"");
         assertThat(html).doesNotContain("gallery__item");
+    }
+
+    @Test
+    @DisplayName("Both print views show the abstract and keywords they are given, and nothing when there are none")
+    void printViewsShowTheFrontMatter() {
+        io.pacod.cms.site.services.PrintExtras.PrintMeta meta =
+                new io.pacod.cms.site.services.PrintExtras.PrintMeta("Кратко резюме.", List.of("наука", "град"));
+        for (String view : List.of("article-print", "article-print-scientific")) {
+            String html = render(view, Map.of(
+                    "article", new ArticleModel(article(7, true, null), "bg"),
+                    "lang", "bg", "printMeta", meta));
+            assertThat(html).as(view).contains("print-abstract").contains("Кратко резюме.")
+                    .contains("наука · град").contains("/site-assets/print.css")
+                    .doesNotContain("??").doesNotContain("pacod-theme");
+
+            String bare = render(view, Map.of(
+                    "article", new ArticleModel(article(7, true, null), "bg"),
+                    "lang", "bg", "printMeta", new io.pacod.cms.site.services.PrintExtras.PrintMeta(null, List.of())));
+            assertThat(bare).as(view).doesNotContain("print-abstract").doesNotContain("print-keywords");
+        }
+    }
+
+    @Test
+    @DisplayName("The scientific print view lays the body in two columns and prints no video frame")
+    void scientificPrintView() {
+        Article article = article(7, false, null);
+        article.setEmbedded("<iframe src=\"https://www.youtube.com/embed/x\"></iframe>");
+        article.setImages(List.of(image(11), image(12)));
+
+        String html = render("article-print-scientific", Map.of(
+                "article", new ArticleModel(article, "bg"), "lang", "bg"));
+
+        assertThat(html).contains("class=\"article-body sci-body\"").contains("Заглавие 7")
+                .doesNotContain("youtube.com/embed");
+        assertThat(count(html, "/assets/img/articles/")).isEqualTo(1);
     }
 
     /* ----------------------------------------------------------------- error ----------- */

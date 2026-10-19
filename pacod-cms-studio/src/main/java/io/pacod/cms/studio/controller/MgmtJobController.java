@@ -5,6 +5,10 @@ import io.pacod.cms.core.control.data.JobStatus;
 import io.pacod.cms.core.control.data.JobType;
 import io.pacod.cms.core.data.Language;
 import io.pacod.cms.core.data.LanguageChain;
+import io.pacod.cms.core.data.PdfFormat;
+import io.pacod.cms.core.data.PdfMode;
+import io.pacod.cms.core.data.PdfSettings;
+import io.pacod.cms.core.repository.PdfSettingsRepository;
 import io.pacod.cms.core.design.PrintTokens;
 import io.pacod.cms.core.jobs.JobQueue;
 import io.pacod.cms.core.tenant.Tenant;
@@ -60,10 +64,12 @@ public class MgmtJobController {
     private final AiAccess ai;
     private final MgmtLanguageService languages;
     private final MgmtText text;
+    private final PdfSettingsRepository pdfSettings;
 
     public MgmtJobController(JobQueue queue, GotenbergClient gotenberg, PrintTokens printTokens, AiAccess ai,
-                             MgmtLanguageService languages, MgmtText text) {
+                             MgmtLanguageService languages, MgmtText text, PdfSettingsRepository pdfSettings) {
         this.queue = queue;
+        this.pdfSettings = pdfSettings;
         this.gotenberg = gotenberg;
         this.printTokens = printTokens;
         this.ai = ai;
@@ -94,6 +100,9 @@ public class MgmtJobController {
         model.addAttribute("aiRefusal", ai.refusalHere().orElse(null));
         model.addAttribute("translateLanguages", translatable());
         model.addAttribute("maxSiteCalls", TranslateSiteHandler.MAX_CALLS);
+        model.addAttribute("pdfSettings", settings());
+        model.addAttribute("pdfFormats", PdfFormat.values());
+        model.addAttribute("pdfModes", PdfMode.values());
         return "mgmt/jobs";
     }
 
@@ -128,15 +137,37 @@ public class MgmtJobController {
         return answer;
     }
 
-    /** PDFs of articles: numbers, or a range; optionally only some languages. */
+    private PdfSettings settings() {
+        return pdfSettings.findById(PdfSettings.ID).orElseGet(PdfSettings::new);
+    }
+
+    /**
+     * PDFs of articles: numbers, or a range; optionally only some languages; a format and a mode,
+     * blank meaning the website's defaults -- resolved now and stored, so the job does what the
+     * form said even if the defaults change before it runs. The LLM mode needs AI available to
+     * this person here, as a translation does.
+     */
     @PostMapping("/pdf")
     public String queuePdf(@RequestParam(required = false) String ids, @RequestParam(required = false) Integer from,
                            @RequestParam(required = false) Integer to, @RequestParam(required = false) String languages,
+                           @RequestParam(required = false) String format, @RequestParam(required = false) String mode,
+                           @RequestParam(defaultValue = "false") boolean refresh,
                            @RequestParam(defaultValue = "false") boolean next,
                            @RequestParam(required = false) String back,
                            Authentication authentication, RedirectAttributes redirect) {
         String failure = pdfEnabled() ? null : text.msg("jobs.pdf.off");
+        PdfSettings settings = settings();
+        PdfFormat pdfFormat = PdfFormat.parse(format, settings.format());
+        PdfMode pdfMode = PdfMode.parse(mode, settings.mode());
+        if (failure == null && pdfMode == PdfMode.LLM) {
+            failure = ai.refusalHere().map(refusal -> text.label(refusal)).orElse(null);
+        }
         Map<String, String> params = new LinkedHashMap<>();
+        params.put("format", pdfFormat.param());
+        params.put("mode", pdfMode.param());
+        if (refresh && pdfMode == PdfMode.LLM) {
+            params.put("refresh", "true");
+        }
         if (failure == null) {
             failure = selection(ids, from, to, params);
         }

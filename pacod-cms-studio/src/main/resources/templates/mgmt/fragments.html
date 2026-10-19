@@ -116,6 +116,10 @@
             <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
             <path d="M14 2v5h5M9 13h6M9 17h6"/>
         </symbol>
+        <symbol id="i-book" viewBox="0 0 24 24">
+            <path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2Z"/>
+            <path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7Z"/>
+        </symbol>
         <symbol id="i-users" viewBox="0 0 24 24">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
             <circle cx="9" cy="7" r="4"/>
@@ -408,6 +412,12 @@
                     <svg class="i"><use href="#i-share"></use></svg>
                     <span class="nav-text" th:text="#{chrome.nav.social}">social</span>
                 </a>
+                <!--/* Journal issues: selected articles in one PDF with a cover and contents
+                       (MgmtIssueController), published at /issues. */-->
+                <a th:href="@{/mgmt/issues}" th:classappend="${active == 'issues'} ? 'active'" th:title="#{chrome.nav.issues}">
+                    <svg class="i"><use href="#i-book"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.issues}">issues</span>
+                </a>
             </div>
         </div>
 
@@ -482,6 +492,11 @@
                 <a th:href="@{/mgmt/jobs}" th:classappend="${active == 'jobs'} ? 'active'" th:title="#{chrome.nav.jobs}">
                     <svg class="i"><use href="#i-play"></use></svg>
                     <span class="nav-text" th:text="#{chrome.nav.jobs}">jobs</span>
+                </a>
+                <!--/* What every PDF starts from (MgmtPdfSettingsController). */-->
+                <a th:href="@{/mgmt/pdf}" th:classappend="${active == 'pdf'} ? 'active'" th:title="#{chrome.nav.pdf}">
+                    <svg class="i"><use href="#i-file-text"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.pdf}">pdf</span>
                 </a>
             </div>
         </div>
@@ -655,6 +670,37 @@
        th:href="@{/mgmt/articles/{id}/translations/{lang}(id=${article.id}, lang=${t.key})}"
        th:text="${t.value}">English</a>
 </div>
+
+<!--/*
+  A PDF form's format and mode (MgmtJobController.queuePdf, and the issue's generate form): the
+  first choice of each is blank, "the website's default", named so the operator sees what blank
+  means. The LLM mode is disabled with a hint where AI is not available to this person here; the
+  controller checks again. `prefix` keeps the ids apart when two forms share a page.
+*/-->
+<th:block th:fragment="pdfChoices(prefix, defaultFormat, defaultMode, aiOk)">
+    <div class="grid-2">
+        <div class="field">
+            <label th:for="${prefix} + '-format'" th:text="#{jobs.pdf.format}">Format</label>
+            <select name="format" th:id="${prefix} + '-format'">
+                <option value="" th:text="#{jobs.pdf.default(${mgmtText.label(defaultFormat)})}">Default</option>
+                <option th:each="f : ${pdfFormats}" th:value="${f.param()}" th:text="${mgmtText.label(f)}">Standard</option>
+            </select>
+        </div>
+        <div class="field">
+            <label th:for="${prefix} + '-mode'" th:text="#{jobs.pdf.mode}">Made by</label>
+            <select name="mode" th:id="${prefix} + '-mode'">
+                <option value="" th:text="#{jobs.pdf.default(${mgmtText.label(defaultMode)})}">Default</option>
+                <option th:each="m : ${pdfModes}" th:value="${m.param()}" th:text="${mgmtText.label(m)}"
+                        th:disabled="${m.name() == 'LLM' and !aiOk}">Code</option>
+            </select>
+            <span class="hint" th:unless="${aiOk}" th:text="#{jobs.pdf.mode.noAi}">The AI mode is not available here.</span>
+        </div>
+    </div>
+    <div class="checkline" th:if="${aiOk}">
+        <input type="checkbox" name="refresh" value="true" th:id="${prefix} + '-refresh'">
+        <label th:for="${prefix} + '-refresh'" th:text="#{jobs.pdf.refresh}">Write the abstracts again</label>
+    </div>
+</th:block>
 
 </body>
 </html>

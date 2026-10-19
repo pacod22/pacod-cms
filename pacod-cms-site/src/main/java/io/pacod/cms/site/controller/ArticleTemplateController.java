@@ -4,6 +4,8 @@ import io.pacod.cms.core.data.Article;
 import io.pacod.cms.core.data.BannerPage;
 import io.pacod.cms.core.data.BannerPlacement;
 import io.pacod.cms.core.data.LanguageChain;
+import io.pacod.cms.core.data.PdfFormat;
+import io.pacod.cms.core.data.PdfMode;
 import io.pacod.cms.site.data.ArticleListPageable;
 import io.pacod.cms.site.data.ArticleModel;
 import io.pacod.cms.site.exceptions.ArticleNotFoundException;
@@ -11,6 +13,7 @@ import io.pacod.cms.core.data.Tag;
 import io.pacod.cms.core.services.TagService;
 import io.pacod.cms.site.services.BannerService;
 import io.pacod.cms.site.services.SiteMetricCollector;
+import io.pacod.cms.site.services.PrintExtras;
 import io.pacod.cms.site.services.SitePdfs;
 import io.pacod.cms.site.render.PageComposer;
 import io.pacod.cms.core.design.PageType;
@@ -41,13 +44,16 @@ public class ArticleTemplateController {
     private final BannerService bannerService;
     private final SiteMetricCollector metrics;
     private final SitePdfs pdfs;
+    private final PrintExtras printExtras;
 
     public ArticleTemplateController(WebArticleService articleService, TagService tagService,
                                      PageComposer composer,
                                      BannerService bannerService,
                                      SiteMetricCollector metrics,
-                                     SitePdfs pdfs) {
+                                     SitePdfs pdfs,
+                                     PrintExtras printExtras) {
         this.pdfs = pdfs;
+        this.printExtras = printExtras;
         this.articleService = articleService;
         this.tagService = tagService;
         this.composer = composer;
@@ -270,8 +276,21 @@ public class ArticleTemplateController {
         return "article";
     }
 
+    /**
+     * The print view: what the studio's PDF jobs have Gotenberg render, and a reader may open.
+     *
+     * <p>{@code format} picks the template -- {@code article-print} or
+     * {@code article-print-scientific} -- through {@link PdfFormat}, so the view name never comes
+     * from the request; anything unknown is the standard one. {@code mode} decides where the
+     * abstract and keywords come from ({@link PrintExtras}). Neither changes what a reader may see:
+     * an unpublished article is a 404 here as everywhere, the token only stops the count.
+     */
     @RequestMapping(value = {"/article-print/{id}"}, method = RequestMethod.GET)
-    public String getArticlePrint(HttpServletRequest request, @PathVariable(required = false) Integer id, Model model, @RequestParam(required = false) String lang, java.util.Locale locale) throws ArticleNotFoundException {
+    public String getArticlePrint(HttpServletRequest request, @PathVariable(required = false) Integer id, Model model,
+                                  @RequestParam(required = false) String lang,
+                                  @RequestParam(required = false) String format,
+                                  @RequestParam(required = false) String mode,
+                                  java.util.Locale locale) throws ArticleNotFoundException {
 
         logRequest(request);
 
@@ -289,11 +308,14 @@ public class ArticleTemplateController {
             throw new ArticleNotFoundException(0);
         }
 
-        ArticleModel articleModel = new ArticleModel(article, lang);
+        List<Tag> tags = currentTags();
+        ArticleModel articleModel = new ArticleModel(article, lang, tags);
+        PdfFormat pdfFormat = PdfFormat.parse(format, PdfFormat.STANDARD);
 
         model.addAttribute("article", articleModel);
         model.addAttribute("lang", lang);
-        return "article-print";
+        model.addAttribute("printMeta", printExtras.meta(article, lang, PdfMode.parse(mode, PdfMode.CODE), tags));
+        return pdfFormat == PdfFormat.SCIENTIFIC ? "article-print-scientific" : "article-print";
     }
 
     /**

@@ -29,7 +29,8 @@ import java.util.Optional;
  */
 @Slf4j
 @ControllerAdvice(assignableTypes = {ArticleTemplateController.class, PageController.class,
-        SearchController.class, SocialController.class, BasicErrorController.class})
+        SearchController.class, SocialController.class, IssueController.class, IssuePrintController.class,
+        BasicErrorController.class})
 public class SiteChromeAdvice {
 
     private final SiteChromeReader reader;

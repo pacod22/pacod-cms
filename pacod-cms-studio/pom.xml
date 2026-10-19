@@ -54,6 +54,17 @@
 		</dependency>
 
 		<!--
+			A journal issue's PDF: each article's page count, the merge of cover, contents and
+			articles, the bookmarks, and the page numbers stamped on (studio.pdf.IssuePdfAssembler).
+			Apache-2.0.
+		-->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>3.0.8</version>
+		</dependency>
+
+		<!--
 			The Public Suffix List, private section included, as browsers apply it to cookies
 			(InternetDomainName): what "the same registrable domain as the studio" means
 			(studio.portal.RegistrableDomains). Apache-2.0; the list inside it is MPL-2.0.

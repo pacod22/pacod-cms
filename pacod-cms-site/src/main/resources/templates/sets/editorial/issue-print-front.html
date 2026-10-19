@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  A journal issue's front matter, as the studio's issue job has Gotenberg render it:
+  GET /issue-print/{id}/front?lang=&ids=&pages= (IssuePrintController), behind a print token only
+  -- it shows drafts. The cover, then the editorial on a page of its own when there is one, then
+  the contents, each article with the page the studio computed it starts on (PdfIssueHandler).
+
+  Like the article print views: no fragments/head (it prints light), only this website's origin
+  reachable under Gotenberg, the page numbers stamped on afterwards by the studio.
+*/-->
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="#{issues.volumeNumber(${view.issue().volume}, ${view.issue().number})}">Volume 1, number 1</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <link rel="stylesheet" href="/site-assets/site.css"/>
+    <link rel="stylesheet" th:if="${theme != null and theme.present}" th:href="${theme.href()}"/>
+    <link rel="stylesheet" href="/site-assets/print.css"/>
+</head>
+
+<body class="issue-print">
+<section class="issue-cover">
+    <div>
+        <h1 class="issue-cover__journal" th:text="${view.journalName() ?: (site != null ? site.name(lang) : '')}">Demo Journal</h1>
+        <p class="issue-cover__issn" th:if="${view.issn() != null}" th:text="#{issues.issn(${view.issn()})}">ISSN 1234-5678</p>
+        <p class="issue-cover__number" th:text="#{issues.volumeNumber(${view.issue().volume}, ${view.issue().number})}">Volume 1, number 1</p>
+        <p class="issue-cover__month" th:text="${view.monthName()} + ' ' + ${view.issue().year}">October 2026</p>
+        <p class="issue-cover__title" th:if="${!#strings.isEmpty(view.title())}" th:text="${view.title()}">Autumn</p>
+        <img class="issue-cover__image" th:if="${view.coverPath() != null}" th:src="${view.coverPath()}" alt=""/>
+    </div>
+    <p class="issue-cover__site" th:if="${site != null and view.journalName() != null}" th:text="${site.name(lang)}">Demo Journal</p>
+</section>
+
+<section class="issue-editorial" th:if="${!#strings.isEmpty(view.editorial())}">
+    <h2 th:text="#{print.editorial}">Editorial</h2>
+    <div class="article-body" th:utext="${view.editorial()}"></div>
+</section>
+
+<!--/* The last section: no break after it, or the front would end on a blank page. */-->
+<section class="issue-toc">
+    <h2 th:text="#{print.contents}">Contents</h2>
+    <ol>
+        <li th:each="e : ${entries}">
+            <span class="issue-toc__entry">
+                <span class="issue-toc__title" th:utext="${e.title()}">Title</span>
+                <span class="issue-toc__authors" th:if="${!#strings.isEmpty(e.authors())}" th:text="${e.authors()}">Author</span>
+            </span>
+            <span class="issue-toc__leader" aria-hidden="true"></span>
+            <span class="issue-toc__page" th:text="${e.page()}">3</span>
+        </li>
+    </ol>
+</section>
+</body>
+</html>
