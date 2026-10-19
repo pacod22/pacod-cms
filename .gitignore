@@ -48,6 +48,9 @@ HELP.md
 # Local runtime data created by docker compose
 .data/
 
+# Local claude data
+.claude/
+
 # Local tool output: screenshots, and a studio session cookie jar (make e2e-signin writes one).
 # The jar holds a live JSESSIONID, so this line is a secret rule, not a tidiness one.
 .artifacts/
