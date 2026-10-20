@@ -2,8 +2,8 @@
 
 An open-source content management system for editorial websites: articles, categories, authors and
 tags; standing pages; a shared image library; advertising bookings with an HTML5 banner builder;
-a link-in-bio page; reader, advertising and crawler statistics; and multilingual content with a
-configurable original language.
+a link-in-bio page; PDFs of articles and whole journal issues; reader, advertising and crawler
+statistics; and multilingual content with a configurable original language.
 
 Java 25 · Spring Boot 4.1 · Thymeleaf · MongoDB · Maven
 
@@ -105,7 +105,7 @@ the data; `make destroy` also drops the volumes — the content and every pacod-
 |---|---|
 | `pacod-cms-core` | Nearly all the code: documents, repositories, services, the tenancy (which website a unit of work belongs to, and its database, storage and cache scope), the control plane (organisations, websites, domains), the seed content new websites start with, and a Java port of pacod-id's rules engine with the CMS's roles (`authz/cms.yaml`). A jar, not an application. |
 | `pacod-cms-site` | The public site for every website: Thymeleaf templates, page controllers, view models, the chrome's message bundles, read-side services, caches and the traffic counters. Picks the website by the request's host. |
-| `pacod-cms-studio` | The studio: the portal (organisations, creating websites, members and invitations, the installation's settings), the website list, and each website's settings, editing, advertising and statistics screens. Server-rendered Thymeleaf. Sign-in is OpenID Connect against pacod-id; each screen checks the person's role at that website, read from pacod-id's authorisation feed. Its UI is in English, Bulgarian, German or Russian; `pacod.studio.default-language` (default `en`) picks the default. |
+| `pacod-cms-studio` | The studio: the portal (organisations, creating websites, members and invitations, the installation's settings), the website list, and each website's settings, editing, journal issues, PDF settings, advertising and statistics screens. Server-rendered Thymeleaf. Sign-in is OpenID Connect against pacod-id; each screen checks the person's role at that website, read from pacod-id's authorisation feed. Its UI is in English, Bulgarian, German or Russian; `pacod.studio.default-language` (default `en`) picks the default. |
 
 **The two applications talk to MongoDB directly.** Neither is an HTTP client of the other; the
 only HTTP client in the project is the studio's, to pacod-id. That is why the site's caches use
@@ -208,22 +208,46 @@ plus a manifest, `pacod-cms-core/src/main/resources/design/sets/<id>.yaml`. The 
 the set's page types, regions, the section types it implements, its default layouts and its theme
 presets. A set may `extend` another and override only some of its templates.
 
-## Jobs and PDF export
+## Jobs, PDF export and journal issues
 
 Work that takes a while runs in the background in the studio, under **Jobs**: one job of an
-organisation at a time, with a live log, cancel and "run it next". **PDF export** is one: each
-article becomes one PDF per language it is written in, rendered by Gotenberg (part of the compose
-stack) from the article's print view, and the article links its PDF once it exists. The article
-editor has a button for its own PDFs; the jobs screen takes numbers or a range. The AI
-translations (below) are jobs too.
+organisation at a time, with a live log, cancel and "run it next". The PDFs below and the AI
+translations are jobs.
+
+**PDF export** renders each article into one PDF per language it is written in, through Gotenberg
+(part of the compose stack), from the article's print view; the article links its PDF once it
+exists. The article editor has a button for its own PDFs; the jobs screen takes numbers or a range.
+
+- **Two formats.** *Standard* is the website's print view. *Scientific* is a paper layout: a
+  full-width head with the title, authors, abstract and keywords, then the article's text in two
+  columns.
+- **Two ways to make them.** *Code only* takes the abstract and keywords from the article's own
+  description and tags. *With AI* has pacod-gw write an abstract, keywords and a short running title
+  for each article and language; the article's text itself is never changed, and what the AI wrote
+  is reused until the article is edited.
+- **PDF settings** (under *Maintenance*, `/mgmt/pdf`) hold each website's defaults: the format and
+  the way to make them, paper (A4, Letter or A5) and margins, the journal's name per language and
+  its ISSN, a running head and page numbers, and what the AI is asked to write. Everyone who reads
+  content sees them; the website's admin changes them. Every PDF form can choose another format and
+  way for one run. An article has one PDF per language, so the latest render wins.
+
+**Journal issues** (under *Content → Issues*, `/mgmt/issues`) gather articles into one PDF per
+language, formatted as a journal. An issue has a volume, number and month, a title and an editorial
+per language, and an optional cover image; its articles are picked one by one or filled from its
+month, then put in order. Generating it renders a cover, the editorial, a table of contents with
+page numbers, and then the articles — in the standard or scientific format, made by code or with AI
+— with the issue's running head, a bookmark per article and the pages numbered throughout. A draft
+issue's PDFs are downloaded from the studio only. **Publishing** it (anyone who may publish
+content) puts the issue and its PDFs on the website at `/issues`; unpublishing takes them down again.
 
 ## Publishing and search engines
 
 **Only a published article reaches a reader.** New articles, drafts and private ones answer 404
 and appear in no list, search, sitemap or PDF; an author writes, an editor (who holds
 `content.publish`) publishes. Each website answers its own `/robots.txt` and `/sitemap.xml` from
-its database: the home page, the latest list, its published pages, categories and articles, at
-the address set as its base URL (or the one it was reached at).
+its database: the home page, the latest list, its published pages, categories, journal issues and
+articles, at the address set as its base URL (or the one it was reached at). A draft journal issue
+is never public.
 
 ## AI
 
@@ -232,7 +256,8 @@ platform admin switches AI on per organisation; a website's admin can switch it 
 website. **Translation** is a job: an article's title, summary and body into the languages ticked,
 each answer refused unless it keeps the article's markup exactly; a second job translates the rest
 of the website — standing pages, section names, menus, the social page and, if ticked, tags —
-without overwriting an edit made while it ran. The installation screen has a button that tests the
+without overwriting an edit made while it ran. PDFs can have their abstract, keywords and running
+title written by AI too (*Jobs, PDF export and journal issues* above). The installation screen has a button that tests the
 gateway with one short call. The development stack runs
 pacod-gw-lite in front of a mock (from `../pacod-gw`, `make images`), so nothing leaves the
 machine and a "translation" is an echo of its source.
