@@ -71,7 +71,33 @@ public interface ArticleRepository extends MongoRepository<Article, Integer> {
            sort = "{ _id : -1 }")
     List<Article> findPublishedForSitemap(Pageable pageable);
 
+    /**
+     * The outline of published articles -- id, titles, authors, date -- for an issue's table of
+     * contents; the body and the images stay unread.
+     */
+    @Query(value = "{ '_id': { $in: ?0 }, status: 'PUBLISHED' }",
+           fields = "{ '_id': 1, 'title': 1, 'titles': 1, 'authors': 1, 'date': 1 }")
+    List<Article> findPublishedOutlineByIdIn(Collection<Integer> ids);
+
+    /**
+     * The ids of the articles published with a date in {@code [from, to)}, oldest first: what
+     * "fill from month" puts in an issue. A closed-open range, written by hand (a derived
+     * {@code Between} is exclusive at both ends on Mongo).
+     */
+    @Query(value = "{ status: 'PUBLISHED', date: { $gte: ?0, $lt: ?1 } }",
+           fields = "{ '_id': 1 }",
+           sort = "{ date: 1, _id: 1 }")
+    List<Article> findPublishedIdsBetween(LocalDateTime from, LocalDateTime to);
+
     /* ---------------------------------------------------------------- the studio's (drafts included) */
+
+    /**
+     * The outline of the given articles, drafts included, for the issue editor: it lists what it
+     * holds and flags what a reader would not see.
+     */
+    @Query(value = "{ '_id': { $in: ?0 } }",
+           fields = "{ '_id': 1, 'title': 1, 'titles': 1, 'date': 1, 'status': 1 }")
+    List<Article> findOutlineByIdIn(Collection<Integer> ids);
 
     @Query(value = "{}", sort = "{ _id : -1 }")
     Page<Article> findAllArticle(Pageable pageable);

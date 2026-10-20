@@ -59,6 +59,27 @@ class GotenbergClientTest {
     }
 
     @Test
+    @DisplayName("paper and margins as given, header and footer as Gotenberg's named files")
+    void options() throws Exception {
+        AtomicReference<String> received = new AtomicReference<>();
+        GotenbergClient client = new GotenbergClient(serve(200, "%PDF-1.7 x".getBytes(), received), Duration.ofSeconds(5));
+
+        client.render("http://site:8443/article-print/12", "http://site:8443", Map.of(),
+                new GotenbergClient.RenderOptions(io.pacod.cms.core.data.PaperSize.LETTER, 0.75, 0.6, 0.59055,
+                        "<html>head</html>", "<html>foot</html>"));
+
+        assertThat(received.get())
+                .contains("name=\"paperWidth\"\r\n", "8.5")
+                .contains("name=\"paperHeight\"\r\n")
+                .contains("name=\"marginTop\"\r\n", "0.75")
+                .contains("name=\"marginLeft\"\r\n", "0.59")
+                .contains("name=\"files\"; filename=\"header.html\"", "<html>head</html>")
+                .contains("name=\"files\"; filename=\"footer.html\"", "<html>foot</html>");
+        assertThat(GotenbergClient.inches(11.0)).isEqualTo("11");
+        assertThat(GotenbergClient.inches(0.6)).isEqualTo("0.6");
+    }
+
+    @Test
     @DisplayName("Gotenberg's refusal reaches the job's log in its own words; a non-PDF answer is refused")
     void failures() throws Exception {
         AtomicReference<String> received = new AtomicReference<>();

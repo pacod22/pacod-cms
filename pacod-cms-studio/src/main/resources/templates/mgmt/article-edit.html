@@ -701,6 +701,7 @@
                                 <input type="hidden" name="ids" th:value="${article.id}">
                                 <input type="hidden" name="next" value="true">
                                 <input type="hidden" name="back" th:value="'/mgmt/articles/' + ${article.id}">
+                                <div th:replace="~{mgmt/fragments :: pdfChoices('article-pdf', ${pdfSettings.format()}, ${pdfSettings.mode()}, ${aiAvailable})}"></div>
                                 <button class="btn" type="submit">
                                     <svg class="i"><use href="#i-play"></use></svg> <th:block th:text="#{jobs.article.pdf.make}">Make the PDFs</th:block>
                                 </button>

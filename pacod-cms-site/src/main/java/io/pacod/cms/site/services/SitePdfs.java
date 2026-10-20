@@ -24,10 +24,25 @@ public class SitePdfs {
     }
 
     public Optional<String> article(Integer articleId, String lang) {
-        if (articleId == null || lang == null || !lang.matches("[a-z]{2,3}") || storageRoot == null || storageRoot.isBlank()) {
+        if (articleId == null || !usable(lang)) {
             return Optional.empty();
         }
-        String relative = SiteStorage.articlePdf(articleId, lang);
+        return existing(SiteStorage.articlePdf(articleId, lang));
+    }
+
+    /** A published journal issue's PDF in a language ({@code PDF_ISSUE} jobs, or publishing one). */
+    public Optional<String> issue(Integer issueId, String lang) {
+        if (issueId == null || !usable(lang)) {
+            return Optional.empty();
+        }
+        return existing(SiteStorage.issuePdf(issueId, lang));
+    }
+
+    private boolean usable(String lang) {
+        return lang != null && lang.matches("[a-z]{2,3}") && storageRoot != null && !storageRoot.isBlank();
+    }
+
+    private Optional<String> existing(String relative) {
         Path file = SiteStorage.siteRoot(storageRoot).resolve(relative);
         return Files.isRegularFile(file) ? Optional.of("/" + relative) : Optional.empty();
     }

@@ -1,0 +1,108 @@
+/*
+   The print views' own rules: article-print.html, article-print-scientific.html and the journal
+   issue's front matter (issue-print-front.html). Linked by those templates alone, after site.css
+   and the website's theme, so the rules here are unconditional -- Gotenberg renders with the print
+   media type, and a reader who opens a print view sees what will be printed.
+
+   Gotenberg's Chromium reaches nothing but the site, so web fonts never load there: every stack
+   below ends in fonts that ship in its image (Noto, Liberation, DejaVu), Cyrillic included.
+*/
+
+:root {
+    --print-serif: 'Libertinus Serif', 'Noto Serif', 'Liberation Serif', 'DejaVu Serif', Georgia, serif;
+    --print-sans: 'Noto Sans', 'Liberation Sans', 'DejaVu Sans', system-ui, sans-serif;
+}
+
+@page { size: auto; }
+
+/* ------------------------------------------------------------------ abstract and keywords */
+
+.print-abstract {
+    margin: 18px 0 10px;
+    padding: 12px 16px;
+    border-left: 3px solid var(--accent);
+    background: var(--paper, transparent);
+    break-inside: avoid;
+}
+.print-abstract__label {
+    margin: 0 0 6px;
+    font: 600 0.78rem/1.2 var(--font-label, var(--print-sans));
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.print-abstract p { margin: 0; }
+.print-keywords { margin: 0 0 18px; font-size: 0.92rem; color: var(--muted); }
+.print-keywords strong { color: var(--ink); font-weight: 600; }
+
+/* ------------------------------------------------------------------ the scientific format */
+
+body.sci { background: #fff; color: #111; }
+
+.sci-paper { max-width: none; margin: 0; padding: 0; font-family: var(--print-serif); }
+
+.sci-head { text-align: center; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 0.6pt solid #888; }
+.sci-title { margin: 0 0 8px; font: 700 20pt/1.2 var(--print-serif); color: #111; }
+.sci-authors { margin: 0 0 4px; font: italic 11pt/1.3 var(--print-serif); }
+.sci-meta { margin: 0 0 8px; font: 8.5pt/1.3 var(--print-sans); color: #444; }
+.sci-head .print-abstract { text-align: justify; margin: 12px 6% 6px; font: 9.5pt/1.4 var(--print-serif); background: #f5f5f2; border-left-color: #555; }
+.sci-head .print-keywords { text-align: left; margin: 0 6% 6px; font: 8.5pt/1.4 var(--print-sans); }
+.sci-figure { margin: 10px 0 0; break-inside: avoid; }
+.sci-figure img { max-width: 100%; max-height: 9cm; display: block; margin: 0 auto; }
+.sci-figure figcaption { margin-top: 4px; font: italic 8pt/1.3 var(--print-sans); color: #444; }
+
+.sci-body {
+    column-count: 2;
+    column-gap: 7mm;
+    column-fill: balance;
+    text-align: justify;
+    hyphens: auto;
+    orphans: 3;
+    widows: 3;
+    font: 9.5pt/1.38 var(--print-serif);
+    color: #111;
+    max-width: none;
+    counter-reset: sci-section;
+}
+.sci-body p { margin: 0 0 0.6em; }
+.sci-body h2, .sci-body h3, .sci-body h4 { break-after: avoid; text-align: left; font-family: var(--print-serif); }
+.sci-body h2 { counter-increment: sci-section; counter-reset: sci-subsection; font-size: 11pt; margin: 1em 0 0.4em; }
+.sci-body h2::before { content: counter(sci-section) ". "; }
+.sci-body h3 { counter-increment: sci-subsection; font-size: 10pt; margin: 0.8em 0 0.3em; }
+.sci-body h3::before { content: counter(sci-section) "." counter(sci-subsection) " "; }
+.sci-body img, .sci-body figure, .sci-body table, .sci-body pre, .sci-body blockquote { max-width: 100%; break-inside: avoid; }
+.sci-body img { height: auto; }
+.sci-body table { width: 100%; font-size: 8.5pt; border-collapse: collapse; }
+.sci-body td, .sci-body th { padding: 2px 4px; border-top: 0.5pt solid #999; }
+/* Legacy bodies: inline widths and <font> sizes written for a 900-pixel page, not a column. */
+.sci-body [style*="width"] { width: auto !important; max-width: 100% !important; }
+.sci-body font { font-size: inherit !important; font-family: inherit !important; }
+/* A frame prints as an empty box under Gotenberg (no JavaScript, no other origin). */
+.sci-body iframe, .sci-body .video-container { display: none; }
+
+/* ------------------------------------------------------------------ an issue's front matter */
+
+body.issue-print { background: #fff; color: #111; font-family: var(--print-serif); }
+/* No fixed height: the paper may be A5. The cover is a page of its own by its break alone. */
+.issue-cover {
+    text-align: center;
+    break-after: page;
+}
+.issue-cover__journal { margin: 2cm 0 0; font: 700 30pt/1.15 var(--print-serif); }
+.issue-cover__issn { margin: 6px 0 0; font: 9pt/1.3 var(--print-sans); color: #444; }
+.issue-cover__number { margin: 1.2cm 0 0; font: 600 14pt/1.3 var(--print-sans); letter-spacing: 0.04em; }
+.issue-cover__month { margin: 4px 0 0; font: 12pt/1.3 var(--print-sans); color: #333; }
+.issue-cover__title { margin: 1cm 0 0; font: italic 18pt/1.3 var(--print-serif); }
+.issue-cover__image { margin: 1cm auto 0; max-width: 100%; max-height: 11cm; display: block; }
+.issue-cover__site { margin: 1.5cm 0 0; font: 10pt/1.3 var(--print-sans); color: #444; }
+
+.issue-editorial { break-after: page; font: 10.5pt/1.5 var(--print-serif); }
+.issue-editorial h2, .issue-toc h2 { font: 700 16pt/1.2 var(--print-serif); margin: 0 0 14px; }
+
+.issue-toc ol { list-style: none; margin: 0; padding: 0; }
+.issue-toc li { display: flex; align-items: baseline; gap: 6px; margin: 0 0 10px; break-inside: avoid; }
+.issue-toc__entry { flex: 0 1 auto; }
+.issue-toc__title { display: block; font: 600 11pt/1.3 var(--print-serif); }
+.issue-toc__authors { display: block; font: italic 9pt/1.3 var(--print-serif); color: #444; }
+.issue-toc__leader { flex: 1 1 auto; border-bottom: 1px dotted #888; min-width: 2em; transform: translateY(-4px); }
+.issue-toc__page { flex: 0 0 auto; font: 11pt/1.3 var(--print-sans); font-variant-numeric: tabular-nums; }

@@ -2,9 +2,11 @@ package io.pacod.cms.site.controller;
 
 import io.pacod.cms.core.data.Article;
 import io.pacod.cms.core.data.Category;
+import io.pacod.cms.core.data.JournalIssue;
 import io.pacod.cms.core.data.Page;
 import io.pacod.cms.core.repository.ArticleRepository;
 import io.pacod.cms.core.repository.CategoryRepository;
+import io.pacod.cms.core.repository.JournalIssueRepository;
 import io.pacod.cms.site.services.PageReader;
 import io.pacod.cms.site.services.SiteChromeReader;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,17 +25,19 @@ import org.springframework.web.util.UriUtils;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * {@code /robots.txt} and {@code /sitemap.xml}, per website: answered for the website the Host
  * names, from its own database, so no file sits in a folder and no website's list names another's.
  *
  * <ul>
- *   <li><b>robots</b> keeps crawlers off what is not a page: the PDF renderer's print view, the
+ *   <li><b>robots</b> keeps crawlers off what is not a page: the PDF renderer's print views, the
  *       banner and social redirects and beacons, search results, the JSON API. It names the
  *       sitemap by an absolute address, as the protocol requires.</li>
  *   <li><b>sitemap</b> lists the home page, the latest list, every published standing page, every
- *       category with a published article and the newest {@link #MAX_ARTICLES} published articles,
+ *       category with a published article, {@code /issues} and every published journal issue, and
+ *       the newest {@link #MAX_ARTICLES} published articles,
  *       through {@code ArticleRepository}'s public queries -- a draft's number is never listed --
  *       and a projection, so no row resolves its {@code @DBRef}s. Bare addresses only: the site
  *       writes no {@code hreflang} either.</li>
@@ -58,9 +62,11 @@ public class SitemapController {
     private final CategoryRepository categories;
     private final PageReader pages;
     private final SiteChromeReader chrome;
+    private final JournalIssueRepository issues;
 
     public SitemapController(ArticleRepository articles, CategoryRepository categories, PageReader pages,
-                             SiteChromeReader chrome) {
+                             SiteChromeReader chrome, JournalIssueRepository issues) {
+        this.issues = issues;
         this.articles = articles;
         this.categories = categories;
         this.pages = pages;
@@ -72,6 +78,7 @@ public class SitemapController {
         String body = """
                 User-agent: *
                 Disallow: /article-print/
+                Disallow: /issue-print/
                 Disallow: /b/
                 Disallow: /social/go/
                 Disallow: /social/read/
@@ -99,6 +106,14 @@ public class SitemapController {
             for (Category category : categories.findAll(Sort.by("_id"))) {
                 if (category.getId() != null && articles.existsByCategoriesAndStatus(category.getId(), ArticleRepository.PUBLIC)) {
                     entry(xml, origin + "/list/" + category.getId(), null);
+                }
+            }
+            List<JournalIssue> published = issues.findPublishedForSitemap();
+            if (!published.isEmpty()) {
+                entry(xml, origin + "/issues", null);
+                for (JournalIssue issue : published) {
+                    entry(xml, origin + "/issues/" + issue.getId(),
+                            issue.getLastModifiedOn() != null ? issue.getLastModifiedOn() : issue.getPublishedOn());
                 }
             }
             for (Article article : articles.findPublishedForSitemap(PageRequest.of(0, MAX_ARTICLES))) {

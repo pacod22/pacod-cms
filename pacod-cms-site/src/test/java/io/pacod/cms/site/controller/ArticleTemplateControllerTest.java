@@ -6,7 +6,9 @@ import io.pacod.cms.core.services.TagService;
 import io.pacod.cms.site.data.ArticleListPageable;
 import io.pacod.cms.site.services.BannerService;
 import io.pacod.cms.site.services.SiteMetricCollector;
+import io.pacod.cms.site.services.PrintExtras;
 import io.pacod.cms.site.services.SitePdfs;
+import io.pacod.cms.core.repository.PdfEnrichmentRepository;
 import io.pacod.cms.core.design.PageType;
 import io.pacod.cms.site.render.PageComposer;
 import io.pacod.cms.site.render.Regions;
@@ -73,7 +75,8 @@ class ArticleTemplateControllerTest {
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new ArticleTemplateController(
-                        articleService, tagService, composer, bannerService, metrics, new SitePdfs("")))
+                        articleService, tagService, composer, bannerService, metrics, new SitePdfs(""),
+                        new PrintExtras(mock(PdfEnrichmentRepository.class))))
                 // /list/{id} takes a @PageableDefault Pageable.
                 .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
                 .build();
@@ -309,7 +312,21 @@ class ArticleTemplateControllerTest {
         mockMvc.perform(get("/article-print/1"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("article-print"))
-                .andExpect(model().attributeExists("article"));
+                .andExpect(model().attributeExists("article"))
+                .andExpect(model().attributeExists("printMeta"));
+    }
+
+    @Test
+    @DisplayName("GET /article-print/{id}?format= picks the template by enum; anything unknown is standard")
+    void printFormatPicksTheTemplate() throws Exception {
+        when(articleService.getArticleById(1)).thenReturn(Optional.of(article(1)));
+
+        mockMvc.perform(get("/article-print/1").param("format", "scientific").param("mode", "llm"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("article-print-scientific"));
+        mockMvc.perform(get("/article-print/1").param("format", "../error"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("article-print"));
     }
 
     @Test

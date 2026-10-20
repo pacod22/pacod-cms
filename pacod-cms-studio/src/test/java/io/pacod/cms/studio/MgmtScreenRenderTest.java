@@ -244,6 +244,14 @@ class MgmtScreenRenderTest {
     @MockitoBean
     private MgmtCrawlerService crawlerService;
 
+    /** The PDF cards' defaults: empty, so the defaults of a fresh website. */
+    @MockitoBean
+    private io.pacod.cms.core.repository.PdfSettingsRepository pdfSettingsRepository;
+
+    /** /mgmt/issues. */
+    @MockitoBean
+    private MgmtIssueService issueService;
+
     private static io.pacod.cms.core.data.Language language(String code, String bulgarian,
                                                                   String nativeName) {
         io.pacod.cms.core.data.Language language = new io.pacod.cms.core.data.Language(code);
@@ -2166,7 +2174,7 @@ class MgmtScreenRenderTest {
         mockMvc.perform(post("/mgmt/jobs/pdf").with(csrf()).param("ids", "12, 14").param("languages", "BG,de").param("next", "true"))
                 .andExpect(redirectedUrl("/mgmt/jobs/" + JOB_ID));
         verify(jobQueue).enqueue(eq("test"), any(), eq(JobType.PDF_ARTICLES),
-                eq(Map.of("ids", "12,14", "languages", "bg,de")), any(), eq(true));
+                eq(Map.of("ids", "12,14", "languages", "bg,de", "format", "standard", "mode", "code")), any(), eq(true));
 
         mockMvc.perform(post("/mgmt/jobs/pdf").with(csrf()).param("ids", "12; drop").param("back", "//evil.example"))
                 .andExpect(redirectedUrl("/mgmt/jobs"));
@@ -2174,6 +2182,108 @@ class MgmtScreenRenderTest {
                         .param("back", "/mgmt/articles/12"))
                 .andExpect(redirectedUrl("/mgmt/articles/12"));
         verify(jobQueue, times(1)).enqueue(any(), any(), any(), any(), any(), anyBoolean());
+
+        // The AI mode needs AI here: refused with the reason while it is off, queued once it is on.
+        mockMvc.perform(post("/mgmt/jobs/pdf").with(csrf()).param("ids", "12").param("mode", "llm"))
+                .andExpect(redirectedUrl("/mgmt/jobs"))
+                .andExpect(flash().attributeExists("error"));
+        when(aiAccess.refusalHere()).thenReturn(Optional.empty());
+        mockMvc.perform(post("/mgmt/jobs/pdf").with(csrf()).param("ids", "12").param("format", "scientific")
+                        .param("mode", "llm").param("refresh", "true"))
+                .andExpect(redirectedUrl("/mgmt/jobs/" + JOB_ID));
+        verify(jobQueue).enqueue(eq("test"), any(), eq(JobType.PDF_ARTICLES),
+                eq(Map.of("ids", "12", "format", "scientific", "mode", "llm", "refresh", "true")), any(), eq(false));
+    }
+
+    @Test
+    @DisplayName("the PDF settings screen offers every default, a journal name per language, and saves")
+    void pdfSettingsScreen() throws Exception {
+        String html = mockMvc.perform(get("/mgmt/pdf")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(html)
+                .contains("action=\"/mgmt/pdf\"", "name=\"defaultFormat\"", "name=\"defaultMode\"",
+                        "name=\"paperSize\"", "name=\"marginMm\"", "name=\"journalName_bg\"", "name=\"issn\"",
+                        "name=\"maxKeywords\"");
+
+        when(pdfSettingsRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        mockMvc.perform(post("/mgmt/pdf").with(csrf()).param("defaultFormat", "SCIENTIFIC").param("defaultMode", "CODE")
+                        .param("paperSize", "A5").param("marginMm", "20").param("issn", "1234-567x")
+                        .param("pageNumbers", "true").param("maxKeywords", "5").param("journalName_bg", "Вестник"))
+                .andExpect(redirectedUrl("/mgmt/pdf"))
+                .andExpect(flash().attributeExists("message"));
+        verify(pdfSettingsRepository).save(org.mockito.ArgumentMatchers.argThat(saved ->
+                saved.format() == io.pacod.cms.core.data.PdfFormat.SCIENTIFIC
+                        && saved.paper() == io.pacod.cms.core.data.PaperSize.A5
+                        && "1234-567X".equals(saved.getIssn()) && saved.isPageNumbers() && !saved.isRunningHeader()
+                        && "Вестник".equals(saved.rawJournalName("bg"))));
+
+        mockMvc.perform(post("/mgmt/pdf").with(csrf()).param("marginMm", "3"))
+                .andExpect(flash().attributeExists("error"));
+    }
+
+    @Test
+    @DisplayName("the issue screens: the list, a new one, and the editor with its articles, generation and publication")
+    void issueScreens() throws Exception {
+        io.pacod.cms.core.data.JournalIssue issue = new io.pacod.cms.core.data.JournalIssue();
+        issue.setId(3);
+        issue.setVolume(2);
+        issue.setNumber(5);
+        issue.setYear(2026);
+        issue.setMonth(10);
+        issue.setArticleIds(List.of(12, 13));
+        issue.setTitles(List.of(new io.pacod.cms.core.data.TextItem("Есен", "bg")));
+        issue.setRenditions(new java.util.LinkedHashMap<>(Map.of("bg", new io.pacod.cms.core.data.IssueRendition(
+                LocalDateTime.now(), 24, io.pacod.cms.core.data.PdfFormat.STANDARD, io.pacod.cms.core.data.PdfMode.CODE, JOB_ID, 2048))));
+        when(issueService.list(0)).thenReturn(new PageImpl<>(List.of(issue)));
+        when(issueService.suggestion()).thenReturn(issue);
+        when(issueService.find(3)).thenReturn(issue);
+        when(issueService.rows(any(), any())).thenReturn(List.of(
+                new MgmtIssueService.ArticleRow(12, "Заглавие", LocalDateTime.now(), io.pacod.cms.core.data.ArticleStatus.PUBLISHED, false),
+                new MgmtIssueService.ArticleRow(14, "Чернова", null, io.pacod.cms.core.data.ArticleStatus.DRAFT, false),
+                new MgmtIssueService.ArticleRow(13, null, null, null, true)));
+        when(gotenberg.enabled()).thenReturn(true);
+        when(printTokens.enabled()).thenReturn(true);
+
+        org.assertj.core.api.Assertions.assertThat(mockMvc.perform(get("/mgmt/issues")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).contains("href=\"/mgmt/issues/3\"", "Есен", "2026-10");
+        org.assertj.core.api.Assertions.assertThat(mockMvc.perform(get("/mgmt/issues/new")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).contains("action=\"/mgmt/issues\"", "name=\"volume\"");
+
+        String editor = mockMvc.perform(get("/mgmt/issues/3")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(editor)
+                .contains("action=\"/mgmt/issues/3\"", "name=\"title_bg\"", "name=\"editorial_bg\"",
+                        "value=\"12, 13\"", "action=\"/mgmt/issues/3/fill-month\"", "action=\"/mgmt/issues/3/articles/move\"",
+                        "action=\"/mgmt/issues/3/generate\"", "action=\"/mgmt/issues/3/publish\"",
+                        "action=\"/mgmt/issues/3/delete\"", "href=\"/mgmt/issues/3/pdf/bg\"");
+        // A draft is flagged, a missing article named; the article list is its own form.
+        org.assertj.core.api.Assertions.assertThat(editor.split("class=\"badge draft\"", -1).length - 1).isEqualTo(2);
+        org.assertj.core.api.Assertions.assertThat(editor).contains("Чернова");
+
+        mockMvc.perform(post("/mgmt/issues/3/generate").with(csrf()).param("format", "scientific"))
+                .andExpect(redirectedUrl("/mgmt/jobs/" + JOB_ID));
+        verify(jobQueue).enqueue(eq("test"), any(), eq(JobType.PDF_ISSUE),
+                eq(Map.of("issue", "3", "format", "scientific", "mode", "code")), any(), eq(false));
+
+        mockMvc.perform(post("/mgmt/issues/3").with(csrf()).param("volume", "2").param("number", "5")
+                        .param("year", "2026").param("month", "10").param("articleIds", "12; 13"))
+                .andExpect(redirectedUrl("/mgmt/issues/3"))
+                .andExpect(flash().attributeExists("error"));
+        mockMvc.perform(get("/mgmt/issues/x1")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("the PDF cards offer format and mode, the website's defaults first, the AI mode off without AI")
+    void pdfChoices() throws Exception {
+        when(gotenberg.enabled()).thenReturn(true);
+        when(printTokens.enabled()).thenReturn(true);
+        String jobs = mockMvc.perform(get("/mgmt/jobs")).andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(jobs)
+                .contains("name=\"format\"", "value=\"scientific\"", "name=\"mode\"", "value=\"llm\" disabled")
+                .doesNotContain("name=\"refresh\"");
+        when(aiAccess.refusalHere()).thenReturn(Optional.empty());
+        jobs = mockMvc.perform(get("/mgmt/jobs")).andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(jobs).contains("name=\"refresh\"").doesNotContain("value=\"llm\" disabled");
     }
 
     @Test

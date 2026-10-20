@@ -77,6 +77,14 @@ public class MgmtArticleController {
         this.ai = ai;
     }
 
+    private io.pacod.cms.core.repository.PdfSettingsRepository pdfSettings;
+
+    /** The PDF card's defaults; optional for the hand-built tests' reason. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void usePdfSettings(io.pacod.cms.core.repository.PdfSettingsRepository pdfSettings) {
+        this.pdfSettings = pdfSettings;
+    }
+
     @GetMapping
     public String list(@RequestParam(required = false) String q,
                        @RequestParam(required = false) Integer category,
@@ -416,6 +424,11 @@ public class MgmtArticleController {
         // but the original, each marked when the article already has it.
         boolean aiAvailable = ai != null && ai.availableHere();
         model.addAttribute("aiAvailable", aiAvailable);
+        // The PDF card's format and mode, its first choice saying what the website's default is.
+        model.addAttribute("pdfSettings", pdfSettings == null ? new io.pacod.cms.core.data.PdfSettings()
+                : pdfSettings.findById(io.pacod.cms.core.data.PdfSettings.ID).orElseGet(io.pacod.cms.core.data.PdfSettings::new));
+        model.addAttribute("pdfFormats", io.pacod.cms.core.data.PdfFormat.values());
+        model.addAttribute("pdfModes", io.pacod.cms.core.data.PdfMode.values());
         if (aiAvailable) {
             String original = io.pacod.cms.core.data.LanguageChain.original();
             java.util.List<String> have = article.translatedIn();

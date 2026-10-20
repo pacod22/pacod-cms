@@ -29,6 +29,7 @@
     <link rel="stylesheet" href="/site-assets/site.css"/>
     <!--/* The website's theme, as on every page: its colours and fonts reach its PDFs too. */-->
     <link rel="stylesheet" th:if="${theme != null and theme.present}" th:href="${theme.href()}"/>
+    <link rel="stylesheet" href="/site-assets/print.css"/>
 </head>
 
 <body>
@@ -48,6 +49,18 @@
             </span>
         </div>
     </div>
+
+    <!--/* The abstract and keywords: the article's own description and tags, or what the AI
+           gateway wrote for its PDF (PrintExtras). Absent, absent: an article without either
+           prints as it always did. */-->
+    <section class="print-abstract" th:if="${printMeta != null and printMeta.hasAbstract()}">
+        <h2 class="print-abstract__label" th:text="#{print.abstract}">Abstract</h2>
+        <p th:text="${printMeta.abstractText}"></p>
+    </section>
+    <p class="print-keywords" th:if="${printMeta != null and printMeta.hasKeywords()}">
+        <strong th:text="#{article.keywords} + ':'">Keywords:</strong>
+        <span th:text="${#strings.listJoin(printMeta.keywords, ' · ')}"></span>
+    </p>
 
     <!--/* One image, not the strip fragments/article-view.html renders. This page is deliberately
            bare -- it loads no site.js, so nothing ever adds .is-carousel -- and .gallery without

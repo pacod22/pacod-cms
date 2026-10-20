@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  One journal issue (MgmtIssueController): its details, its articles in order, generating its PDF,
+  the PDFs generated, publishing and deleting. Every card is its own form -- the move and remove
+  buttons, filling from the month, generating -- so none of them can post another's fields; the
+  details form alone carries the article list, as text, for an order typed by hand.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{issues.label(${issue.volume}, ${issue.number})})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('issues')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{issues.label(${issue.volume}, ${issue.number})})}"></header>
+
+        <main class="content" th:with="mayWrite=${can != null and can.site('content.write')}">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <a class="btn btn-ghost" th:href="@{/mgmt/issues}">&larr; <th:block th:text="#{issues.back}">All issues</th:block></a>
+                <span class="badge" th:classappend="${issue.published()} ? 'published' : 'draft'"
+                      th:text="${mgmtText.label(issue.status)}">draft</span>
+                <a class="btn btn-ghost push" th:if="${issue.published() and publicUrl != null}" th:href="${publicUrl}"
+                   target="_blank" rel="noopener">
+                    <svg class="i"><use href="#i-external"></use></svg> <th:block th:text="#{issues.viewOnSite}">View on the website</th:block>
+                </a>
+            </div>
+
+            <form class="form-page" method="post" th:action="@{/mgmt/issues/{id}(id=${issue.id})}">
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-book"></use></svg> <span th:text="#{issues.section.details}">Details</span></h2>
+                    <div class="card-body">
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="volume" th:text="#{issues.field.volume}">Volume</label>
+                                <input type="number" id="volume" name="volume" min="1" max="9999" required th:value="${issue.volume}">
+                            </div>
+                            <div class="field">
+                                <label for="number" th:text="#{issues.field.number}">Number</label>
+                                <input type="number" id="number" name="number" min="1" max="999" required th:value="${issue.number}">
+                            </div>
+                            <div class="field">
+                                <label for="year" th:text="#{issues.field.year}">Year</label>
+                                <input type="number" id="year" name="year" min="1900" max="2999" required th:value="${issue.year}">
+                            </div>
+                            <div class="field">
+                                <label for="month" th:text="#{issues.field.month}">Month</label>
+                                <input type="number" id="month" name="month" min="1" max="12" required th:value="${issue.month}">
+                            </div>
+                        </div>
+
+                        <h3 class="subhead" th:text="#{issues.field.title}">Title</h3>
+                        <span class="hint" th:text="#{issues.field.title.hint}">Optional, per language.</span>
+                        <div class="field" th:each="t : ${titles}">
+                            <label th:for="'title-' + ${t.code()}" th:text="${t.name() ?: t.code()} + ' (' + ${t.code()} + ')'">English (en)</label>
+                            <input type="text" th:id="'title-' + ${t.code()}" th:name="'title_' + ${t.code()}" th:value="${t.value()}" maxlength="200">
+                        </div>
+
+                        <h3 class="subhead" th:text="#{issues.field.editorial}">Editorial</h3>
+                        <span class="hint" th:text="#{issues.field.editorial.hint}">Optional, per language, HTML allowed.</span>
+                        <div class="field" th:each="e : ${editorials}">
+                            <label th:for="'editorial-' + ${e.code()}" th:text="${e.name() ?: e.code()} + ' (' + ${e.code()} + ')'">English (en)</label>
+                            <textarea th:id="'editorial-' + ${e.code()}" th:name="'editorial_' + ${e.code()}" rows="5" th:text="${e.value()}"></textarea>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="coverImageId" th:text="#{issues.field.cover}">Cover image number</label>
+                                <input type="text" id="coverImageId" name="coverImageId" inputmode="numeric" th:value="${issue.coverImageId}">
+                                <span class="hint" th:text="#{issues.field.cover.hint}">An image from the library; blank for none.</span>
+                            </div>
+                            <div class="field" th:if="${issue.coverImageId != null}">
+                                <a th:href="@{/mgmt/images/{id}(id=${issue.coverImageId})}" th:text="'#' + ${issue.coverImageId}">#12</a>
+                            </div>
+                        </div>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="format" th:text="#{jobs.pdf.format}">Format</label>
+                                <select id="format" name="format">
+                                    <option value="" th:text="#{jobs.pdf.default(${mgmtText.label(pdfSettings.format())})}">Default</option>
+                                    <option th:each="f : ${pdfFormats}" th:value="${f.param()}" th:text="${mgmtText.label(f)}"
+                                            th:selected="${f == issue.format}">Standard</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="mode" th:text="#{jobs.pdf.mode}">Made by</label>
+                                <select id="mode" name="mode">
+                                    <option value="" th:text="#{jobs.pdf.default(${mgmtText.label(pdfSettings.mode())})}">Default</option>
+                                    <option th:each="m : ${pdfModes}" th:value="${m.param()}" th:text="${mgmtText.label(m)}"
+                                            th:selected="${m == issue.mode}">Code</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label th:text="#{issues.field.languages}">Languages to generate</label>
+                            <div class="checkline" th:each="l : ${languages}">
+                                <input type="checkbox" name="languages" th:id="'lang-' + ${l.code()}" th:value="${l.code()}"
+                                       th:checked="${issue.languages.contains(l.code())}">
+                                <label th:for="'lang-' + ${l.code()}" th:text="${l.name() ?: l.code()}">English</label>
+                            </div>
+                            <span class="hint" th:text="#{issues.field.languages.hint}">None ticked means the original.</span>
+                        </div>
+                        <div class="field">
+                            <label for="articleIds" th:text="#{issues.field.articleIds}">Articles, in order</label>
+                            <input type="text" id="articleIds" name="articleIds" th:value="${articleIdsText}" autocomplete="off">
+                            <span class="hint" th:text="#{issues.field.articleIds.hint(${maxArticles})}">Numbers separated by commas.</span>
+                        </div>
+                    </div>
+                    <div class="card-foot" th:if="${mayWrite}">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{issues.save}">Save</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-file-text"></use></svg> <span th:text="#{issues.section.articles}">Articles</span></h2>
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th class="shrink">#</th>
+                            <th th:text="#{issues.col.title}">Title</th>
+                            <th class="shrink" th:text="#{issues.col.date}">Date</th>
+                            <th class="shrink" th:if="${mayWrite}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="r, it : ${rows}">
+                            <td class="shrink muted" th:text="${r.id()}">12</td>
+                            <td>
+                                <a th:unless="${r.missing()}" th:href="@{/mgmt/articles/{id}(id=${r.id()})}" th:utext="${r.title()}">Title</a>
+                                <span class="muted" th:if="${r.missing()}" th:text="#{issues.article.missing}">no such article</span>
+                                <span class="badge draft" th:if="${!r.missing() and !r.included()}" th:text="#{issues.article.draft}">not published</span>
+                            </td>
+                            <td class="shrink muted" th:text="${r.date() == null} ? '—' : ${#temporals.format(r.date(), 'dd.MM.yyyy')}">01.10.2026</td>
+                            <td class="shrink" th:if="${mayWrite}">
+                                <div class="actions">
+                                    <form method="post" th:action="@{/mgmt/issues/{id}/articles/move(id=${issue.id})}" th:unless="${it.first}">
+                                        <input type="hidden" name="article" th:value="${r.id()}"><input type="hidden" name="delta" value="-1">
+                                        <button class="btn btn-icon btn-sm" type="submit" th:title="#{issues.move.up}"><svg class="i"><use href="#i-arrow-up"></use></svg></button>
+                                    </form>
+                                    <form method="post" th:action="@{/mgmt/issues/{id}/articles/move(id=${issue.id})}" th:unless="${it.last}">
+                                        <input type="hidden" name="article" th:value="${r.id()}"><input type="hidden" name="delta" value="1">
+                                        <button class="btn btn-icon btn-sm" type="submit" th:title="#{issues.move.down}"><svg class="i"><use href="#i-arrow-down"></use></svg></button>
+                                    </form>
+                                    <form method="post" th:action="@{/mgmt/issues/{id}/articles/remove(id=${issue.id})}">
+                                        <input type="hidden" name="article" th:value="${r.id()}">
+                                        <button class="btn btn-danger btn-icon btn-sm" type="submit" th:title="#{issues.remove}"><svg class="i"><use href="#i-trash"></use></svg></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr th:if="${rows.isEmpty()}">
+                            <td colspan="4" class="muted" th:text="#{issues.error.empty}">No article.</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <form class="card-foot" method="post" th:if="${mayWrite}" th:action="@{/mgmt/issues/{id}/fill-month(id=${issue.id})}">
+                    <span class="hint" th:text="#{issues.fillMonth.hint}">Replaces the list with the month's articles.</span>
+                    <button class="btn" type="submit">
+                        <svg class="i"><use href="#i-calendar"></use></svg> <span th:text="#{issues.fillMonth}">Fill from the month</span>
+                    </button>
+                </form>
+            </div>
+
+            <div class="card" th:if="${mayWrite}">
+                <h2><svg class="i"><use href="#i-play"></use></svg> <span th:text="#{issues.section.generate}">Generate the PDF</span></h2>
+                <p class="card-body muted" th:unless="${pdfEnabled}" th:text="#{jobs.pdf.off}">PDF export is off.</p>
+                <form method="post" th:if="${pdfEnabled}" th:action="@{/mgmt/issues/{id}/generate(id=${issue.id})}">
+                    <div class="card-body">
+                        <span class="hint" th:text="#{issues.generate.hint}">One PDF per language.</span>
+                        <div th:replace="~{mgmt/fragments :: pdfChoices('issue-pdf', ${issue.format ?: pdfSettings.format()}, ${issue.mode ?: pdfSettings.mode()}, ${aiRefusal == null})}"></div>
+                        <div class="checkline">
+                            <input type="checkbox" id="issue-next" name="next" value="true">
+                            <label for="issue-next" th:text="#{jobs.pdf.next}">Run it next</label>
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-play"></use></svg> <span th:text="#{issues.generate}">Queue</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-file-text"></use></svg> <span th:text="#{issues.section.pdfs}">Generated PDFs</span></h2>
+                <p class="card-body muted" th:if="${issue.renditions.isEmpty()}" th:text="#{issues.pdf.none}">Not generated yet.</p>
+                <div class="table-wrap" th:unless="${issue.renditions.isEmpty()}">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th th:text="#{issues.col.language}">Language</th>
+                            <th class="shrink" th:text="#{issues.col.generated}">Generated</th>
+                            <th class="shrink" th:text="#{issues.col.pages}">Pages</th>
+                            <th class="shrink" th:text="#{jobs.pdf.format}">Format</th>
+                            <th class="shrink"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="r : ${issue.renditions}">
+                            <td th:text="${r.key}">bg</td>
+                            <td class="shrink muted" th:text="${r.value.generatedOn == null} ? '—' : ${#temporals.format(r.value.generatedOn, 'dd.MM.yyyy HH:mm')}">—</td>
+                            <td class="shrink muted" th:text="${r.value.pages}">24</td>
+                            <td class="shrink muted" th:text="${r.value.format == null} ? '—' : ${mgmtText.label(r.value.format)}">Standard</td>
+                            <td class="shrink">
+                                <a class="btn btn-sm" th:href="@{/mgmt/issues/{id}/pdf/{lang}(id=${issue.id}, lang=${r.key})}">
+                                    <svg class="i"><use href="#i-arrow-down"></use></svg> <th:block th:text="#{issues.pdf.download}">Download</th:block>
+                                </a>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card" th:if="${can != null and can.site('content.publish')}">
+                <h2><svg class="i"><use href="#i-globe"></use></svg> <span th:text="#{issues.section.publish}">Publication</span></h2>
+                <div class="card-body">
+                    <p class="muted" style="margin-top:0" th:text="#{issues.publish.hint}">Published, it is at /issues.</p>
+                    <form method="post" th:unless="${issue.published()}" th:action="@{/mgmt/issues/{id}/publish(id=${issue.id})}">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-check"></use></svg> <span th:text="#{issues.publish}">Publish</span>
+                        </button>
+                    </form>
+                    <form method="post" th:if="${issue.published()}" th:action="@{/mgmt/issues/{id}/unpublish(id=${issue.id})}">
+                        <button class="btn" type="submit">
+                            <svg class="i"><use href="#i-eye-off"></use></svg> <span th:text="#{issues.unpublish}">Unpublish</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card danger" th:if="${can != null and can.site('content.delete')}">
+                <h2><svg class="i"><use href="#i-trash"></use></svg> <span th:text="#{issues.delete}">Delete the issue</span></h2>
+                <div class="card-body">
+                    <form method="post" th:action="@{/mgmt/issues/{id}/delete(id=${issue.id})}" th:data-confirm="#{issues.delete.confirm}">
+                        <button class="btn btn-danger" type="submit">
+                            <svg class="i"><use href="#i-trash"></use></svg> <span th:text="#{issues.delete}">Delete the issue</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

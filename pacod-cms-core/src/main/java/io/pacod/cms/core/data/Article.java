@@ -203,18 +203,38 @@ public class Article {
      * <p>Not a getter, for {@link #visibleImages()}'s reason.
      */
     public String titleIn(String lang) {
+        return storedIn(titles, title, lang);
+    }
+
+    /**
+     * The body stored for exactly {@code lang}, or {@code null}: {@link #titleIn}'s rule applied to
+     * {@code texts} and {@code text}. What a PDF's enrichment is computed from and checked against,
+     * so a fallback body is never summarised as if it were the requested language's.
+     *
+     * <p>Not a getter, for {@link #visibleImages()}'s reason.
+     */
+    public String textIn(String lang) {
+        return storedIn(texts, text, lang);
+    }
+
+    /** The description stored for exactly {@code lang}, or {@code null}; {@link #titleIn}'s rule. */
+    public String descriptionIn(String lang) {
+        return storedIn(descriptions, description, lang);
+    }
+
+    private static String storedIn(List<TextItem> items, String scalar, String lang) {
         String code = LanguageChain.normalise(lang);
         if (code == null) {
             return null;
         }
-        for (TextItem item : titles == null ? List.<TextItem>of() : titles) {
+        for (TextItem item : items == null ? List.<TextItem>of() : items) {
             if (item != null && code.equalsIgnoreCase(item.getLang())
                     && item.getText() != null && !item.getText().isBlank()) {
                 return item.getText();
             }
         }
-        if (LanguageChain.original().equals(code) && title != null && !title.isBlank()) {
-            return title;
+        if (LanguageChain.original().equals(code) && scalar != null && !scalar.isBlank()) {
+            return scalar;
         }
         return null;
     }

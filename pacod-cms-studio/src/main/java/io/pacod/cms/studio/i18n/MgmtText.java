@@ -45,7 +45,7 @@ public class MgmtText {
 
     /** The bundle files, one per area of the console, under {@code src/main/resources/i18n/}. */
     public static final List<String> BASENAMES =
-            List.of("i18n/common", "i18n/articles", "i18n/banners", "i18n/pages", "i18n/ops", "i18n/portal", "i18n/design", "i18n/jobs");
+            List.of("i18n/common", "i18n/articles", "i18n/banners", "i18n/pages", "i18n/ops", "i18n/portal", "i18n/design", "i18n/jobs", "i18n/pdf");
 
     /** The languages the console is offered in. English first: it is the base bundle. */
     public static final List<UiLanguage> LANGUAGES = List.of(

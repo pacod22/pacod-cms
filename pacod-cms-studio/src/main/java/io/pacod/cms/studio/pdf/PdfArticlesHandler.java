@@ -1,14 +1,20 @@
 package io.pacod.cms.studio.pdf;
 
-import io.pacod.cms.core.control.data.Domain;
 import io.pacod.cms.core.control.data.JobType;
-import io.pacod.cms.core.control.repository.DomainRepository;
 import io.pacod.cms.core.data.Article;
 import io.pacod.cms.core.data.LanguageChain;
-import io.pacod.cms.core.design.PrintTokens;
+import io.pacod.cms.core.data.PdfEnrichment;
+import io.pacod.cms.core.data.PdfFormat;
+import io.pacod.cms.core.data.PdfMode;
+import io.pacod.cms.core.data.PdfSettings;
 import io.pacod.cms.core.repository.ArticleRepository;
+import io.pacod.cms.core.repository.PdfSettingsRepository;
 import io.pacod.cms.core.tenant.SiteStorage;
 import io.pacod.cms.core.tenant.TenantContext;
+import io.pacod.cms.studio.ai.AiAccess;
+import io.pacod.cms.studio.ai.AiGateway;
+import io.pacod.cms.studio.ai.HtmlSafety;
+import io.pacod.cms.studio.ai.PdfEnricher;
 import io.pacod.cms.studio.jobs.ArticleSelection;
 import io.pacod.cms.studio.jobs.JobContext;
 import io.pacod.cms.studio.jobs.JobHandler;
@@ -16,14 +22,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -32,34 +33,38 @@ import java.util.Set;
  * Gotenberg into {@code resources/pdfs/articles/<lang>/article-<id>.pdf} in the website's folder
  * -- once per language the article is written in: its original and every translation.
  *
- * <p>Gotenberg reaches the site on the compose network ({@code pacod.pdf.site-url},
- * {@code http://site:8443}), where no host names a website, so every request of the render carries
- * {@code X-Forwarded-Host} -- one of the website's own hosts, which the site resolves exactly as
- * Caddy's forwarded host -- and the {@code X-Pacod-Print} token that keeps it uncounted. A file is
- * written whole (a temporary file, then a move) and overwritten by a later run: running again is
- * safe.
+ * <p>Parameters: the articles and, optionally, the languages ({@link ArticleSelection}); the
+ * {@code format} ({@link PdfFormat}) and {@code mode} ({@link PdfMode}), which the studio resolves
+ * against the website's {@link PdfSettings} when it queues the job and this handler resolves again
+ * for a job queued without them; and {@code refresh}, which asks the gateway again where an
+ * abstract already matches. The paper, margins, running header and page numbers come from the
+ * settings as they stand when the job runs.
  *
- * <p>Parameters: the articles and, optionally, the languages ({@link ArticleSelection}).
+ * <p>In {@code mode=llm} each article's abstract is written first ({@link PdfEnricher}); a failure
+ * there fails that article and language, which is not rendered. Each article has one PDF per
+ * language whatever its format: the latest render wins.
+ *
+ * <p>A file is written whole (a temporary file, then a move) and overwritten by a later run, and
+ * an abstract that still matches is not asked for again: running again is safe.
  */
 @Component
 public class PdfArticlesHandler implements JobHandler {
 
-    private final GotenbergClient gotenberg;
-    private final PrintTokens tokens;
+    private final PdfRenderer renderer;
     private final ArticleRepository articles;
-    private final DomainRepository domains;
-    private final String siteUrl;
+    private final PdfSettingsRepository settingsRepository;
+    private final PdfEnricher enricher;
+    private final AiAccess access;
     private final String storageRoot;
 
-    public PdfArticlesHandler(GotenbergClient gotenberg, PrintTokens tokens, ArticleRepository articles,
-                              DomainRepository domains,
-                              @Value("${pacod.pdf.site-url:http://site:8443}") String siteUrl,
+    public PdfArticlesHandler(PdfRenderer renderer, ArticleRepository articles,
+                              PdfSettingsRepository settingsRepository, PdfEnricher enricher, AiAccess access,
                               @Value("${pacod.storage.root:}") String storageRoot) {
-        this.gotenberg = gotenberg;
-        this.tokens = tokens;
+        this.renderer = renderer;
         this.articles = articles;
-        this.domains = domains;
-        this.siteUrl = siteUrl.strip().replaceAll("/+$", "");
+        this.settingsRepository = settingsRepository;
+        this.enricher = enricher;
+        this.access = access;
         this.storageRoot = storageRoot;
     }
 
@@ -71,12 +76,20 @@ public class PdfArticlesHandler implements JobHandler {
     @Override
     public void run(JobContext context) throws IOException {
         String siteId = TenantContext.current().siteId();
-        String host = host(siteId).orElseThrow(() -> new IllegalStateException("The website has no address to render it at"));
+        String host = renderer.host(siteId).orElseThrow(() -> new IllegalStateException("The website has no address to render it at"));
+        PdfSettings settings = settingsRepository.findById(PdfSettings.ID).orElseGet(PdfSettings::new);
+        PdfFormat format = PdfFormat.parse(context.param("format"), settings.format());
+        PdfMode mode = PdfMode.parse(context.param("mode"), settings.mode());
+        if (mode == PdfMode.LLM) {
+            access.refusalFor(siteId).ifPresent(refusal -> {
+                throw new IllegalStateException("AI is not available for this website (" + refusal + ")");
+            });
+        }
         List<Integer> ids = ArticleSelection.articleIds(context);
         Set<String> only = ArticleSelection.languages(context.param("languages"));
-        context.log(ids.size() + " article(s) at " + host);
+        context.log(ids.size() + " article(s) at " + host + ", " + format.param() + ", " + mode.param());
 
-        List<String[]> work = new ArrayList<>();
+        List<Item> work = new ArrayList<>();
         for (Integer id : ids) {
             Optional<Article> article = articles.findById(id);
             if (article.isEmpty()) {
@@ -94,43 +107,66 @@ public class PdfArticlesHandler implements JobHandler {
             languages.addAll(article.get().translatedIn());
             for (String lang : languages) {
                 if (only.isEmpty() || only.contains(lang)) {
-                    work.add(new String[]{id.toString(), lang});
+                    work.add(new Item(article.get(), lang));
                 }
             }
         }
         context.total(work.size());
-        for (String[] item : work) {
+        PdfEnricher.Run enrichment = mode == PdfMode.LLM
+                ? enricher.run(context, siteId, settings, "true".equals(context.param("refresh"))) : null;
+        String siteName = renderer.siteName(siteId);
+        for (Item item : work) {
             context.checkpoint();
-            int id = Integer.parseInt(item[0]);
-            String lang = item[1];
+            int id = item.article().getId();
+            String label = "article " + id + " (" + item.lang() + ")";
             try {
-                byte[] pdf = gotenberg.render(siteUrl + "/article-print/" + id + "?lang=" + lang, siteUrl,
-                        Map.of("X-Forwarded-Host", host, PrintTokens.HEADER, tokens.mint(siteId)));
+                Optional<PdfEnrichment> enriched = enrichment == null ? Optional.empty() : enrichment.ensure(item.article(), item.lang());
                 context.checkpoint();
-                write(SiteStorage.siteRoot(storageRoot).resolve(SiteStorage.articlePdf(id, lang)), pdf);
-                context.log("article " + id + " (" + lang + "): " + (pdf.length / 1024) + " KB");
+                byte[] pdf = renderer.article(siteId, host, id, item.lang(), format, mode,
+                        options(settings, format, item, enriched, siteName));
+                context.checkpoint();
+                PdfRenderer.write(SiteStorage.siteRoot(storageRoot).resolve(SiteStorage.articlePdf(id, item.lang())), pdf);
+                context.log(label + ": " + (pdf.length / 1024) + " KB");
                 context.advance();
-            } catch (GotenbergClient.PdfException e) {
-                context.fail("article " + id + " (" + lang + "): " + e.getMessage());
+            } catch (PdfEnricher.Exhausted e) {
+                context.log(e.getMessage());
+                return;
+            } catch (GotenbergClient.PdfException | AiGateway.AiException | PdfEnricher.Refused e) {
+                context.fail(label + ": " + e.getMessage());
             }
         }
     }
 
-    /** The website's primary host, else any. */
-    private Optional<String> host(String siteId) {
-        return domains.findByWebsiteId(siteId).stream()
-                .sorted(Comparator.comparing(Domain::isPrimary).reversed())
-                .map(Domain::getHost).findFirst();
+    /**
+     * A scientific PDF's running head names the journal and the article; any PDF's footer the
+     * journal and the page, each as the settings ask.
+     */
+    private static GotenbergClient.RenderOptions options(PdfSettings settings, PdfFormat format, Item item,
+                                                         Optional<PdfEnrichment> enriched, String siteName) {
+        String journal = journalName(settings, item.lang(), siteName);
+        String header = null;
+        if (format == PdfFormat.SCIENTIFIC && settings.isRunningHeader()) {
+            String running = enriched.map(PdfEnrichment::getRunningTitle).filter(t -> !t.isBlank())
+                    .orElseGet(() -> runningTitle(item.article(), item.lang()));
+            header = PdfHeaders.line(journal, running, settings.marginInches());
+        }
+        String footer = settings.isPageNumbers() ? PdfHeaders.pageFooter(journal, settings.marginInches()) : null;
+        return PdfRenderer.options(settings, header, footer);
     }
 
-    private static void write(Path file, byte[] pdf) throws IOException {
-        Files.createDirectories(file.getParent());
-        Path temporary = Files.createTempFile(file.getParent(), ".article-", ".pdf.part");
-        try {
-            Files.write(temporary, pdf);
-            Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } finally {
-            Files.deleteIfExists(temporary);
-        }
+    /** The journal's name in a language, else the website's. */
+    static String journalName(PdfSettings settings, String lang, String siteName) {
+        String name = settings.journalName(LanguageChain.forRequest(lang));
+        return name == null || name.isBlank() ? siteName : name;
+    }
+
+    /** The article's title in a language as plain text, at most 80 characters: a running head's. */
+    static String runningTitle(Article article, String lang) {
+        String title = article.titleIn(lang);
+        String plain = HtmlSafety.text(title == null ? article.getTitle() : title);
+        return plain.length() > 80 ? plain.substring(0, 79).strip() + "…" : plain;
+    }
+
+    private record Item(Article article, String lang) {
     }
 }

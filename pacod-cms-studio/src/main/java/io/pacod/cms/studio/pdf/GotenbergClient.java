@@ -1,6 +1,10 @@
 package io.pacod.cms.studio.pdf;
 
+import io.pacod.cms.core.data.PaperSize;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -10,7 +14,10 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.ObjectMapper;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.http.HttpClient;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -48,12 +55,30 @@ public class GotenbergClient {
     }
 
     /**
+     * The paper, the margins in inches, and an optional running header and footer: whole HTML
+     * documents Gotenberg prints into the top and bottom margins, with Chromium's
+     * {@code pageNumber}/{@code totalPages} classes filled in. Header and footer load nothing --
+     * Chromium renders them apart from the page -- so they carry their own styles ({@link PdfHeaders}).
+     */
+    public record RenderOptions(PaperSize paper, double marginTop, double marginBottom, double marginSide,
+                                String headerHtml, String footerHtml) {
+
+        /** A4, with the margins of a printed article, no header or footer: what every render was. */
+        public static final RenderOptions DEFAULT = new RenderOptions(PaperSize.A4, 0.6, 0.6, 0.6, null, null);
+    }
+
+    /**
      * The page at {@code pageUrl} as a PDF, every request of the render carrying {@code headers}
      * where its address starts with {@code origin}.
      *
      * @throws PdfException with Gotenberg's own words when it refuses or fails
      */
     public byte[] render(String pageUrl, String origin, Map<String, String> headers) {
+        return render(pageUrl, origin, headers, RenderOptions.DEFAULT);
+    }
+
+    /** {@link #render(String, String, Map)} on the given paper, margins, header and footer. */
+    public byte[] render(String pageUrl, String origin, Map<String, String> headers, RenderOptions options) {
         if (!enabled()) {
             throw new PdfException("PDF export is off: pacod.pdf.gotenberg-url is blank");
         }
@@ -65,13 +90,19 @@ public class GotenbergClient {
         form.add("extraHttpHeaders", toJson(scoped));
         form.add("emulatedMediaType", "print");
         form.add("printBackground", "true");
-        // A4, with the margins of a printed article.
-        form.add("paperWidth", "8.27");
-        form.add("paperHeight", "11.7");
-        form.add("marginTop", "0.6");
-        form.add("marginBottom", "0.6");
-        form.add("marginLeft", "0.6");
-        form.add("marginRight", "0.6");
+        form.add("paperWidth", inches(options.paper().widthInches()));
+        form.add("paperHeight", inches(options.paper().heightInches()));
+        form.add("marginTop", inches(options.marginTop()));
+        form.add("marginBottom", inches(options.marginBottom()));
+        form.add("marginLeft", inches(options.marginSide()));
+        form.add("marginRight", inches(options.marginSide()));
+        // Gotenberg's convention: the header and footer are files of the form, by these names.
+        if (options.headerHtml() != null) {
+            form.add("files", htmlFile("header.html", options.headerHtml()));
+        }
+        if (options.footerHtml() != null) {
+            form.add("files", htmlFile("footer.html", options.footerHtml()));
+        }
         try {
             byte[] pdf = client.post().uri(url + "/forms/chromium/convert/url")
                     .contentType(MediaType.MULTIPART_FORM_DATA).body(form)
@@ -87,6 +118,24 @@ public class GotenbergClient {
         } catch (org.springframework.web.client.ResourceAccessException e) {
             throw new PdfException("Gotenberg cannot be reached: " + e.getMessage());
         }
+    }
+
+    /** Two decimals at most, never a locale's comma: {@code 0,6} is no number to Gotenberg. */
+    static String inches(double value) {
+        return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
+    }
+
+    private static HttpEntity<ByteArrayResource> htmlFile(String name, String html) {
+        ByteArrayResource resource = new ByteArrayResource(html.getBytes(StandardCharsets.UTF_8)) {
+            @Override
+            public String getFilename() {
+                return name;
+            }
+        };
+        HttpHeaders part = new HttpHeaders();
+        part.setContentType(MediaType.TEXT_HTML);
+        part.setContentDispositionFormData("files", name);
+        return new HttpEntity<>(resource, part);
     }
 
     private String toJson(Map<String, String> headers) {

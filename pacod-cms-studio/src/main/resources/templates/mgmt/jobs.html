@@ -198,6 +198,7 @@
                                 <input type="number" id="pdf-to" name="to" min="1">
                             </div>
                         </div>
+                        <div th:replace="~{mgmt/fragments :: pdfChoices('pdf', ${pdfSettings.format()}, ${pdfSettings.mode()}, ${aiRefusal == null})}"></div>
                         <div class="checkline">
                             <input type="checkbox" id="pdf-next" name="next" value="true">
                             <label for="pdf-next" th:text="#{jobs.pdf.next}">Run it next</label>

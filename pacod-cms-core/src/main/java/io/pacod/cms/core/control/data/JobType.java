@@ -1,5 +1,7 @@
 package io.pacod.cms.core.control.data;
 
+import java.util.Map;
+
 /**
  * What a {@link Job} does. A studio {@code JobHandler} implements each; the enum is in core because
  * the job document carries it.
@@ -13,7 +15,10 @@ public enum JobType {
     TRANSLATE_ARTICLES(true),
 
     /** The rest of a website through the AI gateway: standing pages, categories, tags, menus, social page. */
-    TRANSLATE_SITE(true);
+    TRANSLATE_SITE(true),
+
+    /** A journal issue: cover, contents and its articles in one PDF per language, through Gotenberg. */
+    PDF_ISSUE(false);
 
     private final boolean usesAi;
 
@@ -24,5 +29,15 @@ public enum JobType {
     /** Whether it calls the AI gateway: then it needs {@code ai.use} and AI switched on. */
     public boolean usesAi() {
         return usesAi;
+    }
+
+    /**
+     * Whether a job of this type with these parameters calls the AI gateway: always for the
+     * translations, and for the PDF jobs in {@code mode=llm}, which have the gateway write each
+     * article's abstract and keywords before rendering it.
+     */
+    public boolean usesAi(Map<String, String> params) {
+        return usesAi || ((this == PDF_ARTICLES || this == PDF_ISSUE)
+                && params != null && "llm".equals(params.get("mode")));
     }
 }

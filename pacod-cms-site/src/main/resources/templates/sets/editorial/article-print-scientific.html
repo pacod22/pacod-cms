@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  The scientific print view: GET /article-print/{id}?format=scientific. A full-width head --
+  title, authors, date and issue, the abstract and the keywords -- then the body as the author
+  wrote it, in two columns (print.css, .sci-body). What the studio's PDF jobs render in the
+  SCIENTIFIC format; the standard one is article-print.html, whose rules apply here too: no
+  fragments/head (it must print light), only this website's origin reachable under Gotenberg.
+
+  No embedded video: Gotenberg runs with JavaScript off and frames blocked, and a frame in a
+  column would print as an empty box. The first visible image heads the page across both columns.
+*/-->
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="${article.title}"></title>
+    <meta name="author" th:if="${site != null}" th:content="${site.name(lang)}"/>
+    <meta name="description" th:content="${printMeta != null and printMeta.hasAbstract() ? printMeta.abstractText : article.description}"/>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta http-equiv="CONTENT-LANGUAGE" th:content="${site != null ? site.ogLocale(lang) : lang}"/>
+    <link rel="icon" type="image/svg+xml" th:href="${site?.favicon() ?: '/site-assets/favicon.svg'}"
+          href="/site-assets/favicon.svg"/>
+    <link rel="stylesheet" href="/site-assets/site.css"/>
+    <link rel="stylesheet" th:if="${theme != null and theme.present}" th:href="${theme.href()}"/>
+    <link rel="stylesheet" href="/site-assets/print.css"/>
+</head>
+
+<body class="sci">
+<article class="sci-paper">
+
+    <header class="sci-head">
+        <h1 class="sci-title" id="article-title" th:utext="${article.title}"></h1>
+        <p class="sci-authors" th:if="${article.showArticleInfo() and !#strings.isEmpty(article.authorsAsText)}"
+           id="authors" th:text="${article.authorsAsText}"></p>
+        <p class="sci-meta" th:if="${article.showArticleInfo()}">
+            <span th:text="#{article.date} + ' ' + ${article.dateAsText}">Date: …</span>
+            <span aria-hidden="true">·</span>
+            <span th:text="#{article.issue} + ' ' + ${article.issue}">Issue: …</span>
+        </p>
+
+        <section class="print-abstract sci-abstract" th:if="${printMeta != null and printMeta.hasAbstract()}">
+            <h2 class="print-abstract__label" th:text="#{print.abstract}">Abstract</h2>
+            <p th:text="${printMeta.abstractText}"></p>
+        </section>
+        <p class="print-keywords" th:if="${printMeta != null and printMeta.hasKeywords()}">
+            <strong th:text="#{article.keywords} + ':'">Keywords:</strong>
+            <span th:text="${#strings.listJoin(printMeta.keywords, ' · ')}"></span>
+        </p>
+
+        <th:block th:with="images=${article.visibleImages()}">
+            <figure class="sci-figure" th:if="${!images.isEmpty()}">
+                <img th:src="'/assets/img/articles/' + ${images[0].filename}" th:alt="${images[0].altFor(lang)}"/>
+                <figcaption th:if="${!#strings.isEmpty(images[0].caption)}" th:text="${images[0].caption}"></figcaption>
+            </figure>
+        </th:block>
+    </header>
+
+    <div class="article-body sci-body" id="text" th:utext="${article.text}"></div>
+</article>
+</body>
+</html>

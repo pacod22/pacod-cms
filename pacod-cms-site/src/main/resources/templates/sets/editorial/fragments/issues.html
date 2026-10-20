@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<!--/*
+  The journal's issues on the public site (IssueController): the archive and one issue. Shared by
+  every set's issues.html and issue.html, which differ only in the page around them. Everything is
+  computed in Java (IssueReader.IssueView, Entry): restricted-mode SpEL constructs nothing.
+*/-->
+<body>
+
+<!--/* The archive: newest first, a page of IssueReader.PAGE_SIZE. */-->
+<th:block th:fragment="list(views, page, lang)">
+    <div class="page-head">
+        <h1 class="page-head__title" th:text="#{issues.title}">Issues</h1>
+    </div>
+    <p class="muted" th:text="#{issues.intro}">Every issue of the journal.</p>
+
+    <div class="empty-note" th:if="${views.isEmpty()}" th:text="#{issues.empty}">No issue has been published yet.</div>
+
+    <article class="list-row" th:each="v : ${views}">
+        <a class="list-row__thumb" th:if="${v.coverPath() != null}" th:href="@{/issues/{id}(id=${v.issue().id}, lang=${lang})}">
+            <img th:src="${v.coverPath()}" alt="" loading="lazy"/>
+        </a>
+        <span class="list-row__thumb list-row__thumb--empty" th:if="${v.coverPath() == null}" aria-hidden="true"></span>
+        <div class="list-row__body">
+            <span class="list-row__meta" th:text="${v.monthName()} + ' ' + ${v.issue().year}">October 2026</span>
+            <h2 class="list-row__title">
+                <a th:href="@{/issues/{id}(id=${v.issue().id}, lang=${lang})}"
+                   th:text="#{issues.volumeNumber(${v.issue().volume}, ${v.issue().number})}">Volume 1, number 1</a>
+            </h2>
+            <span class="list-row__author" th:if="${!#strings.isEmpty(v.title())}" th:text="${v.title()}">Autumn</span>
+        </div>
+    </article>
+
+    <nav class="pager" th:if="${page.totalPages > 1}" th:aria-label="#{pager.label}">
+        <a class="pager__item" th:if="${!page.first}" th:href="@{/issues(page=${page.number - 1}, lang=${lang})}"
+           th:aria-label="#{pager.previous}">«</a>
+        <span class="pager__item pager__item--current" th:text="${page.number + 1}">1</span>
+        <a class="pager__item" th:if="${!page.last}" th:href="@{/issues(page=${page.number + 1}, lang=${lang})}"
+           th:aria-label="#{pager.next}">»</a>
+    </nav>
+</th:block>
+
+<!--/* One issue: its cover, title, editorial, contents linking to the articles, and its PDFs. */-->
+<th:block th:fragment="detail(view, entries, pdfs, lang)">
+    <div class="page-head">
+        <span class="page-head__kicker" th:text="${view.monthName()} + ' ' + ${view.issue().year}">October 2026</span>
+        <h1 class="page-head__title" th:text="#{issues.volumeNumber(${view.issue().volume}, ${view.issue().number})}">Volume 1, number 1</h1>
+    </div>
+    <p class="issue-subtitle" th:if="${!#strings.isEmpty(view.title())}" th:text="${view.title()}">Autumn</p>
+    <p class="muted" th:if="${view.issn() != null}" th:text="#{issues.issn(${view.issn()})}">ISSN 1234-5678</p>
+
+    <figure class="figure" th:if="${view.coverPath() != null}">
+        <div class="figure__frame"><img th:src="${view.coverPath()}" alt=""/></div>
+    </figure>
+
+    <p class="issue-downloads" th:if="${!pdfs.isEmpty()}">
+        <a class="button-ghost" th:each="p : ${pdfs}" th:href="${p.value}" target="_blank" rel="noopener"
+           th:hreflang="${p.key}" th:text="#{issues.pdf} + ' · ' + ${#strings.toUpperCase(p.key)}">PDF</a>
+    </p>
+
+    <section th:if="${!#strings.isEmpty(view.editorial())}">
+        <h2 th:text="#{print.editorial}">Editorial</h2>
+        <div class="article-body" th:utext="${view.editorial()}"></div>
+    </section>
+
+    <section>
+        <h2 th:text="#{print.contents}">Contents</h2>
+        <article class="list-row" th:each="e : ${entries}">
+            <div class="list-row__body">
+                <h3 class="list-row__title">
+                    <a th:href="@{/article/{id}(id=${e.articleId()}, lang=${lang})}" th:utext="${e.title()}">Title</a>
+                </h3>
+                <span class="list-row__author" th:if="${!#strings.isEmpty(e.authors())}" th:text="${e.authors()}">Author</span>
+            </div>
+        </article>
+    </section>
+
+    <p><a th:href="@{/issues(lang=${lang})}" th:text="#{issues.back}">All issues</a></p>
+</th:block>
+
+</body>
+</html>

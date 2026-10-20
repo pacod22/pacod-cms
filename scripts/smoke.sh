@@ -115,6 +115,10 @@ if [ -n "$SITE_HOST" ]; then
   row "/search.html" 404 "$SITE_HOST" /search.html
   row "/robots.txt" 200 "$SITE_HOST" /robots.txt
   row "/sitemap.xml" 200 "$SITE_HOST" /sitemap.xml
+  row "/issues" 200 "$SITE_HOST" /issues
+  row "/issues/999999 (no such issue)" 404 "$SITE_HOST" /issues/999999
+  # The issue's print front shows drafts: without the PDF renderer's token it is not there at all.
+  row "/issue-print/1/front (no print token)" 404 "$SITE_HOST" /issue-print/1/front
   row "/social/go/x" 302 "$SITE_HOST" /social/go/x "$SITE_URL/"
   row "/_internal/tls-ask (closed from outside)" 404 "$SITE_HOST" "/_internal/tls-ask?domain=$SITE_HOST"
   row "/assets/img/articles/none.jpg" 404 "$SITE_HOST" /assets/img/articles/none.jpg
@@ -152,7 +156,8 @@ row "/resources/banners/x/index.html" 302 "$STUDIO_HOST" /resources/banners/x/in
 if [ -n "$SITE" ]; then
   # The polls and data screens one by one: a matcher covering a screen but not its JSON would hand
   # the data to anyone, with nothing on any screen to show it.
-  for screen in articles monitoring/live dashboard/live jobs crawlers social/stats banners/layouts design/preview settings members; do
+  for screen in articles monitoring/live dashboard/live jobs crawlers social/stats banners/layouts design/preview settings members \
+      pdf issues issues/1/pdf/en; do
     row "/sites/$SITE/mgmt/$screen" 302 "$STUDIO_HOST" "/sites/$SITE/mgmt/$screen" "$STUDIO_URL/sites/$SITE/mgmt/login"
   done
 fi

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  The website's PDF defaults (MgmtPdfSettingsController): format and mode, paper and margins, the
+  journal's name per language and ISSN, the running head and page numbers, what the AI gateway is
+  asked for. One form, saved whole; content readers see it, website.manage saves it.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{pdf.settings.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('pdf')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{pdf.settings.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+            <p class="muted" th:text="#{pdf.settings.intro}">What every PDF of this website starts from.</p>
+
+            <form class="form-page" method="post" th:action="@{/mgmt/pdf}"
+                  th:with="mayEdit=${can != null and can.site('website.manage')}">
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-file-text"></use></svg> <span th:text="#{pdf.settings.defaults}">Defaults</span></h2>
+                    <div class="card-body">
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="defaultFormat" th:text="#{jobs.pdf.format}">Format</label>
+                                <select id="defaultFormat" name="defaultFormat" th:disabled="${!mayEdit}">
+                                    <option th:each="f : ${formats}" th:value="${f}" th:text="${mgmtText.label(f)}"
+                                            th:selected="${f == settings.format()}">Standard</option>
+                                </select>
+                                <span class="hint" th:text="#{pdf.settings.format.hint}">Standard is the website's print view; scientific sets the body in two columns under an abstract.</span>
+                            </div>
+                            <div class="field">
+                                <label for="defaultMode" th:text="#{jobs.pdf.mode}">Made by</label>
+                                <select id="defaultMode" name="defaultMode" th:disabled="${!mayEdit}">
+                                    <option th:each="m : ${modes}" th:value="${m}" th:text="${mgmtText.label(m)}"
+                                            th:selected="${m == settings.mode()}">Code</option>
+                                </select>
+                                <span class="hint" th:text="#{pdf.settings.mode.hint}">With AI, the gateway writes each article's abstract and keywords; the body is never changed.</span>
+                                <span class="hint" th:if="${aiRefusal != null}" th:text="${mgmtText.label(aiRefusal)}">AI is off.</span>
+                            </div>
+                            <div class="field">
+                                <label for="paperSize" th:text="#{pdf.settings.paper}">Paper</label>
+                                <select id="paperSize" name="paperSize" th:disabled="${!mayEdit}">
+                                    <option th:each="p : ${papers}" th:value="${p}" th:text="${mgmtText.label(p)}"
+                                            th:selected="${p == settings.paper()}">A4</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="marginMm" th:text="#{pdf.settings.margin}">Margins (mm)</label>
+                                <input type="number" id="marginMm" name="marginMm" th:value="${settings.marginMm}"
+                                       th:min="${minMargin}" th:max="${maxMargin}" required th:disabled="${!mayEdit}">
+                            </div>
+                        </div>
+                        <div class="checkline">
+                            <input type="checkbox" id="runningHeader" name="runningHeader" value="true"
+                                   th:checked="${settings.runningHeader}" th:disabled="${!mayEdit}">
+                            <label for="runningHeader" th:text="#{pdf.settings.runningHeader}">A running head on scientific PDFs</label>
+                        </div>
+                        <div class="checkline">
+                            <input type="checkbox" id="pageNumbers" name="pageNumbers" value="true"
+                                   th:checked="${settings.pageNumbers}" th:disabled="${!mayEdit}">
+                            <label for="pageNumbers" th:text="#{pdf.settings.pageNumbers}">Page numbers on articles' PDFs</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-book"></use></svg> <span th:text="#{pdf.settings.journal}">The journal</span></h2>
+                    <div class="card-body">
+                        <span class="hint" th:text="#{pdf.settings.journal.hint}">Printed in running heads and on issue covers; the website's name where blank.</span>
+                        <div class="field" th:each="n : ${journalNames}">
+                            <label th:for="'journal-' + ${n.code()}" th:text="${n.name() ?: n.code()} + ' (' + ${n.code()} + ')'">English (en)</label>
+                            <input type="text" th:id="'journal-' + ${n.code()}" th:name="'journalName_' + ${n.code()}"
+                                   th:value="${n.value()}" maxlength="120" th:disabled="${!mayEdit}">
+                        </div>
+                        <div class="field">
+                            <label for="issn" th:text="#{pdf.settings.issn}">ISSN</label>
+                            <input type="text" id="issn" name="issn" th:value="${settings.issn}" maxlength="9"
+                                   pattern="\d{4}-\d{3}[\dXx]" placeholder="1234-5678" th:disabled="${!mayEdit}">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-bot"></use></svg> <span th:text="#{pdf.settings.ai}">With AI</span></h2>
+                    <div class="card-body">
+                        <div class="checkline">
+                            <input type="checkbox" id="llmAbstract" name="llmAbstract" value="true"
+                                   th:checked="${settings.llmAbstract}" th:disabled="${!mayEdit}">
+                            <label for="llmAbstract" th:text="#{pdf.settings.llmAbstract}">Write an abstract</label>
+                        </div>
+                        <div class="checkline">
+                            <input type="checkbox" id="llmKeywords" name="llmKeywords" value="true"
+                                   th:checked="${settings.llmKeywords}" th:disabled="${!mayEdit}">
+                            <label for="llmKeywords" th:text="#{pdf.settings.llmKeywords}">Choose keywords</label>
+                        </div>
+                        <div class="field">
+                            <label for="maxKeywords" th:text="#{pdf.settings.maxKeywords}">At most this many keywords</label>
+                            <input type="number" id="maxKeywords" name="maxKeywords" th:value="${settings.maxKeywords}"
+                                   th:min="${minKeywords}" th:max="${maxKeywords}" required th:disabled="${!mayEdit}">
+                        </div>
+                    </div>
+                    <div class="card-foot" th:if="${mayEdit}">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{pdf.action.save}">Save</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+</body>
+</html>
