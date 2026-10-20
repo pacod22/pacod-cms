@@ -60,11 +60,11 @@ class HostResolutionIT extends TwoWebsitesIT {
     @Test
     @DisplayName("the TLS proxy may have a certificate for an active website's host only, asking with its own Host")
     void tlsAsk() {
-        // Caddy asks on the compose network as http://site:8443, a host no website claims.
-        assertThat(get("site:8443", "/_internal/tls-ask?domain=" + ALPHA_HOST, "text/plain").statusCode()).isEqualTo(200);
-        assertThat(get("site:8443", "/_internal/tls-ask?domain=ALPHA.test", "text/plain").statusCode()).isEqualTo(200);
-        assertThat(get("site:8443", "/_internal/tls-ask?domain=nobody.test", "text/plain").statusCode()).isEqualTo(404);
-        assertThat(get("site:8443", "/_internal/tls-ask", "text/plain").statusCode()).isEqualTo(404);
+        // Caddy asks on the compose network as http://cms-site:8443, a host no website claims.
+        assertThat(get("cms-site:8443", "/_internal/tls-ask?domain=" + ALPHA_HOST, "text/plain").statusCode()).isEqualTo(200);
+        assertThat(get("cms-site:8443", "/_internal/tls-ask?domain=ALPHA.test", "text/plain").statusCode()).isEqualTo(200);
+        assertThat(get("cms-site:8443", "/_internal/tls-ask?domain=nobody.test", "text/plain").statusCode()).isEqualTo(404);
+        assertThat(get("cms-site:8443", "/_internal/tls-ask", "text/plain").statusCode()).isEqualTo(404);
 
         // A suspended website answers nobody, so it gets no certificate either.
         if (directory.bySite("kappa").isEmpty()) {
@@ -74,7 +74,7 @@ class HostResolutionIT extends TwoWebsitesIT {
         controlPlane.updateFirst(Query.query(Criteria.where("_id").is("kappa")),
                 Update.update("status", WebsiteStatus.SUSPENDED), Website.class);
         directory.evictAll();
-        assertThat(get("site:8443", "/_internal/tls-ask?domain=kappa.test", "text/plain").statusCode()).isEqualTo(404);
+        assertThat(get("cms-site:8443", "/_internal/tls-ask?domain=kappa.test", "text/plain").statusCode()).isEqualTo(404);
     }
 
     @Test

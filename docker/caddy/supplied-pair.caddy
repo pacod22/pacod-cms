@@ -1,0 +1,14 @@
+# A certificate pair supplied by the deployment (SSL_CERT_FILE, SSL_KEY_FILE), imported by cms's
+# Caddyfiles only when one is named (compose sets CADDY_SUPPLIED_PAIR). This site is here only to
+# load the pair into Caddy's certificate cache, which every listener shares: a TLS handshake for a
+# name the pair covers finds it there, and automatic HTTPS leaves those names alone ("skipping
+# automatic certificate management" in the log). Every name the pair does not cover gets its
+# certificate the usual way.
+#
+# No hostname, on a port compose does not publish: a site with a name the pair does not cover would
+# have Caddy order a certificate for that name, and keep retrying. Standalone only: the full stack is
+# HTTP only and imports nothing from docker/caddy/.
+https://:4443 {
+	tls /etc/caddy/tls/fullchain.pem /etc/caddy/tls/privkey.pem
+	respond 404
+}

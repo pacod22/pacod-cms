@@ -1,16 +1,18 @@
 # pacod-id for pacod-cms: one realm and the studio's two clients.
 #
-# pacod-id expands the variables below at start; an unset or empty one is fatal. docker-compose.yml
-# sets them from ID_ISSUER and STUDIO_ORIGIN (development: the hosts Caddy routes on HTTP_PORT).
+# pacod-id expands the variables below at start; an unset or empty one is fatal.
+# docker-compose.standalone.yml sets them from ID_ISSUER and STUDIO_ORIGIN (development: the hosts
+# Caddy routes on HTTP_PORT).
 #
 # Browser endpoints (sign-in, authorize, logout) answer only when the Host is the issuer's own, so
 # the issuer is the address Caddy publishes. The studio calls the token and key endpoints, and the
-# internal API, on the internal listener (http://id:8071) instead.
+# internal API, on the internal listener (http://pacod-id:8071) instead.
 
 [[realm]]
 name = "cms"
 issuer = "${CMS_ID_ISSUER}"
-brand = "pacod"
+# The look of the hosted pages: one of the brands pacod-id ships (gateway, cms, kb, shop, bazaar).
+brand = "cms"
 # Anyone may create an account; what they may do in the studio is decided by role bindings, and a
 # new account holds none until an organisation is created or someone invites them.
 self_signup = true

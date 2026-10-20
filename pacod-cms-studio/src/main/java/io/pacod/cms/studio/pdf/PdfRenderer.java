@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
  * through Gotenberg, the options built from a website's {@link PdfSettings}, and whole-file writes.
  *
  * <p>Gotenberg reaches the site on the compose network ({@code pacod.pdf.site-url},
- * {@code http://site:8443}), where no host names a website, so every request of a render carries
+ * {@code http://cms-site:8443}), where no host names a website, so every request of a render carries
  * {@code X-Forwarded-Host} -- one of the website's own hosts, which the site resolves exactly as
  * Caddy's forwarded host -- and an {@code X-Pacod-Print} token that keeps it uncounted and opens
  * the issue's front page. <b>A token is minted for every render</b>: it lasts five minutes, and an
@@ -43,7 +43,7 @@ public class PdfRenderer {
 
     public PdfRenderer(GotenbergClient gotenberg, PrintTokens tokens, DomainRepository domains,
                        WebsiteRepository websites,
-                       @Value("${pacod.pdf.site-url:http://site:8443}") String siteUrl) {
+                       @Value("${pacod.pdf.site-url:http://cms-site:8443}") String siteUrl) {
         this.gotenberg = gotenberg;
         this.tokens = tokens;
         this.domains = domains;

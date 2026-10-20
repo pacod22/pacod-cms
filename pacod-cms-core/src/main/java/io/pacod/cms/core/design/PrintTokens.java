@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
  * <p>The same shared key as {@link PreviewTokens} under another purpose ({@code pacod-print}), so
  * neither token opens the other's door. {@code r1.<site>.<expiry>.<mac>}, bound to one website and
  * {@link #TTL}: long enough for one render and its images. Caddy removes the header on the way in
- * ({@code docker/caddy/routes.caddy}); the site's port is published directly, which is why it is
+ * ({@code platform/caddy/cms.caddy}); the site's port is published directly, which is why it is
  * signed at all.
  */
 @Component

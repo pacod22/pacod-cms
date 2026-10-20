@@ -67,7 +67,7 @@ class PdfArticlesHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new PdfArticlesHandler(new PdfRenderer(gotenberg, tokens, domains, websites, "http://site:8443/"),
+        handler = new PdfArticlesHandler(new PdfRenderer(gotenberg, tokens, domains, websites, "http://cms-site:8443/"),
                 articles, settings, new PdfEnricher(gateway, enrichments, "@fast"), access, storage.toString());
         when(settings.findById(PdfSettings.ID)).thenReturn(Optional.empty());
         when(websites.findById("test")).thenReturn(Optional.of(new Website("test", "org_t", "Demo Journal")));
@@ -105,10 +105,10 @@ class PdfArticlesHandlerTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, String>> headers = ArgumentCaptor.forClass(Map.class);
         ArgumentCaptor<GotenbergClient.RenderOptions> options = ArgumentCaptor.forClass(GotenbergClient.RenderOptions.class);
-        verify(gotenberg).render(eq("http://site:8443/article-print/12?lang=bg&format=standard&mode=code"),
-                eq("http://site:8443"), headers.capture(), options.capture());
-        verify(gotenberg).render(eq("http://site:8443/article-print/12?lang=de&format=standard&mode=code"),
-                eq("http://site:8443"), any(), any());
+        verify(gotenberg).render(eq("http://cms-site:8443/article-print/12?lang=bg&format=standard&mode=code"),
+                eq("http://cms-site:8443"), headers.capture(), options.capture());
+        verify(gotenberg).render(eq("http://cms-site:8443/article-print/12?lang=de&format=standard&mode=code"),
+                eq("http://cms-site:8443"), any(), any());
         // The defaults: A4, page numbers in the footer, no running head on a standard PDF.
         assertThat(options.getValue().paper()).isEqualTo(PaperSize.A4);
         assertThat(options.getValue().headerHtml()).isNull();
@@ -163,7 +163,7 @@ class PdfArticlesHandlerTest {
         handler.run(context(Map.of("ids", "12", "languages", "bg", "format", "scientific")));
 
         ArgumentCaptor<GotenbergClient.RenderOptions> options = ArgumentCaptor.forClass(GotenbergClient.RenderOptions.class);
-        verify(gotenberg).render(eq("http://site:8443/article-print/12?lang=bg&format=scientific&mode=code"),
+        verify(gotenberg).render(eq("http://cms-site:8443/article-print/12?lang=bg&format=scientific&mode=code"),
                 anyString(), any(), options.capture());
         assertThat(options.getValue().paper()).isEqualTo(PaperSize.LETTER);
         assertThat(options.getValue().footerHtml()).isNull();
@@ -199,7 +199,7 @@ class PdfArticlesHandlerTest {
 
         verify(enrichments).save(org.mockito.ArgumentMatchers.argThat(row -> "12:bg".equals(row.getId())
                 && "Резюме".equals(row.getAbstractText())));
-        verify(gotenberg).render(eq("http://site:8443/article-print/12?lang=bg&format=standard&mode=llm"), anyString(), any(), any());
+        verify(gotenberg).render(eq("http://cms-site:8443/article-print/12?lang=bg&format=standard&mode=llm"), anyString(), any(), any());
         verify(gotenberg, org.mockito.Mockito.never()).render(contains("lang=de"), anyString(), any(), any());
         assertThat(context.failed()).isEqualTo(1);
         assertThat(context.progress().log()).contains("FAILED article 12 (de): The gateway answered 402");

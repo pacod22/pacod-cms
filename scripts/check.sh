@@ -52,7 +52,7 @@ SECRET_KEYS="MONGO_ROOT_PASSWORD MONGO_PASSWORD PID_PG_SUPERUSER_PASSWORD PID_DB
 CMS_ID_STUDIO_SECRET CMS_ID_SERVICE_SECRET ID_ADMIN_PASSWORD PACOD_PREVIEW_SECRET METRICS_VISITOR_SALT PACOD_GW_API_KEY
 PACOD_ID_PROVISIONER_TOKEN PID_SMTP_USERNAME PID_SMTP_PASSWORD"
 SECRET_KEYS=$(printf '%s' "$SECRET_KEYS" | tr '\n' ' ')
-known=" $(cat docker-compose.yml Makefile env/*.env .env.example 2>/dev/null | grep -oE '[A-Z][A-Z0-9_]{2,}' | sort -u | tr '\n' ' ') "
+known=" $(cat docker-compose.yml docker-compose.standalone.yml Makefile env/*.env .env.example 2>/dev/null | grep -oE '[A-Z][A-Z0-9_]{2,}' | sort -u | tr '\n' ' ') "
 unused=()
 for file in .env .env-local; do
   [ -f "$file" ] || continue
@@ -67,7 +67,7 @@ for file in .env .env-local; do
     case " $SECRET_KEYS " in *" $key "*) continue ;; esac
     case "$value" in *\#*) bad "$file: $key contains # -- make cuts the value there. Choose another value." ;; esac
     case "$key" in
-      CADDY_GLOBAL_OPTIONS|ID_ADMIN_EMAIL|ID_MAIL_FROM) ;;
+      CADDY_GLOBAL_OPTIONS|CMS_STUDIO_SITE|CMS_PUBLIC_SITE|ID_ADMIN_EMAIL|ID_MAIL_FROM) ;;
       *) case "$value" in *[[:space:]]*) bad "$file: $key contains a space." ;; esac ;;
     esac
   done < <(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$file")
@@ -140,11 +140,11 @@ if [ "$ENV_NAME" = stage ]; then
       *) ok "demo websites at $demo" ;;
     esac
   fi
-  [ -z "$smtp" ] || [ "$smtp" = mailpit ] || warn "PID_SMTP_HOST=$smtp: stage sends real mail"
+  [ -z "$smtp" ] || [ "$smtp" = pacod-mailpit ] || warn "PID_SMTP_HOST=$smtp: stage sends real mail"
 fi
 
 if [ "$ENV_NAME" = prod ]; then
-  if [ -z "$smtp" ] || [ "$smtp" = mailpit ]; then
+  if [ -z "$smtp" ] || [ "$smtp" = pacod-mailpit ]; then
     bad "PID_SMTP_HOST is not set: pacod-id sends confirmations, invitations and password resets through it"
   else
     ok "mail through $smtp"
@@ -163,10 +163,29 @@ if [ -n "$(get SSL_CERT_FILE)$(get SSL_KEY_FILE)" ]; then
   SSL_CERT_FILE=$(get SSL_CERT_FILE) SSL_KEY_FILE=$(get SSL_KEY_FILE) ./scripts/check-tls.sh | sed '1d;s/^/  /' || errors=$((errors + 1))
 fi
 
+# ---- names from before the shared network pacod-net ----------------------------------------------
+# The services and volumes were renamed (pacod-demo/docs/NETWORK.md); a value naming an old one
+# reaches nothing, and a volume under its old name is data the stack would no longer see.
+for pair in "PID_SMTP_HOST:mailpit" "PACOD_GW_URL:http://gw:" "PACOD_PDF_GOTENBERG_URL:http://gotenberg:" "MONGO_DATA_DIR:mongo-data"; do
+  key=${pair%%:*} old=${pair#*:}
+  case "$(get "$key")" in "$old"*) bad "$key names '$old', renamed with the move to pacod-net (cms-mongo-data, pacod-mailpit, http://pacod-gw:8080, http://cms-gotenberg:3000)" ;; esac
+done
+if docker info >/dev/null 2>&1; then
+  project=${COMPOSE_PROJECT_NAME:-$(basename "$PWD" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_-')}
+  pairs="id-pg-data:pacod-postgres-data caddy-data:pacod-caddy-data"
+  case "$(get MONGO_DATA_DIR)" in */*) ;; *) pairs="mongo-data:cms-mongo-data $pairs" ;; esac
+  for pair in $pairs; do
+    old=${project}_${pair%%:*} new=${project}_${pair#*:}
+    if docker volume inspect "$old" >/dev/null 2>&1 && ! docker volume inspect "$new" >/dev/null 2>&1; then
+      bad "volume $old holds data from before the move to pacod-net: copy it into $new first (docs/RUNNING.md, \"Moving to pacod-net\")"
+    fi
+  done
+fi
+
 # ---- what compose makes of it all ----------------------------------------------------------------
 if command -v docker >/dev/null 2>&1; then
-  compose=${COMPOSE:-docker compose --env-file env/$ENV_NAME.env --env-file .env $([ -f .env-local ] && printf -- '--env-file .env-local')}
-  if out=$($compose config -q 2>&1); then ok "docker-compose.yml resolves"; else bad "docker compose config: $out"; fi
+  compose=${COMPOSE:-docker compose --env-file env/$ENV_NAME.env --env-file .env $([ -f .env-local ] && printf -- '--env-file .env-local') -f docker-compose.yml -f docker-compose.standalone.yml}
+  if out=$($compose config -q 2>&1); then ok "the compose files resolve"; else bad "docker compose config: $out"; fi
 else
   bad "docker is not installed"
 fi

@@ -1,0 +1,75 @@
+# pacod-cms behind the shared edge (pacod-caddy): the studio's site and the public websites'.
+# Imported by a Caddyfile that holds the global options -- cms's own (docker/caddy/Caddyfile,
+# Caddyfile.dev) or the full stack's -- so it has none, and its snippets carry cms's prefix (every
+# imported fragment shares one namespace). Everything a request meets is here, so development, stage,
+# production and the full stack run the same rules. Each one fails silently when dropped:
+#   - Host passes through unchanged (Caddy's default): the site picks the website by it, pacod-id
+#     answers only its issuer's host. X-Forwarded-Host is that Host, port included, so a redirect
+#     the applications build keeps the published port.
+#   - X-Real-IP is the TCP peer: the site believes it only from a proxy on a private address, which
+#     Caddy is, and the crawler log verifies Googlebot by it. X-Forwarded-For is Caddy's own: it
+#     REPLACES a value a client wrote rather than appending to it.
+#   - X-Pacod-Print is removed: only the PDF renderer, on pacod-net, may send one;
+#   - request bodies stop at 4 MiB, in step with the studio's multipart limits (Spring's 4MB is
+#     4 MiB; Caddy's MB is decimal, so the unit is MiB);
+#   - / on the studio's host answers 302 to /mgmt/sites;
+#   - /_internal/ answers 404: those questions are asked on pacod-net only.
+#
+# The addresses come from the environment, a developer machine's by default:
+#   CMS_STUDIO_SITE   the studio's site address(es). cms standalone: `http://<STUDIO_HOST>,
+#                     https://<STUDIO_HOST>` on dev, `https://<STUDIO_HOST>` on stage and prod (the
+#                     Makefile derives it); the full stack: http://studio.<domain>:<port>.
+#   CMS_PUBLIC_SITE   every other host: the public websites, the edge's ONLY catch-all. cms
+#                     standalone: `http://, https://` on dev, `https://` on stage and prod; the full
+#                     stack: http://:<port>.
+#   CMS_PUBLIC_TLS    `import cms-on-demand-tls` where the Caddyfile's global options ask the site
+#                     before an on-demand certificate (cms standalone always sets it); unset, the
+#                     catch-all carries no TLS directive (the full stack, HTTP only).
+# A variable set to the empty string is used as such, not replaced by the default: leave it unset.
+
+(cms-forward) {
+	header_up X-Real-IP {remote_host}
+	header_up -X-Pacod-Print
+}
+
+(cms-front) {
+	log
+	encode gzip
+	@internal path /_internal/*
+	respond @internal 404
+}
+
+# A website's certificate, obtained at its host's first handshake once the site says the host is an
+# active website's: the Caddyfile's global options name the question (on_demand_tls { ask
+# http://cms-site:8443/_internal/tls-ask }).
+(cms-on-demand-tls) {
+	tls {
+		on_demand
+	}
+}
+
+# The studio.
+{$CMS_STUDIO_SITE:http://studio.localhost, https://studio.localhost} {
+	import cms-front
+	request_body {
+		max_size 4MiB
+	}
+	# Relative: the browser keeps the host and port it asked with.
+	redir / /mgmt/sites 302
+	reverse_proxy cms-studio:7443 {
+		import cms-forward
+	}
+}
+
+# Every host no other site block names: the public site, which answers 404 for a host no website
+# claims.
+{$CMS_PUBLIC_SITE:http://, https://} {
+	{$CMS_PUBLIC_TLS}
+	import cms-front
+	request_body {
+		max_size 4MiB
+	}
+	reverse_proxy cms-site:8443 {
+		import cms-forward
+	}
+}

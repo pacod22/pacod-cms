@@ -17,7 +17,7 @@ import static org.mockito.Mockito.mock;
 class StudioDomainCheckTest {
 
     private static StudioDomainCheck check(String studio, String issuer, String siteDomain) {
-        IdProperties id = new IdProperties(true, issuer, "http://id:8071", "studio", "s", "service", "s", studio,
+        IdProperties id = new IdProperties(true, issuer, "http://pacod-id:8071", "studio", "s", "service", "s", studio,
                 Duration.ofSeconds(60));
         return new StudioDomainCheck(id, new PortalProperties(null, 3, 5, false, siteDomain), mock(DomainRepository.class), false);
     }

@@ -109,7 +109,7 @@ const admin = { studio: {}, id: {} };
 
 // ---- 3. the studio restarts: back in through pacod-id's session, no password ------------------
 {
-  execSync('docker restart studio', { stdio: 'ignore' });
+  execSync('docker restart cms-studio', { stdio: 'ignore' });
   for (let i = 0; i < 60; i++) {
     try { if ((await fetch(`${STUDIO_DIRECT}/mgmt-health`)).ok) break; } catch {}
     await new Promise(r => setTimeout(r, 2000));

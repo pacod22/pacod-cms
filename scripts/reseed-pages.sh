@@ -32,7 +32,7 @@
 #   3. Drop the collection, and mark the website as needing provisioning (schemaVersion 0 in the
 #      control plane). Provisioning is what runs the seed steps, and the studio re-provisions
 #      every out-of-date website when it starts.
-#   4. Force-recreate `studio`, so it starts and re-provisions. --force-recreate because an image
+#   4. Force-recreate `cms-studio`, so it starts and re-provisions. --force-recreate because an image
 #      the layer cache rebuilt identically would otherwise leave the container running, and the
 #      website's pages would stay empty -- every /p/* a 404.
 #   5. Verify: the document count, /p/about through Caddy with the website's host, and the log
@@ -59,12 +59,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SEED_FILE="$ROOT/pacod-cms-core/src/main/resources/seed/pages.json"
 BACKUP_DIR="$ROOT/.data/backup/pages"
 
-# Deliberately NOT $MONGO_BACKUP_DIR. That one is the directory mounted into the mongo container
+# Deliberately NOT $MONGO_BACKUP_DIR. That one is the directory mounted into the cms-mongo container
 # for mongorestore, and this backup is written host-side through mongosh's stdout precisely so it
 # depends neither on that mount existing nor on the container carrying the database tools.
 
 # The Makefile exports COMPOSE with the environment's three --env-file flags; run it through make.
-COMPOSE="${COMPOSE:-docker compose --env-file env/dev.env --env-file .env}"
+COMPOSE="${COMPOSE:-docker compose --env-file env/dev.env --env-file .env -f docker-compose.yml -f docker-compose.standalone.yml}"
 # The website, its database, and the control plane that records its provisioning state.
 SITE="${SITE:-demo}"
 [[ "$SITE" =~ ^[a-z][a-z0-9-]{1,39}$ ]] || { echo "not a website id: $SITE" >&2; exit 2; }
@@ -85,14 +85,14 @@ test -f "$SEED_FILE" || { echo "no seed file at $SEED_FILE" >&2; exit 1; }
 test -z "$RESTORE" -o -f "$RESTORE" || { echo "no such backup: $RESTORE" >&2; exit 1; }
 
 # Passed with --eval rather than on stdin: mongosh treats stdin as a REPL session and interleaves
-# its prompt and progress markers with the output. As the root account the mongo container was
+# its prompt and progress markers with the output. As the root account the cms-mongo container was
 # given, so no password passes through this script.
 mongo() {
-    $COMPOSE exec -T mongo sh -c 'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "$1" --eval "$2"' -- "${2:-$DB}" "$1"
+    $COMPOSE exec -T cms-mongo sh -c 'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "$1" --eval "$2"' -- "${2:-$DB}" "$1"
 }
 
-$COMPOSE exec -T mongo sh -c 'command -v mongosh >/dev/null 2>&1' 2>/dev/null || {
-    echo "cannot reach mongosh in the mongo container -- is the stack up? (make up)" >&2
+$COMPOSE exec -T cms-mongo sh -c 'command -v mongosh >/dev/null 2>&1' 2>/dev/null || {
+    echo "cannot reach mongosh in the cms-mongo container -- is the stack up? (make up)" >&2
     exit 1
 }
 
@@ -263,14 +263,14 @@ test -s "$BACKUP" || { echo "backup came out empty; refusing to drop" >&2; exit 
 echo "     $BACKUP ($(wc -c < "$BACKUP" | tr -d ' ') bytes)"
 
 echo "2/5  building the studio image so the edited seed is in the jar"
-$COMPOSE build studio
+$COMPOSE build cms-studio
 
 echo "3/5  dropping the page collection and marking ${SITE} for provisioning"
 mongo 'print(`dropped ${db.page.countDocuments()} document(s): ${db.page.drop()}`)'
 mongo "printjson(db.website.updateOne({_id: '${SITE}'}, {\$set: {schemaVersion: 0}}).modifiedCount)" "$CONTROL_DB"
 
-echo "4/5  recreating studio so it re-provisions ${SITE}"
-$COMPOSE up -d --force-recreate --no-deps studio
+echo "4/5  recreating cms-studio so it re-provisions ${SITE}"
+$COMPOSE up -d --force-recreate --no-deps cms-studio
 
 echo "5/5  verifying"
 for _ in $(seq 1 60); do
@@ -290,8 +290,8 @@ printf '     GET %-38s -> %s\n' "$URL/p/about" \
 # The count is not proof on its own -- documents with no log line behind them came from
 # somewhere else. This is the line PageBootstrap writes, and the only direct evidence it ran.
 echo "     PageBootstrap said:"
-$COMPOSE logs --tail 400 studio 2>/dev/null | grep -i "standing page" | tail -3 | sed 's/^/       /' \
-    || echo "       (nothing yet — try: make logs-studio | grep -i 'standing page')"
+$COMPOSE logs --tail 400 cms-studio 2>/dev/null | grep -i "standing page" | tail -3 | sed 's/^/       /' \
+    || echo "       (nothing yet — try: make logs-cms-studio | grep -i 'standing page')"
 echo
 echo "If any of that is wrong, the collection as it was is in"
 echo "  $BACKUP"

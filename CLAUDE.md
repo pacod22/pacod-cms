@@ -43,7 +43,7 @@ make it                 # integration tests (*IT) on Testcontainers — needs Do
 make init               # once per machine: .env with ENV=dev and fresh secrets (stage/prod: ENV=… STUDIO_HOST=… ID_HOST=… SITE_DOMAIN=… EMAIL=…)
 make up                 # check, network, images, the whole stack, wait, provisioner, addresses
 make status             # ENV, the containers, the addresses  |  make down: stop, keep data
-make restart            # rebuild and recreate site + studio
+make restart            # rebuild and recreate cms-site + cms-studio
 make logs / logs-<svc>  # every log / one service's  |  make shell-<svc>
 make mongo              # mongosh on the control plane; `make mongo SITE=demo` on site_demo
 make seed               # the demo content into a website without articles (SITE=demo on dev/stage)
@@ -93,10 +93,10 @@ Three Maven modules, packages `io.pacod.cms.{core,site,studio}`, one library and
   with the CMS's manifest `authz/cms.yaml`. A jar, not an app, and it has **no controllers**.
 - **`pacod-cms-site`** — the public Thymeleaf site, for every website at once: controllers, view
   models, `WebArticleService`, caches, the counters' buffers, the chrome's message bundles. Compose
-  service `site`.
+  service `cms-site`.
 - **`pacod-cms-studio`** — the studio: sign-in and the website list at `/mgmt/**`, each website's
   screens at `/sites/<id>/mgmt/**`, its CSS and JS at `/mgmt-assets/**`, and the pacod-id
-  integration (`studio.identity`, `studio.access`). Compose service `studio`. Routes, `app.mgmt.*`
+  integration (`studio.identity`, `studio.access`). Compose service `cms-studio`. Routes, `app.mgmt.*`
   properties, `MGMT_*` variables and the `Mgmt*` classes still say mgmt (`ROLE_MGMT` survives only
   in the tests, see *Sign-in and roles*), and `WEB_PORT`/`MGMT_PORT` keep their names: the services
   were `web` and `admin` until Phase 8.
@@ -506,7 +506,7 @@ only place a permission is decided — evaluates that with the rules engine agai
   demands it of confidential clients too) through a **hand-built `ClientRegistration`, no
   discovery**: pacod-id answers its browser endpoints only on the issuer's own Host, which the
   compose network is not. Authorize and end-session are on the public issuer (`pacod.id.issuer`),
-  token and JWKS on the internal listener (`pacod.id.internal-url`, `http://id:8071`), `issuerUri`
+  token and JWKS on the internal listener (`pacod.id.internal-url`, `http://pacod-id:8071`), `issuerUri`
   set for the `iss` check; scopes `openid email profile`, no user-info call.
   - **Every OAuth endpoint sits under `/mgmt/oauth2/`** (`authorization/pacod-id`, `code/pacod-id`):
     Spring's `/oauth2/**` and `/login/oauth2/**` fall outside the chain's matcher, into the
@@ -554,7 +554,7 @@ only place a permission is decided — evaluates that with the rules engine agai
   `cms.platform_admin` and anyone else nothing; `use(subject)`/`reset()` narrow it per thread.
   `StudioSiteRoutingTest` signs in with `oidcLogin()`. **`make e2e-signin`** runs the real thing: a
   self-registered account confirmed through mailpit sees no website and gets the 403 page; the
-  bootstrap admin opens the demo, is signed back in by pacod-id after `docker restart studio`, and
+  bootstrap admin opens the demo, is signed back in by pacod-id after `docker restart cms-studio`, and
   signed out by the feed when pacod-id ends the session; a studio sign-out ends pacod-id's.
   **`make e2e-portal`** runs the portal on the stack (*The portal*); `make e2e` runs both, on dev
   and stage (they read mailpit; production refuses). Make hands them the studio's and pacod-id's
@@ -760,7 +760,7 @@ static resource handler can never serve a file under `/mgmt/`.
   128 KB, on, on) **in the annotations only** — every application and test profile scans the class,
   and a default-less `@Value` fails startup wherever the property is absent. `MgmtControllerAdvice`
   and `UploadSizeAdvice` **autowire the service**, so help text and rule cannot disagree. Set on
-  `studio` only (`IMAGE_*`), read at startup.
+  `cms-studio` only (`IMAGE_*`), read at startup.
   - **Two flags because two rules**: pixels are layout, bytes are weight; all four combinations
     work, none special-cased (`ImageServiceValidationTest` pins the mixed pairs).
   - **The content-type, empty-file and `ImageIO.read() == null` checks are unconditional** ("is
@@ -1097,7 +1097,7 @@ from the `topBanners`/`sidebarBanners` lists each controller puts in the model. 
   same-origin framing too and blanked every HTML5 booking once `MediaController` served the
   folders — at 200, visible only in a reader's browser. `FramingHeaders` sends `frame-ancestors
   'self'` (plus `SAMEORIGIN`), and on `/resources/banners/**` `'self'` and the studio's origin
-  (`pacod.studio.origin`, `STUDIO_ORIGIN` on `site`), which frames a layout's folder for its
+  (`pacod.studio.origin`, `STUDIO_ORIGIN` on `cms-site`), which frames a layout's folder for its
   preview. `FramingIT` pins it over real HTTP; `make smoke` prints the pair.
 - **Viewable impressions are a second count beside served**: half the creative on screen, in a
   visible tab, for one second, **once per booking per page view**, batched in one `POST /b/v` (at most
@@ -1240,9 +1240,9 @@ About, contact, advertise, terms and privacy are `Page` documents, served by `Pa
   an empty list.
 - **`make reseed-pages SITE=<id>` is the only way a changed `seed/pages.json` reaches an existing
   website.** It backs the website's collection up to `.data/backup/pages/<id>-page-<stamp>.json`,
-  **rebuilds the `studio` image** (the seed is on core's classpath, inside the studio's jar), drops the
+  **rebuilds the `cms-studio` image** (the seed is on core's classpath, inside the studio's jar), drops the
   collection, sets the website's `schemaVersion` to 0 in the control plane, **force-recreates**
-  `studio` (an identical image would leave it running and never re-provision: every `/p/*` 404s) so
+  `cms-studio` (an identical image would leave it running and never re-provision: every `/p/*` 404s) so
   its `reconcile()` re-seeds, and checks `/p/about` by the website's Host —
   `PageBootstrap.toPage()` stays the one owner of the mapping. Reports unless `APPLY=1`;
   `make reseed-pages-restore SITE=<id> FILE=…` undoes.
@@ -1366,8 +1366,8 @@ whether a "Googlebot" was Google. **A crawler is not a reader anywhere on the pl
   `SocialSourceClassifierTest` through it. Bot ids are dotted `$inc` keys (`[a-z0-9-]+`), never
   renamed, and `CrawlerClassifier.categoryOf` is **total**.
 - **The address is `X-Real-IP`, never `X-Forwarded-For`** (a proxy that *appends* to XFF, as nginx
-  did, and the directly published `site` port leave its first entry the client's claim), and is believed **only when the TCP peer is a proxy hop**, read from
-  the innermost request — the `site` port is published directly. Only a parsed IP literal is stored.
+  did, and the directly published `cms-site` port leave its first entry the client's claim), and is believed **only when the TCP peer is a proxy hop**, read from
+  the innermost request — the `cms-site` port is published directly. Only a parsed IP literal is stored.
   After a deploy, `db.crawlerVisit.distinct("ip")` should be public addresses.
 - **Verification is reverse then forward DNS, off the request thread** (`CrawlerVerifier`):
   `VERIFIED`, `UNVERIFIED` (forged — a finding) or `UNKNOWN` (no scheme, timeout, pool full, private
@@ -1596,7 +1596,7 @@ once per language the article is written in: `original()` and `translatedIn()`. 
   columns with guards for legacy inline widths and `<font>`, frames hidden (JavaScript is off),
   the issue's cover and contents. Hyphenation follows `<html lang>`.
 
-- **Gotenberg reads the site on the compose network** (`pacod.pdf.site-url`, `http://site:8443`),
+- **Gotenberg reads the site on pacod-net** (`pacod.pdf.site-url`, `http://cms-site:8443`),
   where no host names a website.
   - Every request of the render carries **`X-Forwarded-Host`**, one of the website's hosts (the
     primary first). The site applies it as Caddy's forwarded host, because
@@ -1614,10 +1614,10 @@ once per language the article is written in: `original()` and `translatedIn()`. 
     preview's headless visits are skipped for the same reason.
 - **Gotenberg is the one thing on the stack that fetches what an author wrote**, since an article
   body accepts any markup. Compose therefore starts it locked down:
-  - `--chromium-allow-list=^http://site:8443(/|$$)` with private and public addresses otherwise
+  - `--chromium-allow-list=^http://cms-site:8443(/|$$)` with private and public addresses otherwise
     denied;
   - JavaScript off, `downloadFrom` off, and no published port.
-  - A body framing `http://studio:7443/…` or `http://id:8071/…` renders a blocked frame; that was
+  - A body framing `http://cms-studio:7443/…` or `http://pacod-id:8071/…` renders a blocked frame; that was
     checked on the stack. The print view's web fonts never load there.
 - **The print view is `/article-print/{id}`**, renamed from `/article-clean/{id}`. It links the
   website's published theme. **A token is minted for every render** (`PdfRenderer`): it lasts five
@@ -1824,8 +1824,8 @@ feature's model is `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, 
   attributed** (nothing is bound there; the headers are left out). The flash names the time, the
   model and the gateway's request id. A refusal, here and in every job log, adds the gateway's
   error code and request id when they look like identifiers, and nothing else of its answer.
-- **The development gateway** is pacod-gw-lite in front of pacod-gw's mock providers (services `gw`
-  and `gw-mock`, compose profile **`dev-gateway`**, images from `PACOD_GW_SRC` via
+- **The development gateway** is pacod-gw-lite in front of pacod-gw's mock providers (services `pacod-gw`
+  and `gw-mock`, in `docker-compose.standalone.yml`, compose profile **`dev-gateway`**, images from `PACOD_GW_SRC` via
   `make images`).
   - The mock echoes the last user message and fills a JSON schema with it, so under the mock a
     translation **equals its source**; tags, arrays and numbers come back empty or 0.
@@ -1942,26 +1942,27 @@ application's account without one.
   the applications authenticate against `${MONGO_AUTH_DB:admin}` (compose passes none), where
   `docker/mongo-init/01-create-app-user.js` — run only on an empty data directory — grants
   `readWriteAnyDatabase` and `dbAdminAnyDatabase`: rights on databases that do not exist yet.
-- **Per service.** `site`: `METRICS_VISITOR_SALT` (blank = a per-restart salt), `CRAWLER_TRACKING`,
-  `CRAWLER_VERIFY`, `STUDIO_ORIGIN` (who may frame it, see *Advertising*). `site` and `studio`:
-  `PACOD_PREVIEW_SECRET` (the same value; blank = no previews, see *The draft preview*). `studio`:
+- **Per service.** `cms-site`: `METRICS_VISITOR_SALT` (blank = a per-restart salt), `CRAWLER_TRACKING`,
+  `CRAWLER_VERIFY`, `STUDIO_ORIGIN` (who may frame it, see *Advertising*). `cms-site` and `cms-studio`:
+  `PACOD_PREVIEW_SECRET` (the same value; blank = no previews, see *The draft preview*). `cms-studio`:
   `MGMT_SESSION_TIMEOUT`, `IMAGE_*` (compose defaults equal the code's), `PACOD_PDF_GOTENBERG_URL`,
-  `PACOD_JOBS_WORKERS`/`PACOD_JOBS_PER_ORGANISATION`, `PACOD_GW_URL`/`PACOD_GW_API_KEY` (*AI*;
-  the key has no default, `make init` writes the dev gateway's), `SITE_PUBLIC_SCHEME`/`SITE_PUBLIC_PORT`, `PACOD_BOOTSTRAP_DEMO_HOSTS` (from
-  `DEMO_HOSTS`) and `PACOD_BOOTSTRAP_DEMO_MINIMAL_HOSTS` (from `DEMO_MINIMAL_HOSTS`), `PACOD_ID_ISSUER` (from `ID_ISSUER`), `PACOD_ID_INTERNAL_URL` (fixed),
+  `PACOD_JOBS_WORKERS`/`PACOD_JOBS_PER_ORGANISATION`, `PACOD_GW_URL`/`PACOD_GW_API_KEY`/`PACOD_AI_MODEL` (*AI*;
+  the URL defaults to `http://pacod-gw:8080`, the key has none, `make init` writes the dev gateway's), `SITE_PUBLIC_SCHEME`/`SITE_PUBLIC_PORT`, `PACOD_BOOTSTRAP_DEMO_HOSTS` (from
+  `DEMO_HOSTS`) and `PACOD_BOOTSTRAP_DEMO_MINIMAL_HOSTS` (from `DEMO_MINIMAL_HOSTS`), `PACOD_ID_ISSUER` (from `ID_ISSUER`), `PACOD_ID_INTERNAL_URL` (default `http://pacod-id:8071`),
   `PACOD_ID_{STUDIO,SERVICE}_SECRET` (from `CMS_ID_*_SECRET`), `STUDIO_ORIGIN`,
   `PACOD_ID_PROVISIONER_TOKEN` (empty default: no provisioner, platform admins create
   organisations), `PACOD_SITE_DOMAIN` (default `localhost` when unset; a blank value stays blank,
   `${…-…}`), `PACOD_BOOTSTRAP_DEMO_ENABLED` (from `DEMO_WEBSITES`), `PACOD_ORG_CREATION` (default
   `self-service`), and `PACOD_MAX_ORGS_PER_USER`/`PACOD_MAX_SITES_PER_ORG`/`PACOD_AI_FOR_NEW_ORGS`
-  passed unvalued (the jar's defaults 3, 5, false; starting values only). `id`:
+  passed unvalued (the jar's defaults 3, 5, false; starting values only). `pacod-id`:
   `CMS_ID_ISSUER`/`CMS_STUDIO_ORIGIN` from the same two, expanded by `docker/pacod-id/pacod-id.toml`
   into the realm's issuer and the studio client's exact redirect URIs — so **`ID_ISSUER` must name
   `ID_HOST`, and `STUDIO_ORIGIN` `STUDIO_HOST`** — the Makefile derives both from the hosts unless
   `.env` names them, and `make check` refuses stage or prod when they disagree. Mail:
-  `PID_SMTP_HOST`/`_PORT`/`_TLS` (mailpit by default), `PID_SMTP_USERNAME`/`_PASSWORD` passed
-  unvalued, `ID_MAIL_FROM`. `caddy`: `STUDIO_HOST`, `ID_HOST`, `CADDYFILE`,
-  `SSL_CERT_FILE`/`SSL_KEY_FILE`, `CADDY_GLOBAL_OPTIONS`. `mongo`, `site`, `studio`: `PUBLISH_IP` in
+  `PID_SMTP_HOST`/`_PORT`/`_TLS` (`pacod-mailpit` by default), `PID_SMTP_USERNAME`/`_PASSWORD` passed
+  unvalued, `ID_MAIL_FROM`. `pacod-caddy`: `CMS_STUDIO_SITE`/`CMS_PUBLIC_SITE` (from `STUDIO_HOST`),
+  `ID_HOST`, `CADDYFILE`, `SSL_CERT_FILE`/`SSL_KEY_FILE`, `CADDY_GLOBAL_OPTIONS`. `cms-mongo`,
+  `cms-site`, `cms-studio`: `PUBLISH_IP` in
   front of their published ports (blank: every interface, IPv4 and IPv6; stage and prod
   `127.0.0.1`).
 - **The secrets** (`MONGO_ROOT_PASSWORD`, `MONGO_PASSWORD`, and pacod-id's
@@ -1971,7 +1972,7 @@ application's account without one.
   `scripts/init-env.sh` (`make init`) writes them into `.env` (hex, or base64 for `PID_KEK` and
   `PID_TOKEN_PEPPER`; never printed), and on an existing `.env` adds only the keys neither `.env`
   nor `.env-local` names. **It refuses to write a new value for MongoDB's passwords while MongoDB's
-  data exists, or for pacod-id's while the `id-pg-data` volume does**, and then writes nothing: a
+  data exists, or for pacod-id's while the `pacod-postgres-data` volume does**, and then writes nothing: a
   new value would not match what that data was created with. The bootstrap admin (`ID_ADMIN_EMAIL`, roles `id.admin,cms.platform_admin`, realm `cms`) is
   created once; a changed `ID_ADMIN_PASSWORD` changes nothing.
 - **`pacod.content.default-language`** (fallback where no website is bound) and
@@ -1990,26 +1991,54 @@ application's account without one.
 ## Docker
 
 The root `Dockerfile` builds both applications, chosen by the `MODULE` build arg; its `ENTRYPOINT`
-passes container arguments through (`"$@"`), which `make site-create` relies on. Services: `mongo`,
-`site` (8443 inside, `${WEB_PORT:-8080}`), `studio` (7443, `${MGMT_PORT:-7070}`, healthcheck
-`/mgmt-health`), `caddy` (the front door, `${HTTP_PORT:-8000}`, `${HTTPS_PORT:-8443}` tcp and udp;
-volumes `caddy-data`/`caddy-config` hold its certificates, its local CA and its CA account — keep
-them, a CA rate-limits re-issuing), and for sign-in `id` (pacod-id,
-`${PACOD_ID_IMAGE:-pacod-id:dev}`, public listener 8070, internal 8071), `id-postgres` (volume
-`id-pg-data`, initialised by `docker/pacod-id/initdb`) and `mailpit` (every mail pacod-id sends;
-published on loopback only, `${MAILPIT_PORT:-8125}`), `gotenberg` (PDF export, no published port,
-*PDF export*), and under the profile `dev-gateway` `gw`/`gw-mock` (the development AI gateway,
-*AI*). The network `pacod-cms-net` is **external**; `make network` creates it. **`make up` and
-`make restart` pass `--remove-orphans`**: the containers of services the file no longer defines —
-`web` and `admin`, renamed `site` and `studio` in Phase 8, and `nginx`, the front door until Caddy
-replaced it — would hold their published ports; a service of an inactive profile is not an orphan
-(checked). Gotenberg's command names `site`, so an upgrade across the rename needs `make up`:
-`make restart` leaves the old allow-list, and PDF export answers 403.
+passes container arguments through (`"$@"`), which `make site-create` relies on.
 
-- **Caddy routes by host, and its rules are one file.** `docker/caddy/routes.caddy` holds them as
-  snippets — `studio`, `id`, `site`, and `forward`/`front` inside those — and two Caddyfiles wrap
-  the same snippets in addresses and certificates: `Caddyfile` (production) and `Caddyfile.dev`.
-  `{$STUDIO_HOST}` goes to the studio, `/` answering 302 to `/mgmt/sites` (a relative `Location`);
+**Two compose files on one shared network** (pacod-demo's convention, `pacod-demo/docs/NETWORK.md`:
+service key = `container_name` = DNS name; shared components `pacod-*`, cms's own `cms-*`, volume
+keys likewise). **`docker-compose.yml`, the app file**, holds cms's own services: `cms-mongo`,
+`cms-site` (8443 inside, `${WEB_PORT:-8080}`), `cms-studio` (7443, `${MGMT_PORT:-7070}`,
+healthcheck `/mgmt-health`) and `cms-gotenberg` (PDF export, no published port, *PDF export*).
+**`docker-compose.standalone.yml`** holds cms's copies of the shared components: `pacod-caddy` (the
+front door, `${HTTP_PORT:-8000}`, `${HTTPS_PORT:-8443}` tcp and udp; volumes
+`pacod-caddy-data`/`pacod-caddy-config` hold its certificates, its local CA and its CA account —
+keep them, a CA rate-limits re-issuing), for sign-in `pacod-id` (`${PACOD_ID_IMAGE:-pacod-id:dev}`,
+public listener 8070, internal 8071), `pacod-postgres` (volume `pacod-postgres-data`),
+`pacod-db-init` (a one-shot that runs every `platform/postgres/*-db.sh` at every start — here
+pacod-id's `id-db.sh`, a verbatim copy of pacod-id's: role and database `pacod_id`, password set
+each time) and `pacod-mailpit` (every mail pacod-id sends; published on loopback only,
+`${MAILPIT_PORT:-8125}`), and under the profile `dev-gateway` `pacod-gw`/`gw-mock` (the
+development AI gateway, *AI*). **The Makefile's `COMPOSE` loads both**; the full stack (pacod-demo)
+loads only the app file and provides the shared components once, which is why the app file names
+them only by address (`http://pacod-id:8071`, `http://pacod-gw:8080`) and never in a `depends_on`
+(one would need `required: false`). The network `pacod-net` is **external** and shared by every
+pacod repo; `make network` creates it. **Only one stack running `pacod-*` containers fits on a
+machine** (the container names collide). **`make up`, `make restart` and `make down` pass
+`--remove-orphans`**:
+the containers of services the files no longer define — `mongo`, `site`, `studio`, `caddy`, `id`,
+`id-postgres`, `mailpit`, `gotenberg`, `gw`, renamed for pacod-net; `web` and `admin`, renamed
+`site` and `studio` in Phase 8; and `nginx`, the front door until Caddy replaced it — would hold
+their published ports; a service of an inactive profile is not an orphan (checked). Gotenberg's
+command names `cms-site`, so an upgrade across a rename needs `make up`: `make restart` leaves the
+old allow-list, and PDF export answers 403. **The renamed volumes start empty**: `make check`
+refuses while an old one (`mongo-data`, `id-pg-data`, `caddy-data`) holds data its new name lacks,
+and `docs/RUNNING.md` (*Moving to pacod-net*) copies them.
+
+- **Caddy routes by host, and cms's rules are one file**, `platform/caddy/cms.caddy`, the fragment
+  every Caddyfile imports from `/etc/caddy/sites/` — cms's own two (`docker/caddy/Caddyfile`,
+  production, and `Caddyfile.dev`) and the full stack's. **A fragment has no global options and its
+  snippets carry the `cms-` prefix** (`cms-front`, `cms-forward`, `cms-on-demand-tls`): every
+  imported fragment shares one snippet namespace, and Caddy refuses a name declared twice. Its two
+  sites take their addresses from `CMS_STUDIO_SITE` and `CMS_PUBLIC_SITE`, which the Makefile
+  derives (`http://<STUDIO_HOST>, https://<STUDIO_HOST>` and `http://, https://` on dev,
+  `https://<STUDIO_HOST>` and `https://` on stage and prod: a bare or `https://` address keeps the
+  HTTP→HTTPS redirect, an explicit `http://` one would take port 80 over), and the catch-all's TLS
+  directive comes from `CMS_PUBLIC_TLS` (`import cms-on-demand-tls`, set by the standalone file;
+  unset in the HTTP-only full stack). **A `{$VAR:default}` set to the empty string is used empty**,
+  not defaulted, so compose never passes those three blank. The Caddyfiles add the global options,
+  pacod-id's site (`{$ID_HOST}` → `pacod-id:8070`, reusing `cms-front`/`cms-forward`; not in the
+  fragment, because the full stack routes pacod-id with pacod-id's own) and the supplied pair.
+  Checked: the new files adapt to the same JSON as the old single `routes.caddy` on dev and prod.
+  `CMS_STUDIO_SITE` goes to the studio, `/` answering 302 to `/mgmt/sites` (a relative `Location`);
   `{$ID_HOST}` to pacod-id's public listener, Host and `Origin` unchanged (it answers its pages
   only on the issuer's exact host and refuses a `/ui-api` write from another origin; its internal
   listener is never routed); **every other host** to the site, which 404s a host no website claims
@@ -2022,15 +2051,15 @@ replaced it — would hold their published ports; a service of an inactive profi
   (`local_certs`); **every address in it names its scheme**, because a bare host gets automatic
   HTTPS, which redirects to `https://<host>/` on 443 — not the port a developer machine publishes.
 - **A website's certificate is obtained on demand**, at its host's first handshake, only after
-  `GET http://site:8443/_internal/tls-ask?domain=` (`TlsAskController`) answers 200 — an `ACTIVE`
+  `GET http://cms-site:8443/_internal/tls-ask?domain=` (`TlsAskController`) answers 200 — an `ACTIVE`
   website's host through `TenantDirectory`, else 404, so a scanner cannot make the installation ask
   a CA for names it does not serve. Development asks the same question of the local CA.
   `CADDY_GLOBAL_OPTIONS` adds one global line (`email …`, or `local_certs` to try the production
   file without a public CA).
 - **A supplied pair is switched on by naming it.** `SSL_CERT_FILE`/`SSL_KEY_FILE` are mounted file
   by file (certbot's symlinks resolve on the host; unset, `docker/caddy/no-certificate` stands in,
-  never read), and compose sets `CADDY_SUPPLIED_PAIR: ${SSL_CERT_FILE:+import supplied-pair}`, a
-  directive in a variable like `CADDY_GLOBAL_OPTIONS`. That snippet is a site on `https://:4443`
+  never read), and compose sets `CADDY_SUPPLIED_PAIR: ${SSL_CERT_FILE:+import supplied-pair.caddy}`,
+  a directive in a variable like `CADDY_GLOBAL_OPTIONS`. That file is a site on `https://:4443`
   (unpublished) whose only job is loading the pair into Caddy's shared certificate cache: every
   handshake for a name the pair covers finds it there, and automatic HTTPS skips those names
   ("skipping automatic certificate management" in the log); the rest get theirs as usual. **The
@@ -2051,38 +2080,40 @@ replaced it — would hold their published ports; a service of an inactive profi
   413 instead of the application's sentence. Caddy enforces it while the upstream reads the body,
   so a 302 to sign-in at 5 MB is no evidence either way. Checked: 4,100,000 bytes reach the site,
   413 at 4,194,305 bytes read.
-- **Caddy needs no restart after the applications are recreated**: it resolves `site` and `studio`
+- **Caddy needs no restart after the applications are recreated**: it resolves `cms-site` and `cms-studio`
   for every new connection (checked by forcing the site onto a new address). A `{$VAR}` is read
   when the Caddyfile is parsed, from the container's environment, so a changed host, Caddyfile or
   pair needs `make caddy-reload`, which validates in a one-off container first and then recreates.
   The healthcheck is Caddy's admin API (`127.0.0.1:2019/config/`), not a site address, which in
   production would redirect or need a certificate.
-- **Caddy waits for `id` started, not healthy** (a pacod-id that is down must cost sign-in, not the
-  websites); `studio` does not wait for it at all (it retries in the background, 503 meanwhile).
+- **Caddy waits for `pacod-id` started, not healthy** (a pacod-id that is down must cost sign-in, not the
+  websites); `cms-studio` does not wait for it at all (it retries in the background, 503 meanwhile).
   `PID_TRUSTED_PROXIES=private_ranges`, or pacod-id sees Caddy's address for everyone and one
-  sign-in throttle covers all. **SMTP is hardwired to mailpit** (`PID_SMTP_HOST`,
-  `PID_SMTP_TLS: none`, no variable). `make destroy` drops `id-pg-data`: every account and binding.
+  sign-in throttle covers all. **SMTP defaults to `pacod-mailpit`** (`PID_SMTP_HOST`, port 1025,
+  `PID_SMTP_TLS: none`); production names a relay. `make destroy` drops `pacod-postgres-data`: every
+  account and binding.
 - **Caddy serves no files.** `/assets/**` and `/resources/**` are the site's `MediaController`, out
   of the folder of the website the Host names (the proxy cannot know which), kept inside that root
   (`StorageIsolationIT`), public 10-minute cache. `${STORAGE_HOST:-./.data/storage}` is mounted at
-  `/data/storage` (`STORAGE_ROOT`) — **read-only in `site`**, **read-write in `studio`**, the only
+  `/data/storage` (`STORAGE_ROOT`) — **read-only in `cms-site`**, **read-write in `cms-studio`**, the only
   writer, which really deletes files.
 - `make up`'s wait and `make smoke` connect to `SMOKE_HOST` with `--connect-to`, so the URL — the
   Host header and the TLS name — is the real host's: Caddy picks the route by the one and the
   certificate by the other (`nobody.invalid` must 404 over HTTP, and get no certificate over
   HTTPS).
-- **`env/dev.env` keeps MongoDB in the volume `mongo-data`**: on macOS a bind mount into the Docker
+- **`env/dev.env` keeps MongoDB in the volume `cms-mongo-data`**: on macOS a bind mount into the Docker
   VM intermittently refuses MongoDB's file operations, surfacing as an index that silently fails.
   Stage and prod use `/data/mongo/db`, which `make destroy` leaves alone.
-- **mailpit is a profile** (`mailpit`, on dev and stage); `id`'s `depends_on` on it is
+- **pacod-mailpit is a profile** (`mailpit`, on dev and stage); `pacod-id`'s `depends_on` on it is
   `required: false`, and pacod-id's mail client connects only when it sends, so production starts
   without it.
 
 **Settings files.** Three, the later winning, and the Makefile reads and passes all three
-(`COMPOSE := docker compose --env-file env/$(ENV).env --env-file .env [--env-file .env-local]`):
+(`COMPOSE := docker compose --env-file env/$(ENV).env --env-file .env [--env-file .env-local] -f
+docker-compose.yml -f docker-compose.standalone.yml`):
 the environment's **preset** `env/<ENV>.env` (tracked, no secret), the machine's **`.env`** (`ENV`,
 hosts, secrets; git-ignored, `make init` writes it) and an optional **`.env-local`** (git-ignored;
-on older developer machines it holds pacod-id's secrets — **keep them for as long as `id-pg-data`
+on older developer machines it holds pacod-id's secrets — **keep them for as long as `pacod-postgres-data`
 lives**: the database role was created with those passwords on first start, and what pacod-id
 stored is sealed under `PID_KEK`). Each rule below fails silently when broken:
 
@@ -2100,7 +2131,9 @@ stored is sealed under `PID_KEK`). Each rule below fails silently when broken:
   (both expand it). `scripts/check.sh` checks every key the stack reads and lists the keys nothing
   reads.
 - **Derived values**: `STUDIO_ORIGIN`/`ID_ISSUER` (`?=`, from the hosts, the preset's
-  `PUBLIC_SCHEME` and a port suffix only off 80/443), `SITE_HOST` (`$(SITE).$(PACOD_SITE_DOMAIN)`).
+  `PUBLIC_SCHEME` and a port suffix only off 80/443), `CMS_STUDIO_SITE`/`CMS_PUBLIC_SITE` (from
+  `STUDIO_HOST` and `PUBLIC_SCHEME`; their commas are `$(comma)`), `SITE_HOST`
+  (`$(SITE).$(PACOD_SITE_DOMAIN)`).
 - **No `.env` means no `make up`**: `make check` fails and names `make init`. A server whose `.env`
   went missing must not quietly come up as a dev stack, with mailpit, the mock gateway, demo
   websites and MongoDB on every interface.

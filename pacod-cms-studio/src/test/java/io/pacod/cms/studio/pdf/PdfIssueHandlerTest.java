@@ -87,7 +87,7 @@ class PdfIssueHandlerTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        handler = new PdfIssueHandler(new PdfRenderer(gotenberg, new PrintTokens(SECRET), domains, websites, "http://site:8443"),
+        handler = new PdfIssueHandler(new PdfRenderer(gotenberg, new PrintTokens(SECRET), domains, websites, "http://cms-site:8443"),
                 issues, articles, settings, issueService,
                 new PdfEnricher(mock(AiGateway.class), mock(PdfEnrichmentRepository.class), "@fast"), access);
         when(domains.findByWebsiteId("test")).thenReturn(List.of(new Domain("www.test.example", "test", true)));
@@ -139,12 +139,12 @@ class PdfIssueHandlerTest {
         JobContext context = context(Map.of("issue", "3", "format", "scientific"));
         handler.run(context);
 
-        verify(gotenberg).render(eq("http://site:8443/article-print/12?lang=bg&format=scientific&mode=code"), anyString(), any(), any());
-        verify(gotenberg).render(eq("http://site:8443/article-print/14?lang=bg&format=scientific&mode=code"), anyString(), any(), any());
+        verify(gotenberg).render(eq("http://cms-site:8443/article-print/12?lang=bg&format=scientific&mode=code"), anyString(), any(), any());
+        verify(gotenberg).render(eq("http://cms-site:8443/article-print/14?lang=bg&format=scientific&mode=code"), anyString(), any(), any());
         verify(gotenberg, never()).render(contains("/article-print/13"), anyString(), any(), any());
         // Guessed 2 → renders 1 page → recomputed for 1 → renders 2 → recomputed for 2 → holds.
-        verify(gotenberg, org.mockito.Mockito.times(2)).render(eq("http://site:8443/issue-print/3/front?lang=bg&ids=12,14&pages=3,5"), anyString(), any(), any());
-        verify(gotenberg).render(eq("http://site:8443/issue-print/3/front?lang=bg&ids=12,14&pages=2,4"), anyString(), any(), any());
+        verify(gotenberg, org.mockito.Mockito.times(2)).render(eq("http://cms-site:8443/issue-print/3/front?lang=bg&ids=12,14&pages=3,5"), anyString(), any(), any());
+        verify(gotenberg).render(eq("http://cms-site:8443/issue-print/3/front?lang=bg&ids=12,14&pages=2,4"), anyString(), any(), any());
 
         try (PDDocument document = Loader.loadPDF(storage.resolve("private/issue-bg.pdf").toFile())) {
             assertThat(document.getNumberOfPages()).isEqualTo(6);

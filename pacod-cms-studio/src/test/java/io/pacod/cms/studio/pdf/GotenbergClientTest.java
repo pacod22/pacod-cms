@@ -46,16 +46,16 @@ class GotenbergClientTest {
         String url = serve(200, "%PDF-1.7 x".getBytes(), received);
         GotenbergClient client = new GotenbergClient(url + "/", Duration.ofSeconds(5));
 
-        byte[] pdf = client.render("http://site:8443/article-print/12?lang=de", "http://site:8443",
+        byte[] pdf = client.render("http://cms-site:8443/article-print/12?lang=de", "http://cms-site:8443",
                 Map.of("X-Forwarded-Host", "demo.example"));
 
         assertThat(new String(pdf, StandardCharsets.US_ASCII)).startsWith("%PDF");
         assertThat(received.get())
-                .contains("name=\"url\"", "http://site:8443/article-print/12?lang=de")
+                .contains("name=\"url\"", "http://cms-site:8443/article-print/12?lang=de")
                 .contains("name=\"emulatedMediaType\"", "print")
                 .contains("name=\"paperWidth\"", "8.27")
                 // JSON-escaped once: the scope is a regex quoting the origin, carried after the value.
-                .contains("\"X-Forwarded-Host\":\"demo.example;scope=^\\\\Qhttp://site:8443\\\\E/.*\"");
+                .contains("\"X-Forwarded-Host\":\"demo.example;scope=^\\\\Qhttp://cms-site:8443\\\\E/.*\"");
     }
 
     @Test
@@ -64,7 +64,7 @@ class GotenbergClientTest {
         AtomicReference<String> received = new AtomicReference<>();
         GotenbergClient client = new GotenbergClient(serve(200, "%PDF-1.7 x".getBytes(), received), Duration.ofSeconds(5));
 
-        client.render("http://site:8443/article-print/12", "http://site:8443", Map.of(),
+        client.render("http://cms-site:8443/article-print/12", "http://cms-site:8443", Map.of(),
                 new GotenbergClient.RenderOptions(io.pacod.cms.core.data.PaperSize.LETTER, 0.75, 0.6, 0.59055,
                         "<html>head</html>", "<html>foot</html>"));
 
@@ -91,7 +91,7 @@ class GotenbergClientTest {
         stop();
 
         GotenbergClient html = new GotenbergClient(serve(200, "<html>".getBytes(), received), Duration.ofSeconds(5));
-        assertThatThrownBy(() -> html.render("http://site:8443/x", "http://site:8443", Map.of()))
+        assertThatThrownBy(() -> html.render("http://cms-site:8443/x", "http://cms-site:8443", Map.of()))
                 .hasMessageContaining("not a PDF");
     }
 
@@ -100,7 +100,7 @@ class GotenbergClientTest {
     void off() {
         GotenbergClient off = new GotenbergClient("  ", Duration.ofSeconds(5));
         assertThat(off.enabled()).isFalse();
-        assertThatThrownBy(() -> off.render("http://site:8443/x", "http://site:8443", Map.of()))
+        assertThatThrownBy(() -> off.render("http://cms-site:8443/x", "http://cms-site:8443", Map.of()))
                 .hasMessageContaining("off");
     }
 }

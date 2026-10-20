@@ -116,9 +116,9 @@ function site(host, path) {
     }).on('error', reject).end();
   });
 }
-// As the root account the mongo container was given: no password passes through here.
+// As the root account the cms-mongo container was given: no password passes through here.
 function databases() {
-  const out = execFileSync('docker', ['exec', 'mongo', 'sh', '-c',
+  const out = execFileSync('docker', ['exec', 'cms-mongo', 'sh', '-c',
     'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "$1"', '--',
     'db.adminCommand({listDatabases:1,nameOnly:true}).databases.map(d=>d.name).join(",")'],
     { encoding: 'utf8' });

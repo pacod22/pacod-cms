@@ -13,7 +13,7 @@ and [`DEPLOYMENT.md`](DEPLOYMENT.md) hold the detail and the reasons behind it.
   └──────┬──────────────────────────┬──────────────────────────┬──────┘
          ▼                          ▼                          ▼
    ┌───────────┐             ┌─────────────┐   OIDC, feed   ┌─────────┐
-   │   site    │             │   studio    │◀──────────────▶│ pacod-id│──▶ id-postgres
+   │ cms-site  │             │ cms-studio  │◀──────────────▶│ pacod-id│──▶ pacod-postgres
    │ (public)  │             │ (portal and │                └─────────┘
    │ Host →    │             │  /sites/<id>│── jobs ─▶ Gotenberg ──▶ site (print view)
    │ website   │             │   /mgmt)    │── AI ───▶ pacod-gw
@@ -31,8 +31,8 @@ and [`DEPLOYMENT.md`](DEPLOYMENT.md) hold the detail and the reasons behind it.
 | Module | What it is |
 |---|---|
 | `pacod-cms-core` | A jar: the documents, repositories and services, the tenancy, the control plane, the seed and demo content, the design model (template sets, layouts, themes), and a Java port of pacod-id's rules engine. No controllers. |
-| `pacod-cms-site` | The public site for every website at once (compose service `site`). Thymeleaf pages, the JSON delivery routes, the media of each website, the counters. |
-| `pacod-cms-studio` | The studio (service `studio`): sign-in through pacod-id, the portal (organisations, websites, members, the installation), each website's editing screens, the background jobs, the AI features. |
+| `pacod-cms-site` | The public site for every website at once (compose service `cms-site`). Thymeleaf pages, the JSON delivery routes, the media of each website, the counters. |
+| `pacod-cms-studio` | The studio (service `cms-studio`): sign-in through pacod-id, the portal (organisations, websites, members, the installation), each website's editing screens, the background jobs, the AI features. |
 
 **Neither application calls the other.** Both read and write MongoDB directly. A change made in the
 studio reaches the site through the database; the site's caches expire after 60 seconds, which is
@@ -113,10 +113,12 @@ preview is counted or tracked, and drafts are read past every cache.
 
 ## Front door
 
-Caddy routes by host: the studio's host to `studio`, pacod-id's to `id`, every other host to
-`site`. In production it serves every host over HTTPS, obtaining a website's certificate on demand
-once the site confirms the host is an active website's, or serving a certificate pair the
-deployment supplies for the names it covers; in development it serves plain HTTP, and HTTPS from
-its own local CA. Both run the same rules (`docker/caddy/routes.caddy`). The studio and the
-websites must be on different registrable domains; the studio refuses to start otherwise
+Caddy (`pacod-caddy`) routes by host: the studio's host to `cms-studio`, pacod-id's to `pacod-id`,
+every other host to `cms-site`. In production it serves every host over HTTPS, obtaining a
+website's certificate on demand once the site confirms the host is an active website's, or serving
+a certificate pair the deployment supplies for the names it covers; in development it serves plain
+HTTP, and HTTPS from its own local CA. Both run the same rules for cms's sites
+(`platform/caddy/cms.caddy`), which the full stack (pacod-demo) imports too: every container is on
+the shared network `pacod-net`. The studio and the websites must be on different registrable
+domains; the studio refuses to start otherwise
 ([`SECURITY.md`](SECURITY.md)).

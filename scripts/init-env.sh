@@ -96,7 +96,7 @@ case "$mongo_dir" in
        fi ;;
   *) mongo_data=$(volume "$mongo_dir") ;;
 esac
-id_data=$(volume id-pg-data)
+id_data=$(volume pacod-postgres-data)
 
 # ---- the secrets this machine lacks ----------------------------------------------------------------
 # KEY:kind:guard -- guard names the data the value is bound to once it exists.

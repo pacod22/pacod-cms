@@ -99,6 +99,28 @@ shows the environment, its containers and its addresses; `make down` stops every
 the data; `make destroy` also drops the volumes — the content and every pacod-id account. Run
 `make` on its own for every target, grouped.
 
+## Shared network
+
+pacod-cms runs on **`pacod-net`**, the external Docker network every pacod repo shares (`make
+network`, run by `make up`, creates it), and follows their naming convention,
+[`pacod-demo/docs/NETWORK.md`](../pacod-demo/docs/NETWORK.md): a container's name is its service's
+and its address on the network.
+
+- **`docker-compose.yml`, the app file**: cms's own services — `cms-site`, `cms-studio`,
+  `cms-mongo` and `cms-gotenberg`.
+- **`docker-compose.standalone.yml`**: cms's copies of the shared components it uses — `pacod-caddy`,
+  `pacod-id` with `pacod-postgres` and `pacod-db-init` (which runs `platform/postgres/*-db.sh`),
+  `pacod-gw` and `gw-mock` (profile `dev-gateway`) and `pacod-mailpit` (profile `mailpit`). `make`
+  loads both files; the full stack (`pacod-demo`) loads only the app file and runs one of each shared
+  component for every product.
+- **`platform/caddy/cms.caddy`**: cms's two Caddy sites, the studio (`CMS_STUDIO_SITE`) and every
+  other host, the websites (`CMS_PUBLIC_SITE`). cms's Caddyfiles import it, and so does the full
+  stack's.
+
+Only one stack running `pacod-*` containers fits on a machine: stop another repo's standalone stack
+before `make up` here. An installation from before the move keeps its data under the old volume
+names until it is copied over: [`docs/RUNNING.md`](docs/RUNNING.md), *Moving to pacod-net*.
+
 ## Modules
 
 | Module | What it is |
@@ -323,8 +345,9 @@ every setting a `.env` may hold. The secrets have no published default; `make ch
 | | |
 |---|---|
 | MongoDB | `MONGO_HOST` `MONGO_USER` `MONGO_PASSWORD` `MONGO_DATABASE` (the control plane, default `pacod_cms`) |
-| Sign-in (pacod-id) | `ID_ADMIN_EMAIL` (the first account, a platform admin) · `ID_ISSUER` `STUDIO_ORIGIN` (the addresses browsers use) · secrets `PID_PG_SUPERUSER_PASSWORD` `PID_DB_PASSWORD` `PID_KEK` `PID_TOKEN_PEPPER` `CMS_ID_STUDIO_SECRET` `CMS_ID_SERVICE_SECRET` `ID_ADMIN_PASSWORD` — no defaults; `make init` generates them into `.env` · mail `PID_SMTP_HOST` `PID_SMTP_PORT` `PID_SMTP_TLS` `PID_SMTP_USERNAME` `PID_SMTP_PASSWORD` `ID_MAIL_FROM` (mailpit unless set; production requires a relay) |
+| Sign-in (pacod-id) | `ID_ADMIN_EMAIL` (the first account, a platform admin) · `ID_ISSUER` `STUDIO_ORIGIN` (the addresses browsers use) · secrets `PID_PG_SUPERUSER_PASSWORD` `PID_DB_PASSWORD` `PID_KEK` `PID_TOKEN_PEPPER` `CMS_ID_STUDIO_SECRET` `CMS_ID_SERVICE_SECRET` `ID_ADMIN_PASSWORD` — no defaults; `make init` generates them into `.env` · mail `PID_SMTP_HOST` `PID_SMTP_PORT` `PID_SMTP_TLS` `PID_SMTP_USERNAME` `PID_SMTP_PASSWORD` `ID_MAIL_FROM` (pacod-mailpit unless set; production requires a relay) |
 | Studio session | `MGMT_SESSION_TIMEOUT` — idle time; afterwards pacod-id's own session signs the person back in |
+| AI | `PACOD_GW_URL` (default `http://pacod-gw:8080`) `PACOD_GW_API_KEY` `PACOD_AI_MODEL` (default `@fast`) |
 | Portal | `PACOD_ID_PROVISIONER_TOKEN` (written by `make id-provisioner`; without it only platform admins create organisations) · `PACOD_SITE_DOMAIN` (new websites answer at `<id>.<domain>`) · `PACOD_ORG_CREATION` (`self-service` or `platform-admins`) · `PACOD_MAX_ORGS_PER_USER` `PACOD_MAX_SITES_PER_ORG` `PACOD_AI_FOR_NEW_ORGS` (starting values of the installation screen) |
 | Hosts | `STUDIO_HOST` `ID_HOST` (Caddy) · `DEMO_HOSTS`, `DEMO_MINIMAL_HOSTS` (the demo websites', on an empty platform) · `SITE_PUBLIC_SCHEME` `SITE_PUBLIC_PORT` (how the studio spells a website's address) |
 | Article image rules | `IMAGE_REQUIRED_WIDTH` `IMAGE_REQUIRED_HEIGHT` `IMAGE_MAX_BYTES` `IMAGE_DIMENSION_CHECK` `IMAGE_FILE_SIZE_CHECK` |
@@ -332,7 +355,7 @@ every setting a `.env` may hold. The secrets have no published default; `make ch
 | CORS | `CORS_ALLOWED_ORIGINS` |
 | TLS in the JVM | `SSL_ENABLED` `SSL_KEYSTORE` `SSL_KEYSTORE_PASSWORD` `SSL_KEY_ALIAS` |
 | Paths | `LOG_DIR` `STORAGE_ROOT` (container side) · `MONGO_DATA_DIR` `LOG_DIR_HOST` `STORAGE_HOST` (host side) |
-| Caddy | `HTTP_PORT` `HTTPS_PORT` · `CADDYFILE` (the preset's: `Caddyfile.dev` on dev, `Caddyfile` else) · `SSL_CERT_FILE` `SSL_KEY_FILE` (a certificate pair of your own, optional) · `CADDY_GLOBAL_OPTIONS` · `MAILPIT_PORT` (the mail catcher's page) |
+| Caddy | `HTTP_PORT` `HTTPS_PORT` · `CADDYFILE` (the preset's: `Caddyfile.dev` on dev, `Caddyfile` else) · `CMS_STUDIO_SITE` `CMS_PUBLIC_SITE` (its site addresses, derived from `STUDIO_HOST` and the preset) · `SSL_CERT_FILE` `SSL_KEY_FILE` (a certificate pair of your own, optional) · `CADDY_GLOBAL_OPTIONS` · `MAILPIT_PORT` (the mail catcher's page) |
 | Environment | `ENV` (`dev`, `stage`, `prod`) · `PUBLISH_IP` (where the applications' and MongoDB's own ports listen: every interface on dev, loopback else) · `DEMO_WEBSITES` (the demo websites on an empty platform: on for dev and stage) · `COMPOSE_PROFILES` (`dev-gateway`, `mailpit`) |
 
 See [`docs/RUNNING.md`](docs/RUNNING.md) for running each environment, and

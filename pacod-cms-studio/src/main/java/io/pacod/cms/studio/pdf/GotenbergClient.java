@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 
 /**
  * Gotenberg's Chromium route, {@code POST /forms/chromium/convert/url}: a page of the public site
- * in, a PDF out. {@code pacod.pdf.gotenberg-url} ({@code http://gotenberg:3000} in compose; blank
+ * in, a PDF out. {@code pacod.pdf.gotenberg-url} ({@code http://cms-gotenberg:3000} in compose; blank
  * switches PDF export off).
  *
  * <p>Gotenberg is the one thing here that fetches what an author wrote -- an article body accepts

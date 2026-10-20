@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
  * answer the site gives a reader at that host. Anything else is a 404, so a scanner pointing names
  * at the installation cannot make it request certificates and spend the CA's rate limit.
  *
- * <p>The proxy asks on the compose network with its own Host ({@code site:8443}), so the path is
+ * <p>The proxy asks on the compose network with its own Host ({@code cms-site:8443}), so the path is
  * exempt from the website binding ({@link UnboundPaths}); Caddy answers {@code /_internal/} with a
  * 404 from outside. What it reveals -- that a host is a website's -- the website itself says
  * to anyone who opens it.

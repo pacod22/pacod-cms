@@ -42,6 +42,16 @@ PORT_SUFFIX := $(if $(filter 80,$(HTTP_PORT)),,:$(HTTP_PORT))
 endif
 STUDIO_ORIGIN ?= $(PUBLIC_SCHEME)://$(STUDIO_HOST)$(PORT_SUFFIX)
 ID_ISSUER ?= $(PUBLIC_SCHEME)://$(ID_HOST)$(PORT_SUFFIX)
+# The addresses of cms's two Caddy sites (platform/caddy/cms.caddy): https:// alone on stage and
+# prod, HTTP redirected to it; plain HTTP beside HTTPS from the local CA on dev, where the published
+# HTTP port is the way in.
+ifeq ($(PUBLIC_SCHEME),https)
+CMS_STUDIO_SITE ?= https://$(STUDIO_HOST)
+CMS_PUBLIC_SITE ?= https://
+else
+CMS_STUDIO_SITE ?= http://$(STUDIO_HOST)$(comma) https://$(STUDIO_HOST)
+CMS_PUBLIC_SITE ?= http://$(comma) https://
+endif
 # The website the site-scoped targets act on: SITE=<id> (dev and stage: demo). Without a site domain
 # (production may leave it blank) name its host: SITE_HOST=www.example.org.
 SITE_HOST ?= $(if $(and $(SITE),$(PACOD_SITE_DOMAIN)),$(SITE).$(PACOD_SITE_DOMAIN))
@@ -67,19 +77,22 @@ unexport ENV MONGO_ROOT_PASSWORD MONGO_PASSWORD PID_PG_SUPERUSER_PASSWORD PID_DB
 # The helpers below are make functions: exported, they would be expanded -- and fire -- on every recipe.
 unexport confirm need STUDIO_CLI MONGO_ROOT MVN comma RESTART_STUDIO
 PACOD_ENV := $(ENV)
-COMPOSE := docker compose --env-file env/$(ENV).env --env-file .env $(if $(wildcard .env-local),--env-file .env-local)
+# Both files: cms's own services (docker-compose.yml, the app file) and its copies of the shared
+# components (docker-compose.standalone.yml), on the shared network pacod-net.
+COMPOSE := docker compose --env-file env/$(ENV).env --env-file .env $(if $(wildcard .env-local),--env-file .env-local) \
+	-f docker-compose.yml -f docker-compose.standalone.yml
 
 # $(call confirm,what): refuses outside dev unless CONFIRM=<ENV> is on the command line.
 confirm = $(if $(filter dev,$(ENV)),,$(if $(filter $(ENV),$(CONFIRM)),,$(error $(1) on $(ENV): repeat with CONFIRM=$(ENV))))
 # $(call need,VAR,hint): refuses an empty setting.
 need = $(if $($(1)),,$(error $(1) is not set$(if $(2),: $(2))))
 # A studio run without a web server, bootstrap, pacod-id or jobs, against the stack's MongoDB.
-STUDIO_CLI = $(COMPOSE) run --rm --no-deps -T studio --spring.main.web-application-type=none \
+STUDIO_CLI = $(COMPOSE) run --rm --no-deps -T cms-studio --spring.main.web-application-type=none \
 	--pacod.bootstrap.enabled=false --pacod.id.enabled=false --pacod.jobs.runner.enabled=false \
 	--logging.level.root=WARN --logging.level.io.pacod.cms.studio.site=INFO
-# $(call MONGO_ROOT,exec-flags,tool): mongosh or mongorestore inside the mongo container, as the
-# root account compose gave it -- the passwords never pass through make.
-MONGO_ROOT = $(COMPOSE) exec $(1) mongo sh -c '$(2) -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "$$@"' --
+# $(call MONGO_ROOT,exec-flags,tool): mongosh or mongorestore inside the cms-mongo container, as
+# the root account compose gave it -- the passwords never pass through make.
+MONGO_ROOT = $(COMPOSE) exec $(1) cms-mongo sh -c '$(2) -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "$$@"' --
 
 .PHONY: help
 help:
@@ -107,7 +120,8 @@ up: check network images ## Check, build and start the stack, wait until it answ
 
 down: ## Stop the stack; the data stays
 	@echo "Stopping ENV=$(ENV)"
-	$(COMPOSE) down
+	@# --remove-orphans: also the containers of renamed services (mongo, id-postgres, caddy, ...).
+	$(COMPOSE) down --remove-orphans
 
 status: ## The environment, its containers and its addresses
 	@echo "ENV=$(ENV)  (env/$(ENV).env, .env$(if $(wildcard .env-local),$(comma) .env-local))"
@@ -135,7 +149,7 @@ reseed-pages-restore: ## Put a reseed-pages backup back: SITE=<id> FILE=.data/ba
 		ls -1t .data/backup/pages/*.json 2>/dev/null | head -5 | sed 's/^/  /'; exit 2; }
 	@./scripts/reseed-pages.sh --restore "$(FILE)"
 
-# DUMP is a directory under MONGO_BACKUP_DIR -- the only host folder the mongo container sees, at
+# DUMP is a directory under MONGO_BACKUP_DIR -- the only host folder the cms-mongo container sees, at
 # /data/backup -- containing mongodump's <db>/ folder. FROM_DB renames a dump of another database
 # into TO_DB (the control plane by default, site_<id> for a website). --drop drops only the
 # collections the dump carries; EXCLUDE="siteVisitor crawlerVisit" leaves some out.
@@ -176,15 +190,15 @@ e2e-portal: e2e-allowed
 e2e-allowed:
 	@test "$(ENV)" != prod || { echo "e2e creates accounts and reads their mail in mailpit: not in production"; exit 1; }
 	@case ",$(COMPOSE_PROFILES)," in *,mailpit,*) ;; *) echo "e2e reads pacod-id's mail in mailpit, which this ENV does not run"; exit 1;; esac
-	@test -z "$(PID_SMTP_HOST)" -o "$(PID_SMTP_HOST)" = mailpit || { echo "PID_SMTP_HOST=$(PID_SMTP_HOST): mail goes to a relay, not mailpit"; exit 1; }
+	@test -z "$(PID_SMTP_HOST)" -o "$(PID_SMTP_HOST)" = pacod-mailpit || { echo "PID_SMTP_HOST=$(PID_SMTP_HOST): mail goes to a relay, not pacod-mailpit"; exit 1; }
 
 ##@ Operate
 .PHONY: restart logs caddy-reload destroy
-restart: ## Rebuild and recreate site and studio; MongoDB, pacod-id and Caddy keep running
-	$(COMPOSE) up -d --build --remove-orphans --no-deps site studio
+restart: ## Rebuild and recreate cms-site and cms-studio; MongoDB, pacod-id and Caddy keep running
+	$(COMPOSE) up -d --build --remove-orphans --no-deps cms-site cms-studio
 	@$(MAKE) --no-print-directory wait
 
-logs: ## Follow every log; logs-<service> follows one (site, studio, id, caddy, mongo, …)
+logs: ## Follow every log; logs-<service> follows one (cms-site, cms-studio, pacod-id, pacod-caddy, cms-mongo, …)
 	$(COMPOSE) logs -f --tail 100
 
 logs-%:
@@ -196,8 +210,8 @@ shell-%:
 caddy-reload: ## Check the Caddyfile, then recreate Caddy: after a host, Caddyfile or certificate-pair change
 	@# Validated in a one-off container first, so a broken file never takes the front door down;
 	@# then recreated, because Caddy reads {$$VAR}s when it parses the file.
-	$(COMPOSE) run --rm --no-deps -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-	$(COMPOSE) up -d --force-recreate --no-deps caddy
+	$(COMPOSE) run --rm --no-deps -T pacod-caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+	$(COMPOSE) up -d --force-recreate --no-deps pacod-caddy
 
 destroy: ## Stop and DELETE every volume: content, accounts, certificates. Outside dev: CONFIRM=<ENV>
 	$(call confirm,deleting every volume)
@@ -226,9 +240,8 @@ clean: ## Remove Maven's build output
 
 ##@ Helpers (run by init and up; by hand rarely)
 .PHONY: network images id-provisioner dev-cert keystore wait urls restart-studio
-network: ## Create the external Docker network, if missing
-	@docker network inspect "$${DOCKER_NETWORK:-pacod-cms-net}" >/dev/null 2>&1 \
-		|| docker network create "$${DOCKER_NETWORK:-pacod-cms-net}"
+network: ## Create the shared Docker network pacod-net, if missing
+	@docker network inspect pacod-net >/dev/null 2>&1 || docker network create pacod-net >/dev/null
 
 images: ## Build pacod-id's image (and the mock gateway's, dev/stage) from their sources, if missing
 	@docker image inspect "$(PACOD_ID_IMAGE)" >/dev/null 2>&1 || { \
@@ -260,7 +273,7 @@ keystore: ## A self-signed keystore for TLS inside the JVM (config/keystore.p12)
 	JAVA_HOME=$(JAVA_HOME) ./scripts/generate-dev-keystore.sh
 
 restart-studio:
-	$(COMPOSE) up -d --no-deps studio
+	$(COMPOSE) up -d --no-deps cms-studio
 	@$(MAKE) --no-print-directory wait
 
 # Until the studio answers through Caddy, and the website too where one is named: the studio
@@ -274,7 +287,7 @@ wait:
 		fi; \
 		sleep 2; \
 	done; \
-	echo "no answer after four minutes: make logs-studio, make logs-caddy"; exit 1
+	echo "no answer after four minutes: make logs-cms-studio, make logs-pacod-caddy"; exit 1
 
 urls:
 	@echo
@@ -282,4 +295,4 @@ urls:
 	@echo "  sign-in   $(ID_ISSUER)/"
 	@$(if $(SITE_HOST),echo "  website   $(SITE_URL)/",true)
 	@$(if $(findstring mailpit,$(COMPOSE_PROFILES)),echo "  mail      http://localhost:$(MAILPIT_PORT)/$(if $(filter dev,$(ENV)),,   (from elsewhere: ssh -L $(MAILPIT_PORT):localhost:$(MAILPIT_PORT) <server>))",true)
-	@echo "  direct    site :$(WEB_PORT), studio :$(MGMT_PORT), MongoDB :$(MONGO_PORT)$(if $(PUBLISH_IP), (on $(PUBLISH_IP) only))"
+	@echo "  direct    cms-site :$(WEB_PORT), cms-studio :$(MGMT_PORT), cms-mongo :$(MONGO_PORT)$(if $(PUBLISH_IP), (on $(PUBLISH_IP) only))"

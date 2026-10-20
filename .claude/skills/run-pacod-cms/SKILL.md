@@ -5,10 +5,11 @@ description: Launch and drive the pacod-cms stack — the public site for every 
 
 # Running pacod-cms
 
-The containers: `caddy` in front of `site` (the public Thymeleaf site, for every website), `studio`
-(the studio) and `id` (pacod-id, the sign-in service), plus `mongo`, `id-postgres` (pacod-id's
-accounts and roles), `mailpit` (every mail pacod-id sends), `gotenberg` (PDF export) and the
-development AI gateway `gw`/`gw-mock`. Neither application is a client of
+The containers, on the shared network `pacod-net`: `pacod-caddy` in front of `cms-site` (the public
+Thymeleaf site, for every website), `cms-studio` (the studio) and `pacod-id` (the sign-in service),
+plus `cms-mongo`, `pacod-postgres` (pacod-id's accounts and roles, prepared by the one-shot
+`pacod-db-init`), `pacod-mailpit` (every mail pacod-id sends), `cms-gotenberg` (PDF export) and the
+development AI gateway `pacod-gw`/`gw-mock`. Neither application is a client of
 the other — both talk to the same MongoDB, the control plane `pacod_cms` plus one `site_<id>`
 database per website — and the studio asks pacod-id who someone is and what they may do, so
 "running the app" means running the whole stack. There is no dev server and no watch mode.
@@ -54,7 +55,7 @@ node .claude/skills/run-pacod-cms/driver.mjs <command> [args]
 | `shot <path> [out] [theme]` | full-page PNG through headless Chrome; `theme` = `light`\|`dark` |
 | `traffic [readers]` | synthetic traffic on the website from N distinct readers |
 | `mongo <js>` | `mongosh` on the website's database (`site_<SITE>`), credentials read from `.env` |
-| `ps` / `logs <service> [lines]` | container states / container logs (`site`, `studio`, `id`, `caddy`, `mongo`) |
+| `ps` / `logs <service> [lines]` | container states / container logs (`cms-site`, `cms-studio`, `pacod-id`, `pacod-caddy`, `cms-mongo`) |
 
 Artifacts land in `.artifacts/run-skill/` (git-ignored — the jar holds a live `JSESSIONID`).
 
@@ -69,7 +70,7 @@ goes to the website's host.
 sign-in: a self-registered account confirmed through mailpit sees no website and gets the 403 page,
 the bootstrap admin opens the demo, a studio restart signs them back in through pacod-id's session,
 a session ended at pacod-id signs them out, and sign-out ends pacod-id's session. It **restarts the
-`studio` container** and addresses `studio.localhost` and `id.localhost` only.
+`cms-studio` container** and addresses `studio.localhost` and `id.localhost` only.
 
 `make e2e-portal` (`scripts/e2e-portal.mjs`) is the portal's: a self-registered account creates an
 organisation (becoming its admin through the provisioner — `make id-provisioner` must have run,
@@ -92,7 +93,7 @@ a route you just added answers 404: `docker compose ps` shows the containers up 
 way. A changed seed (`pacod-cms-core/src/main/resources/seed/*.json`) reaches an existing website
 only through `make reseed-pages SITE=<id>`.
 
-Caddy needs no restart after the applications are recreated: it resolves `site` and `studio` for
+Caddy needs no restart after the applications are recreated: it resolves `cms-site` and `cms-studio` for
 every new connection. A changed Caddyfile or `STUDIO_HOST` needs `make caddy-reload`, which checks
 the file in a one-off container and then recreates Caddy.
 

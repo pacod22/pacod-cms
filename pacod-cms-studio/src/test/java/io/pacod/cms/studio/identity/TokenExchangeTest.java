@@ -29,12 +29,12 @@ class TokenExchangeTest {
 
     @BeforeEach
     void setUp() {
-        RestClient.Builder builder = RestClient.builder().baseUrl("http://id:8071")
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://pacod-id:8071")
                 .defaultHeader("Authorization", IdClient.basic("pacod-cms-service", "secret"));
         server = MockRestServiceServer.bindTo(builder).build();
         exchange = new TokenExchange(builder.build(), json);
 
-        RestClient.Builder adminBuilder = RestClient.builder().baseUrl("http://id:8071/admin/v1");
+        RestClient.Builder adminBuilder = RestClient.builder().baseUrl("http://pacod-id:8071/admin/v1");
         adminServer = MockRestServiceServer.bindTo(adminBuilder).build();
         admin = new IdAdmin(adminBuilder.build(), json);
     }
@@ -42,7 +42,7 @@ class TokenExchangeTest {
     @Test
     @DisplayName("an exchange is RFC 8693 as the service client, for audience pacod-id, and is kept for a while")
     void exchangesOnceAndKeeps() {
-        server.expect(once(), requestTo("http://id:8071/oidc/token"))
+        server.expect(once(), requestTo("http://pacod-id:8071/oidc/token"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("Authorization", IdClient.basic("pacod-cms-service", "secret")))
                 .andExpect(content().formDataContains(java.util.Map.of(
@@ -61,7 +61,7 @@ class TokenExchangeTest {
     @Test
     @DisplayName("a refused exchange carries OAuth's error code")
     void refusalKeepsItsCode() {
-        server.expect(requestTo("http://id:8071/oidc/token"))
+        server.expect(requestTo("http://pacod-id:8071/oidc/token"))
                 .andRespond(withStatus(org.springframework.http.HttpStatus.BAD_REQUEST)
                         .contentType(MediaType.APPLICATION_JSON)
                         .body("{\"error\":\"invalid_grant\",\"error_description\":\"subject not taken\"}"));
@@ -73,9 +73,9 @@ class TokenExchangeTest {
     @Test
     @DisplayName("the provisioner binds org_admin at the new organisation, and nothing else")
     void provisionerBindsOrgAdmin() {
-        server.expect(requestTo("http://id:8071/oidc/token"))
+        server.expect(requestTo("http://pacod-id:8071/oidc/token"))
                 .andRespond(withSuccess("{\"access_token\":\"eyJ.svc\"}", MediaType.APPLICATION_JSON));
-        adminServer.expect(requestTo("http://id:8071/admin/v1/bindings"))
+        adminServer.expect(requestTo("http://pacod-id:8071/admin/v1/bindings"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("Authorization", "Bearer eyJ.svc"))
                 .andExpect(content().json("{\"principal\":\"usr_1\",\"role\":\"cms.org_admin\",\"scope\":\"organisation:org_x\"}"))
@@ -90,9 +90,9 @@ class TokenExchangeTest {
     @Test
     @DisplayName("holding the role already is not an error")
     void existingBindingIsFine() {
-        server.expect(requestTo("http://id:8071/oidc/token"))
+        server.expect(requestTo("http://pacod-id:8071/oidc/token"))
                 .andRespond(withSuccess("{\"access_token\":\"eyJ.svc\"}", MediaType.APPLICATION_JSON));
-        adminServer.expect(requestTo("http://id:8071/admin/v1/bindings"))
+        adminServer.expect(requestTo("http://pacod-id:8071/admin/v1/bindings"))
                 .andRespond(withStatus(org.springframework.http.HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON)
                         .body("{\"error\":{\"type\":\"conflict\",\"message\":\"exists\",\"details\":{\"code\":\"binding_exists\"}}}"));
         assertThat(new Provisioner("pidt_abc_def", exchange, admin).makeOrgAdmin("usr_1", "org_x")).isEqualTo(-1);

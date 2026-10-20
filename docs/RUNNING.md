@@ -6,6 +6,12 @@ time, giving it content, keeping it running and checking that it works. `make` o
 every target, grouped. [`DEPLOYMENT.md`](DEPLOYMENT.md) is the reference behind it: services,
 hosts, certificates, sign-in, every setting.
 
+Every environment runs on the shared Docker network `pacod-net` (README, *Shared network*), with
+cms's own services in `docker-compose.yml` (`cms-site`, `cms-studio`, `cms-mongo`, `cms-gotenberg`)
+and its copies of the shared components in `docker-compose.standalone.yml` (`pacod-caddy`,
+`pacod-id`, `pacod-postgres`, `pacod-db-init`, `pacod-gw`, `gw-mock`, `pacod-mailpit`). The Makefile
+loads both.
+
 ## The three environments
 
 | | dev | stage | prod |
@@ -14,7 +20,7 @@ hosts, certificates, sign-in, every setting.
 | Spring profile | `dev` (templates re-read) | `prod` | `prod` |
 | Front door (Caddy) | HTTP on 8000; HTTPS on 8443 from Caddy's local CA | HTTPS on 443 (Let's Encrypt), HTTP redirected | the same as stage |
 | Hosts | `*.localhost`, nothing to set up | yours, in DNS | yours, in DNS |
-| pacod-id's mail | mailpit, http://localhost:8125/ | mailpit (through an SSH tunnel) | your relay (`PID_SMTP_*`) |
+| pacod-id's mail | pacod-mailpit, http://localhost:8125/ | pacod-mailpit (through an SSH tunnel) | your relay (`PID_SMTP_*`) |
 | AI | the mock gateway (echoes) | the mock gateway | your pacod-gw, or off |
 | Demo websites | created on the first start | created on the first start | none |
 | Application and MongoDB ports | every interface | loopback only | loopback only |
@@ -68,7 +74,7 @@ demo websites with the demo content:
 - **"Demo Journal"** (editorial template set) at http://demo.localhost:8000/ and http://localhost:8000/
 - **"Demo Notes"** (minimal template set) at http://minimal.localhost:8000/
 
-pacod-id's sign-in pages are at http://id.localhost:8000/, and every mail it sends lands in mailpit,
+pacod-id's sign-in pages are at http://id.localhost:8000/, and every mail it sends lands in pacod-mailpit,
 http://localhost:8125/. **Create an account** on the sign-in page makes an account with no role,
 which sees no website.
 
@@ -76,9 +82,9 @@ Every day:
 
 | | |
 |---|---|
-| `make restart` | rebuild and recreate `site` and `studio` after a code change. MongoDB, pacod-id and Caddy keep running |
-| `make logs`, `make logs-studio`, `make logs-site`, `make logs-id`, `make logs-caddy` | follow logs |
-| `make shell-studio`, `make shell-site` | a shell in a container |
+| `make restart` | rebuild and recreate `cms-site` and `cms-studio` after a code change. MongoDB, pacod-id and Caddy keep running |
+| `make logs`, `make logs-cms-studio`, `make logs-cms-site`, `make logs-pacod-id`, `make logs-pacod-caddy` | follow logs |
+| `make shell-cms-studio`, `make shell-cms-site` | a shell in a container |
 | `make mongo`, `make mongo SITE=demo` | mongosh on the control plane, or on a website's database |
 | `make down` | stop everything; the data stays |
 | `make destroy` | stop and delete every volume: content, accounts, certificates. Start again with `make up` |
@@ -196,6 +202,35 @@ make smoke
 `make check` also lists the keys in `.env` and `.env-local` that nothing in the release reads;
 remove them when convenient.
 
+### Moving to pacod-net
+
+The release that moved pacod-cms onto the shared network renamed its services and volumes (README,
+*Shared network*). `make check` refuses to start while a value still names an old service
+(`PID_SMTP_HOST=mailpit`, `PACOD_GW_URL=http://gw:…`, `PACOD_PDF_GOTENBERG_URL=http://gotenberg:…`,
+`MONGO_DATA_DIR=mongo-data`) or while an old volume holds data the new one lacks. The data stays
+where it was until it is copied, with every container of the stack stopped -- the old ones too,
+which `make down` removes as orphans; the volumes are named after the checkout's folder,
+`pacod-cms` here:
+
+```bash
+make down                                                    # --remove-orphans: the old containers too
+docker ps -a --filter label=com.docker.compose.project=pacod-cms   # must list nothing
+for pair in id-pg-data:pacod-postgres-data caddy-data:pacod-caddy-data caddy-config:pacod-caddy-config \
+            mongo-data:cms-mongo-data; do
+  docker volume inspect "pacod-cms_${pair%%:*}" >/dev/null 2>&1 || continue   # only the ones that exist
+  docker run --rm -v "pacod-cms_${pair%%:*}:/from:ro" -v "pacod-cms_${pair#*:}:/to" \
+    postgres:18.6-alpine3.24 sh -c 'cp -a /from/. /to/'
+done
+make up
+```
+
+Then set `MONGO_DATA_DIR=cms-mongo-data` wherever `.env` or `.env-local` still says `mongo-data`.
+`id-pg-data` holds every pacod-id account: without the copy, pacod-id starts empty, with a new
+bootstrap admin. `caddy-data` holds the certificates and the CA account: without it every
+certificate is obtained again. Once the stack answers, `docker volume rm` the old ones. The
+pacod-net network replaces `pacod-cms-net` (`DOCKER_NETWORK` is gone): `docker network rm
+pacod-cms-net` when nothing uses it.
+
 ### Backups
 
 Keep copies of five things:
@@ -204,14 +239,14 @@ Keep copies of five things:
 - the MongoDB databases;
 - the websites' files (`STORAGE_HOST`);
 - pacod-id's PostgreSQL;
-- optionally the `caddy-data` volume, to avoid re-issuing certificates.
+- optionally the `pacod-caddy-data` volume, to avoid re-issuing certificates.
 
 For example, nightly (both dump commands checked against a running stack):
 
 ```bash
-docker exec mongo sh -c 'mongodump -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
+docker exec cms-mongo sh -c 'mongodump -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
   --authenticationDatabase admin --out /data/backup/$(date +%F)'      # lands in MONGO_BACKUP_DIR
-docker exec id-postgres pg_dumpall -U postgres > /data/backup/pacod-id-$(date +%F).sql
+docker exec pacod-postgres pg_dumpall -U postgres > /data/backup/pacod-id-$(date +%F).sql
 tar -czf /data/backup/storage-$(date +%F).tgz -C /data storage
 ```
 
@@ -223,10 +258,12 @@ it would do until you add `APPLY=1`, and `CONFIRM=prod` too in production.
 `make up` runs these steps in order, each safe to repeat:
 
 1. **`make check`**: is `.env` complete for this environment (above)?
-2. **The Docker network and the images**: pacod-id's, and the mock gateway's on dev and stage. Each
-   is built from its sources only if missing. Then `site` and `studio` are built from this checkout.
-3. **The containers start.** MongoDB creates its two accounts on its first start. pacod-id creates
-   its database and the bootstrap admin (`ID_ADMIN_EMAIL` / `ID_ADMIN_PASSWORD`), once.
+2. **The Docker network and the images**: `pacod-net`, if missing; pacod-id's image, and the mock
+   gateway's on dev and stage. Each is built from its sources only if missing. Then `cms-site` and
+   `cms-studio` are built from this checkout.
+3. **The containers start.** MongoDB creates its two accounts on its first start. `pacod-db-init`
+   makes sure pacod-id's role and database exist on `pacod-postgres` (at every start), then pacod-id
+   creates its tables and the bootstrap admin (`ID_ADMIN_EMAIL` / `ID_ADMIN_PASSWORD`), once.
 4. **The studio bootstraps the platform**, at every start:
    - it builds the control plane's indexes;
    - it re-provisions every website that is out of date;
@@ -279,7 +316,7 @@ first, only reports until `APPLY=1`, and outside dev also needs `CONFIRM=<env>`.
 | `make check` | the configuration is complete and safe for the environment (run by `make up`) | ✓ | ✓ | ✓ |
 | `make smoke` | every main route answers through Caddy with the expected code and redirect; fails on any mismatch | ✓ | ✓ | ✓ (website rows with `SITE=<id>`) |
 | `make smoke-tls` | each host's certificate, and whether it verifies | ✓ (local CA: "not trusted") | ✓ | ✓ |
-| `make e2e` | sign-up, sign-in, the portal (organisation, website, invited editor, deletion) end to end | ✓ | ✓ (needs mailpit) | — (creates accounts) |
+| `make e2e` | sign-up, sign-in, the portal (organisation, website, invited editor, deletion) end to end | ✓ | ✓ (needs pacod-mailpit) | — (creates accounts) |
 | `make test`, `make verify`, `make it` | the code's tests: unit; unit after the brand check (`make brand-check`, a private deny-list of words kept outside the repository); integration (Docker) | any machine with a JDK | | |
 
 **`make smoke`** probes by name, through `SMOKE_HOST` (localhost): HTTP on dev, HTTPS on stage and
@@ -305,9 +342,10 @@ accounts in pacod-id. `make e2e-signin` and `make e2e-portal` run the halves.
 |---|---|
 | `make up`: "no .env" | run `make init` (`ENV=…` and the hosts for stage/prod) |
 | `make check` ✗ | each line names the setting and why; fix `.env` and run it again |
-| `make up` waits, then gives up | `make logs-studio`: the studio refuses to start on a shared registrable domain; `make logs-caddy`: a certificate cannot be obtained (DNS, ports 80/443) |
-| a 502 from Caddy | an application is still starting, or stopped: `make status`, `make logs-site` |
+| `make up` waits, then gives up | `make logs-cms-studio`: the studio refuses to start on a shared registrable domain; `make logs-pacod-caddy`: a certificate cannot be obtained (DNS, ports 80/443) |
+| a 502 from Caddy | an application is still starting, or stopped: `make status`, `make logs-cms-site` |
+| "container name already in use" (`pacod-caddy`, `pacod-id`, ...) | another repo's standalone stack, or the full stack, runs the same shared component: stop it first |
 | sign-in loops or "redirect URI mismatch" | the studio's or pacod-id's address changed (another `HTTP_PORT`, a host); recreate everything with the same values: `make up` |
-| no confirmation mail | dev/stage: it is in mailpit; prod: `make logs-id`, and the relay's settings |
+| no confirmation mail | dev/stage: it is in pacod-mailpit; prod: `make logs-pacod-id`, and the relay's settings |
 | a smoke row on stage/prod fails with 000 | the certificate is not there yet (first visit) or DNS does not point at the server |
 | `make up` answers, then fails at "id-provisioner" | the server reaches pacod-id at its public address (`https://<id host>`) from itself; a firewall or a router without hairpin NAT can refuse that. Allow it, or add the id host to the server's `/etc/hosts` as 127.0.0.1 |

@@ -100,10 +100,11 @@ function env() {
   return merged;
 }
 
-/** The compose invocation the Makefile uses: the preset, .env, and .env-local if there is one. */
+/** The compose invocation the Makefile uses: the preset, .env, .env-local if there is one, and both compose files. */
 function composeArgs() {
   const args = ['compose', '--env-file', `env/${machineEnv()}.env`, '--env-file', '.env'];
   if (existsSync(join(REPO, '.env-local'))) args.push('--env-file', '.env-local');
+  args.push('-f', 'docker-compose.yml', '-f', 'docker-compose.standalone.yml');
   return args;
 }
 
@@ -112,8 +113,8 @@ function docker(args, opts = {}) {
 }
 
 function mongoContainerId() {
-  const id = docker([...composeArgs(), 'ps', '-q', 'mongo']).trim();
-  if (!id) throw new Error('mongo container is not running -- run `make up` first');
+  const id = docker([...composeArgs(), 'ps', '-q', 'cms-mongo']).trim();
+  if (!id) throw new Error('cms-mongo container is not running -- run `make up` first');
   return id;
 }
 
@@ -476,7 +477,7 @@ const commands = {
   /** mongosh inside the container, with the credentials read from .env. */
   async mongo(...js) {
     const script = js.join(' ') || 'db.getCollectionNames()';
-    // As the root account the mongo container was given; SITE names the website's database.
+    // As the root account the cms-mongo container was given; SITE names the website's database.
     const out = docker([
       'exec', mongoContainerId(), 'sh', '-c',
       'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "$1" --eval "$2"',
@@ -489,7 +490,7 @@ const commands = {
     console.log(docker([...composeArgs(), 'ps', '--format', '{{.Service}}\t{{.Status}}']).trim());
   },
 
-  async logs(service = 'site', lines = '80') {
+  async logs(service = 'cms-site', lines = '80') {
     console.log(docker([...composeArgs(), 'logs', '--tail', String(lines), service]));
   },
 };

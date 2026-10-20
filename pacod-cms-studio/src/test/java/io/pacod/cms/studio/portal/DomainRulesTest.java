@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class DomainRulesTest {
 
     private final DomainRules rules = new DomainRules(new IdProperties(true, "https://id.example.com",
-            "http://id:8071", "studio", "s", "service", "s", "https://studio.example.com:8443", Duration.ofSeconds(60)));
+            "http://pacod-id:8071", "studio", "s", "service", "s", "https://studio.example.com:8443", Duration.ofSeconds(60)));
 
     @Test
     @DisplayName("a host is stored lowercase, without a trailing dot")
@@ -53,10 +53,10 @@ class DomainRulesTest {
     @DisplayName("another registrable domain is a website's to claim, and so is a sibling under a public suffix")
     void otherDomainsAreFine() {
         assertThat(rules.check("news.example-sites.net")).isEqualTo("news.example-sites.net");
-        DomainRules local = new DomainRules(new IdProperties(true, "http://id.localhost:8000", "http://id:8071",
+        DomainRules local = new DomainRules(new IdProperties(true, "http://id.localhost:8000", "http://pacod-id:8071",
                 "studio", "s", "service", "s", "http://studio.localhost:8000", Duration.ofSeconds(60)));
         assertThat(local.check("demo.localhost")).isEqualTo("demo.localhost");
-        DomainRules suffix = new DomainRules(new IdProperties(true, "https://id.example.com", "http://id:8071",
+        DomainRules suffix = new DomainRules(new IdProperties(true, "https://id.example.com", "http://pacod-id:8071",
                 "studio", "s", "service", "s", "https://studio.github.io", Duration.ofSeconds(60)));
         assertThat(suffix.check("news.github.io")).isEqualTo("news.github.io");
     }
