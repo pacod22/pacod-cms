@@ -21,7 +21,11 @@
 
 services:
   cms-mongo:
-    image: mongo:8
+    # An exact release: a cached `mongo:8` is never pulled again, and releases before 8.3.9 (8.0.30
+    # in the 8.0 line) refuse to start on Linux 6.19 and newer, Docker Desktop's VM included
+    # (SERVER-121912, SERVER-125742). 8.3 also opens data written with feature compatibility 8.0
+    # or 8.2.
+    image: mongo:8.3.13
     container_name: cms-mongo
     restart: unless-stopped
     environment:

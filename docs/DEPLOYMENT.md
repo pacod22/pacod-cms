@@ -8,7 +8,7 @@ stack hosts every website. Both applications are built from the root `Dockerfile
 
 | Service | File | Image built from | Listens on (inside) | Published as | Log file |
 |---|---|---|---|---|---|
-| `cms-mongo` | app | `mongo:8` | 27017 | `${MONGO_PORT:-27017}` | — |
+| `cms-mongo` | app | `mongo:8.3.13` | 27017 | `${MONGO_PORT:-27017}` | — |
 | `cms-site` | app | `pacod-cms-site` | 8443 | `${WEB_PORT:-8080}` | `pacod-cms-site.log` |
 | `cms-studio` | app | `pacod-cms-studio` | 7443 | `${MGMT_PORT:-7070}` | `pacod-cms-studio.log` |
 | `cms-gotenberg` | app | `gotenberg/gotenberg:8.38.1` | 3000 | — (the studio's PDF export only) | — |

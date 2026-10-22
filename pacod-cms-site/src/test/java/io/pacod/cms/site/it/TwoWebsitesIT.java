@@ -66,7 +66,7 @@ abstract class TwoWebsitesIT {
      * Spring keeps the one cached application context pointed at the port it no longer listens on.
      */
     @ServiceConnection
-    static final MongoDBContainer MONGO = new MongoDBContainer("mongo:8");
+    static final MongoDBContainer MONGO = new MongoDBContainer("mongo:8.3.13");
 
     static {
         MONGO.start();
