@@ -161,7 +161,7 @@ services:
       PACOD_AI_MODEL: ${PACOD_AI_MODEL:-@fast}
       # See cms-site for why this carries no value.
       CORS_ALLOWED_ORIGINS:
-      LOG_DIR: /data/logs
+      LOG_DIR: ${LOG_DIR_HOST:-./.data/logs}
       # The same storage as cms-site, read-write: the studio is the only writer.
       STORAGE_ROOT: /data/storage
       # How a website's own address is spelled from here: the banner previews are framed from the
