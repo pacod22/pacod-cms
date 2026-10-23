@@ -629,7 +629,10 @@ checks first only so its screens offer what would succeed.
   suffix (`localhost`; a tenant domain registered in the list's private section) passes, an IP
   literal origin is skipped with a WARN. Stored `domain` rows that share one are only **reported at
   ERROR** after startup (with `pacod.bootstrap.enabled`): refusing to start over data would take
-  every website's studio down.
+  every website's studio down. **`pacod.portal.site-domain-shared`** (`PACOD_SITE_DOMAIN_SHARED`,
+  off) accepts the risk for an installation whose websites are all trusted (pacod-demo on one
+  domain): the refusal becomes a WARN, the stored rows' report WARN, and `DomainRules` drops its
+  `sameSite` rule — never the `reserved` one.
 - **A website's settings** (`/sites/<id>/mgmt/settings`, `website.manage`): name, content language,
   time zone, `ACTIVE`/`SUSPENDED`; domains added, made primary, removed (the next becomes primary);
   **deleting needs `org.manage`** — an organisation admin's decision, the website admin's role going

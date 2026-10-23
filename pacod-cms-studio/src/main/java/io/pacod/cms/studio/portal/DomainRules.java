@@ -21,6 +21,10 @@ import java.util.regex.Pattern;
  * {@code studio.example.com} could set cookies for {@code example.com} that the studio receives.
  * In development {@code studio.localhost} and {@code demo.localhost} are two registrable domains,
  * so a sibling there is fine.
+ *
+ * <p>With {@code pacod.portal.site-domain-shared} the registrable-domain rule is off (see
+ * {@link StudioDomainCheck}); the studio's and pacod-id's own hosts, and the names below them,
+ * stay refused.
  */
 @Component
 public class DomainRules {
@@ -30,8 +34,10 @@ public class DomainRules {
 
     private final Set<String> reserved = new LinkedHashSet<>();
     private final Set<String> reservedSites = new LinkedHashSet<>();
+    private final boolean shared;
 
-    public DomainRules(IdProperties id) {
+    public DomainRules(IdProperties id, PortalProperties portal) {
+        this.shared = portal.siteDomainShared();
         addHostOf(id.studioOrigin());
         addHostOf(id.issuer());
         for (String host : reserved) {
@@ -71,7 +77,7 @@ public class DomainRules {
             }
         }
         String registrable = RegistrableDomains.of(h);
-        if (registrable != null && reservedSites.contains(registrable)) {
+        if (!shared && registrable != null && reservedSites.contains(registrable)) {
             throw new MgmtOperationException("portal.domain.sameSite", h, registrable);
         }
         return h;

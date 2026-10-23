@@ -121,4 +121,5 @@ HTTP, and HTTPS from its own local CA. Both run the same rules for cms's sites
 (`platform/caddy/cms.caddy`), which the full stack (pacod-demo) imports too: every container is on
 the shared network `pacod-net`. The studio and the websites must be on different registrable
 domains; the studio refuses to start otherwise
-([`SECURITY.md`](SECURITY.md)).
+([`SECURITY.md`](SECURITY.md)), unless `PACOD_SITE_DOMAIN_SHARED=true` says the risk is accepted:
+an installation whose websites are all trusted, such as a demo on one domain.

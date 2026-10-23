@@ -121,6 +121,8 @@ if [ "$ENV_NAME" != dev ]; then
   if [ -n "$sites" ]; then
     if local_host "$sites"; then
       bad "PACOD_SITE_DOMAIN=$sites is not a public domain"
+    elif [ "$(get PACOD_SITE_DOMAIN_SHARED)" = true ]; then
+      warn "PACOD_SITE_DOMAIN_SHARED=true: the websites may share the studio's registrable domain; run only websites you trust"
     elif [ "$(reg "$sites")" = "$(reg "$studio")" ] || [ "$(reg "$sites")" = "$(reg "$id")" ]; then
       warn "PACOD_SITE_DOMAIN=$sites looks like the studio's or pacod-id's registrable domain: the studio refuses to start if it is"
     fi

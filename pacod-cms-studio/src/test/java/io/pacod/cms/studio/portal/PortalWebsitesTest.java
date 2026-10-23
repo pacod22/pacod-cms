@@ -69,9 +69,9 @@ class PortalWebsitesTest {
             return new Website(request.siteId(), request.organisationId(), request.name());
         });
         when(identity.enabled()).thenReturn(true);
+        PortalProperties properties = new PortalProperties(null, 3, 5, false, "localhost", false);
         DomainRules rules = new DomainRules(new IdProperties(true, "http://id.localhost:8000", "http://pacod-id:8071",
-                "studio", "s", "service", "s", "http://studio.localhost:8000", Duration.ofSeconds(60)));
-        PortalProperties properties = new PortalProperties(null, 3, 5, false, "localhost");
+                "studio", "s", "service", "s", "http://studio.localhost:8000", Duration.ofSeconds(60)), properties);
         SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("usr_me", null, "ROLE_USER"));
         portal = new PortalWebsites(websites, domains, provisioner, retirement, mock(TenantDirectory.class),
                 mock(StudioSites.class), organisations, settings, identity, properties, rules, access);

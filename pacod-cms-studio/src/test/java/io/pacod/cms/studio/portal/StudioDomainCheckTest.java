@@ -17,9 +17,14 @@ import static org.mockito.Mockito.mock;
 class StudioDomainCheckTest {
 
     private static StudioDomainCheck check(String studio, String issuer, String siteDomain) {
+        return check(studio, issuer, siteDomain, false);
+    }
+
+    private static StudioDomainCheck check(String studio, String issuer, String siteDomain, boolean shared) {
         IdProperties id = new IdProperties(true, issuer, "http://pacod-id:8071", "studio", "s", "service", "s", studio,
                 Duration.ofSeconds(60));
-        return new StudioDomainCheck(id, new PortalProperties(null, 3, 5, false, siteDomain), mock(DomainRepository.class), false);
+        return new StudioDomainCheck(id, new PortalProperties(null, 3, 5, false, siteDomain, shared),
+                mock(DomainRepository.class), false);
     }
 
     @Test
@@ -31,6 +36,15 @@ class StudioDomainCheckTest {
         // pacod-id's sign-in cookies are as much at stake.
         assertThatThrownBy(() -> check("https://studio.example.org", "https://id.example-sites.net", "example-sites.net"))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("sign-in");
+    }
+
+    @Test
+    @DisplayName("with the domain shared on purpose, the studio starts beside its websites")
+    void sharedOnPurposeStarts() {
+        assertThatCode(() -> check("https://studio.demo.example.io", "https://id.demo.example.io", "demo.example.io", true))
+                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> check("https://studio.demo.example.io", "https://id.demo.example.io", "demo.example.io"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("example.io");
     }
 
     @Test

@@ -213,6 +213,10 @@ services:
       # the installation screen says. The limits are starting values the screen then owns.
       # A blank value stays blank (no :-): production may leave the address to each website's creator.
       PACOD_SITE_DOMAIN: ${PACOD_SITE_DOMAIN-localhost}
+      # true lets the websites share the studio's and pacod-id's registrable domain, which the studio
+      # otherwise refuses (StudioDomainCheck): a website's script can then set cookies they receive.
+      # Only where every website is trusted, such as pacod-demo on one domain.
+      PACOD_SITE_DOMAIN_SHARED: ${PACOD_SITE_DOMAIN_SHARED:-false}
       PACOD_ORG_CREATION: ${PACOD_ORG_CREATION:-self-service}
       PACOD_MAX_ORGS_PER_USER:
       PACOD_MAX_SITES_PER_ORG:

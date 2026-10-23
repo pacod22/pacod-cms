@@ -34,6 +34,11 @@ against `*.example-sites.net`), judged by the Public Suffix List as browsers jud
 Register a tenant domain shared by many websites in the list's private section, so its websites
 are isolated from each other as well.
 
+`PACOD_SITE_DOMAIN_SHARED=true` lifts the first two rules (the third stays) for an installation
+whose websites are all trusted, such as a demo on one domain: the studio starts with a warning, and
+a website's script can then set cookies the studio and pacod-id receive. Serve the studio over
+HTTPS then, so its `__Host-` cookies are the ones a sibling host cannot set.
+
 **In production the studio's cookies are `__Host-` cookies** (`__Host-studio-session`,
 `__Host-XSRF-TOKEN`): `Secure`, `Path=/`, no `Domain`, which a browser lets no other host set or
 overwrite. CSRF protection is on for every state-changing request.

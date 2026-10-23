@@ -13,6 +13,7 @@ class RegistrableDomainsTest {
     @ParameterizedTest
     @CsvSource({
             "studio.example.com, example.com",
+            "cms.demo.example.io, example.io",
             "www.example.com, example.com",
             "Example.COM., example.com",
             "news.bbc.co.uk, bbc.co.uk",

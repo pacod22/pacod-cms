@@ -31,6 +31,10 @@ import java.util.Map;
  * rather than running exposed. Websites' own addresses are {@link DomainRules}' to refuse; one
  * stored before that rule existed is reported at ERROR once the studio is up, never a reason not
  * to start, which would take every website's studio down with it.
+ *
+ * <p>{@code pacod.portal.site-domain-shared} turns the refusal into a warning, and the stored
+ * addresses' report from ERROR into WARN: an installation whose websites are all trusted (a demo
+ * on one domain) accepts the risk, saying so in its log.
  */
 @Slf4j
 @Component
@@ -39,11 +43,13 @@ public class StudioDomainCheck {
     private final Map<String, String> guarded = new LinkedHashMap<>();
     private final DomainRepository domains;
     private final boolean scanStoredDomains;
+    private final boolean shared;
 
     public StudioDomainCheck(IdProperties id, PortalProperties portal, DomainRepository domains,
                              @Value("${pacod.bootstrap.enabled:true}") boolean scanStoredDomains) {
         this.domains = domains;
         this.scanStoredDomains = scanStoredDomains;
+        this.shared = portal.siteDomainShared();
         guard("the studio", id.studioOrigin());
         guard("sign-in (pacod-id)", id.issuer());
         verify(portal.siteDomain());
@@ -63,7 +69,7 @@ public class StudioDomainCheck {
         guarded.put(what + " (" + host + ")", registrable);
     }
 
-    /** @throws IllegalStateException when the websites' domain is the studio's or pacod-id's */
+    /** @throws IllegalStateException when the websites' domain is the studio's or pacod-id's, unless shared */
     void verify(String siteDomain) {
         if (siteDomain == null || siteDomain.isBlank() || RegistrableDomains.isPublicSuffix(siteDomain)) {
             return;
@@ -73,7 +79,11 @@ public class StudioDomainCheck {
             return;
         }
         guarded.forEach((what, registrable) -> {
-            if (registrable.equals(websites)) {
+            if (registrable.equals(websites) && shared) {
+                log.warn("The websites (*.{}) share the registrable domain {} with {} (PACOD_SITE_DOMAIN_SHARED): "
+                        + "a website's script can set cookies it receives. Run only websites you trust.",
+                        siteDomain, websites, what);
+            } else if (registrable.equals(websites)) {
                 throw new IllegalStateException("The websites (*." + siteDomain + ") would share the registrable domain "
                         + websites + " with " + what + ": a website's script could then set cookies it receives. "
                         + "Give the websites (PACOD_SITE_DOMAIN) or the studio a domain of its own, or register "
@@ -90,8 +100,12 @@ public class StudioDomainCheck {
         }
         try {
             for (String finding : sharing(domains.findAll())) {
-                log.error("{} -- a website's script there could set cookies the studio or sign-in receives; "
-                        + "move the website to a domain of its own", finding);
+                if (shared) {
+                    log.warn("{} -- shared on purpose (PACOD_SITE_DOMAIN_SHARED)", finding);
+                } else {
+                    log.error("{} -- a website's script there could set cookies the studio or sign-in receives; "
+                            + "move the website to a domain of its own", finding);
+                }
             }
         } catch (DataAccessException e) {
             log.error("Could not check the websites' addresses against the studio's domain: {}", e.getMessage());
