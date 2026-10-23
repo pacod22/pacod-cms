@@ -1,54 +1,66 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  No scan="true": the config ships inside the jar, so it is not reachable as a
-  watchable file and logback would only warn about it on every startup.
+  The pacod logging convention, pacod-demo/docs/LOGGING.md: one event per line on stdout, JSON or
+  text (APP_LOG_FORMAT), and a JSON file per service under the log directory. The encoder and the
+  level mapping are pacod-cms-core's (io.pacod.cms.core.logging), shared with the other application.
+
+  No scan="true": the config ships inside the jar, so it is not reachable as a watchable file and
+  logback would only warn about it on every startup.
 -->
 <configuration>
 
+  <!-- Boot's defaults: a few noisy third-party loggers turned down. Its patterns are not used. -->
   <include resource="org/springframework/boot/logging/logback/defaults.xml" />
-  <springProperty scope="context" name="CONSOLE_PATTERN" source="application.console-pattern"/>
 
   <!--
-    Sourced from app.log.dir, with a relative default so a plain `java -jar` works
-    anywhere. Never hardcode a path here: it would silently override every logging.*
-    property in the profile files and make startup fail outright wherever that path
-    is not writable.
+    Sourced from app.log.dir, with a relative default so a plain `java -jar` works anywhere. Never
+    hardcode a path here: it would silently override every logging.* property in the profile files
+    and make startup fail outright wherever that path is not writable.
   -->
   <springProperty scope="context" name="LOG_FOLDER" source="app.log.dir" defaultValue="./logs"/>
-  <springProperty scope="context" name="log-level" source="app.log.level" defaultValue="INFO"/>
-  
+  <!-- SERVICE_NAME: the compose service name, the event's "service" and the file's name. -->
+  <springProperty scope="context" name="SERVICE" source="app.log.service" defaultValue="cms-site"/>
+  <!-- APP_LOG_FORMAT: json (the default) or text, any case; anything else is json. Console only. -->
+  <springProperty scope="context" name="LOG_FORMAT" source="app.log.format" defaultValue="json"/>
+  <!--
+    APP_LOG_LEVEL: debug, info, warn (or warning), error, any case; anything else is info.
+    LogLevelDefiner does the mapping: logback itself reads an unknown level, warning included, as
+    DEBUG.
+  -->
+  <springProperty scope="context" name="LOG_LEVEL_SETTING" source="app.log.level" defaultValue="info"/>
+  <define name="LOG_LEVEL" class="io.pacod.cms.core.logging.LogLevelDefiner">
+    <level>${LOG_LEVEL_SETTING}</level>
+  </define>
+
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-    <encoder>
-      <pattern>%d %clr([%thread]) %highlight([%-5level]) %logger{36} - %msg%n</pattern>
+    <encoder class="io.pacod.cms.core.logging.PacodLogEncoder">
+      <format>${LOG_FORMAT}</format>
+      <service>${SERVICE}</service>
     </encoder>
   </appender>
-  
+
+  <!--
+    Always JSON, whatever the console's format. Rotated at midnight UTC and at 20MB to
+    <service>.<yyyy-mm-dd>.<n>.log.gz; rotated files are kept 30 days and 600MB in all, the oldest
+    going first.
+  -->
   <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-    <file>${LOG_FOLDER}/pacod-cms-site.log</file>
-    <encoder>
-      <pattern>%d %clr([%thread]) %highlight([%-5level]) %logger{36} - %msg%n</pattern>
+    <file>${LOG_FOLDER}/${SERVICE}.log</file>
+    <encoder class="io.pacod.cms.core.logging.PacodLogEncoder">
+      <format>json</format>
+      <service>${SERVICE}</service>
     </encoder>
-    
     <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-      <fileNamePattern>
-        ${LOG_FOLDER}/pacod-cms-site_%d{yyyy-MM-dd}_%i.zip
-      </fileNamePattern>
-      <timeBasedFileNamingAndTriggeringPolicy
-              class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
-        <maxFileSize>20MB</maxFileSize>
-      </timeBasedFileNamingAndTriggeringPolicy>
+      <fileNamePattern>${LOG_FOLDER}/${SERVICE}.%d{yyyy-MM-dd,UTC}.%i.log.gz</fileNamePattern>
       <maxFileSize>20MB</maxFileSize>
+      <maxHistory>30</maxHistory>
+      <totalSizeCap>600MB</totalSizeCap>
     </rollingPolicy>
   </appender>
-  
-  <logger name="org.springframework" level="WARN"/>
-  
-  <logger name="io.pacod" level="${log-level}" additivity="false">
-    <appender-ref ref="CONSOLE"/>
-    <appender-ref ref="FILE"/>
-  </logger>
 
-  <root level="${log-level}">
+  <logger name="org.springframework" level="WARN"/>
+
+  <root level="${LOG_LEVEL}">
     <appender-ref ref="CONSOLE"/>
     <appender-ref ref="FILE"/>
   </root>

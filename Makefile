@@ -86,10 +86,12 @@ COMPOSE := docker compose --env-file env/$(ENV).env --env-file .env $(if $(wildc
 confirm = $(if $(filter dev,$(ENV)),,$(if $(filter $(ENV),$(CONFIRM)),,$(error $(1) on $(ENV): repeat with CONFIRM=$(ENV))))
 # $(call need,VAR,hint): refuses an empty setting.
 need = $(if $($(1)),,$(error $(1) is not set$(if $(2),: $(2))))
-# A studio run without a web server, bootstrap, pacod-id or jobs, against the stack's MongoDB.
+# A studio run without a web server, bootstrap, pacod-id or jobs, against the stack's MongoDB. Its log
+# is the terminal: its file stays inside the throwaway container, never beside the running studio's
+# cms-studio.log, which two processes would roll over each other.
 STUDIO_CLI = $(COMPOSE) run --rm --no-deps -T cms-studio --spring.main.web-application-type=none \
 	--pacod.bootstrap.enabled=false --pacod.id.enabled=false --pacod.jobs.runner.enabled=false \
-	--logging.level.root=WARN --logging.level.io.pacod.cms.studio.site=INFO
+	--logging.level.root=WARN --logging.level.io.pacod.cms.studio.site=INFO --app.log.dir=/tmp/logs
 # $(call MONGO_ROOT,exec-flags,tool): mongosh or mongorestore inside the cms-mongo container, as
 # the root account compose gave it -- the passwords never pass through make.
 MONGO_ROOT = $(COMPOSE) exec $(1) cms-mongo sh -c '$(2) -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "$$@"' --

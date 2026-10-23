@@ -83,7 +83,7 @@ Every day:
 | | |
 |---|---|
 | `make restart` | rebuild and recreate `cms-site` and `cms-studio` after a code change. MongoDB, pacod-id and Caddy keep running |
-| `make logs`, `make logs-cms-studio`, `make logs-cms-site`, `make logs-pacod-id`, `make logs-pacod-caddy` | follow logs |
+| `make logs`, `make logs-cms-studio`, `make logs-cms-site`, `make logs-pacod-id`, `make logs-pacod-caddy` | follow logs: text lines on dev (`APP_LOG_FORMAT=text` in `env/dev.env`), JSON on stage and prod; `APP_LOG_LEVEL=debug` in `.env` for more. The applications also write JSON files, `cms-site.log` and `cms-studio.log`, under `LOG_DIR_HOST` (`pacod-demo/docs/LOGGING.md`) |
 | `make shell-cms-studio`, `make shell-cms-site` | a shell in a container |
 | `make mongo`, `make mongo SITE=demo` | mongosh on the control plane, or on a website's database |
 | `make down` | stop everything; the data stays |

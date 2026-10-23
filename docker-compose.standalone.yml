@@ -8,6 +8,14 @@
 # Only one of each pacod-* component runs on a host at a time: stop another repo's standalone stack
 # (or the full stack) before `make up` here.
 
+# Every service's container log rotates (pacod-demo/docs/LOGGING.md, section 2): 10 MB a file, five
+# files. YAML anchors do not cross files, so each compose file declares its own copy.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   # ---- AI: the development gateway (profile dev-gateway) ---------------------------------------
   #
@@ -19,6 +27,7 @@ services:
   pacod-gw:
     image: ${PACOD_GW_LITE_IMAGE:-pacod-gw-lite:dev}
     container_name: pacod-gw
+    logging: *logging
     profiles: [dev-gateway]
     restart: unless-stopped
     read_only: true
@@ -27,7 +36,7 @@ services:
     command: ["serve"]
     environment:
       PGW_LISTEN: 0.0.0.0:8080
-      PGW_LOG_FORMAT: text
+      PGW_LOG_FORMAT: ${PGW_LOG_FORMAT:-text}
       PGW_EGRESS_ALLOW_PRIVATE: gw-mock
       PGW_PROVIDER_OPENAI_KEY: dev-openai-key
       PGW_PROVIDER_OPENAI_BASE_URL: http://gw-mock:9000/v1
@@ -49,6 +58,7 @@ services:
   gw-mock:
     image: ${PACOD_GW_MOCK_IMAGE:-pacod-gw-mock:dev}
     container_name: gw-mock
+    logging: *logging
     profiles: [dev-gateway]
     restart: unless-stopped
     read_only: true
@@ -72,6 +82,7 @@ services:
   pacod-postgres:
     image: postgres:18.6-alpine3.24
     container_name: pacod-postgres
+    logging: *logging
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${PID_PG_SUPERUSER_PASSWORD:?run make init}
@@ -91,6 +102,7 @@ services:
   pacod-db-init:
     image: postgres:18.6-alpine3.24
     container_name: pacod-db-init
+    logging: *logging
     depends_on:
       pacod-postgres:
         condition: service_healthy
@@ -111,6 +123,7 @@ services:
     # build, slow the first time. PACOD_ID_SRC names the checkout, ../pacod-id by default.
     image: ${PACOD_ID_IMAGE:-pacod-id:dev}
     container_name: pacod-id
+    logging: *logging
     restart: unless-stopped
     depends_on:
       pacod-db-init:
@@ -146,7 +159,7 @@ services:
       PID_SMTP_PASSWORD:
       PID_EMAIL_FROM_ADDRESS: ${ID_MAIL_FROM:-id@pacod-cms.test}
       PID_EMAIL_FROM_NAME: pacod-cms
-      PID_LOG_FORMAT: text
+      PID_LOG_FORMAT: ${PID_LOG_FORMAT:-text}
     volumes:
       - ./docker/pacod-id/pacod-id.toml:/etc/pacod-id/pacod-id.toml:ro
     read_only: true
@@ -167,6 +180,7 @@ services:
   pacod-mailpit:
     image: axllent/mailpit:v1.27
     container_name: pacod-mailpit
+    logging: *logging
     profiles: [mailpit]
     restart: unless-stopped
     ports:
@@ -184,6 +198,7 @@ services:
   pacod-caddy:
     image: caddy:2.11.6-alpine
     container_name: pacod-caddy
+    logging: *logging
     restart: unless-stopped
     environment:
       ID_HOST: ${ID_HOST:-id.localhost}
@@ -200,6 +215,9 @@ services:
       # One extra line for Caddy's global options: `email ops@example.com`, or `local_certs` to try
       # the production Caddyfile without a public CA.
       CADDY_GLOBAL_OPTIONS: ${CADDY_GLOBAL_OPTIONS:-}
+      # The access log's format (platform/caddy/cms.caddy): json or console. Never blank: an empty
+      # value is used as such, and Caddy has no log encoder by that name.
+      CMS_CADDY_LOG_FORMAT: ${CMS_CADDY_LOG_FORMAT:-json}
       # A certificate pair of the deployment's own: naming SSL_CERT_FILE is the whole switch. The
       # Caddyfile then imports supplied-pair.caddy, which serves the pair for every name it covers;
       # otherwise this is empty and Caddy obtains every certificate itself.

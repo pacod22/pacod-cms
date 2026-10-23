@@ -19,6 +19,14 @@
 # (env/<ENV>.env), this machine's .env and an optional .env-local as --env-file, in that order.
 # The defaults below are a developer machine's; docs/RUNNING.md describes dev, stage and prod.
 
+# Every service's container log rotates (pacod-demo/docs/LOGGING.md, section 2): 10 MB a file, five
+# files. YAML anchors do not cross files, so each compose file declares its own copy.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   cms-mongo:
     # An exact release: a cached `mongo:8` is never pulled again, and releases before 8.3.9 (8.0.30
@@ -27,6 +35,7 @@ services:
     # or 8.2.
     image: mongo:8.3.13
     container_name: cms-mongo
+    logging: *logging
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-pacod-root}
@@ -60,6 +69,7 @@ services:
       args:
         MODULE: pacod-cms-site
     container_name: cms-site
+    logging: *logging
     restart: unless-stopped
     depends_on:
       cms-mongo:
@@ -94,6 +104,11 @@ services:
       # reverse/forward DNS check that tells a real Googlebot from a forged one -- see .env.example.
       CRAWLER_TRACKING: ${CRAWLER_TRACKING:-true}
       CRAWLER_VERIFY: ${CRAWLER_VERIFY:-true}
+      # Logging (pacod-demo/docs/LOGGING.md): the event's service name, the level (debug, info, warn,
+      # error) and stdout's format (json or text; the file under LOG_DIR is JSON either way).
+      SERVICE_NAME: cms-site
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-info}
+      APP_LOG_FORMAT: ${APP_LOG_FORMAT:-json}
       LOG_DIR: /data/logs
       # Every website's files, one folder each (sites/<id>/assets/..., sites/<id>/resources/...).
       # The public site serves /assets/** and /resources/** out of the folder of the website the
@@ -126,6 +141,7 @@ services:
       args:
         MODULE: pacod-cms-studio
     container_name: cms-studio
+    logging: *logging
     restart: unless-stopped
     depends_on:
       cms-mongo:
@@ -161,7 +177,11 @@ services:
       PACOD_AI_MODEL: ${PACOD_AI_MODEL:-@fast}
       # See cms-site for why this carries no value.
       CORS_ALLOWED_ORIGINS:
-      LOG_DIR: ${LOG_DIR_HOST:-./.data/logs}
+      # Logging, as on cms-site. LOG_DIR is the container's side of the mount below, never the host's.
+      SERVICE_NAME: cms-studio
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-info}
+      APP_LOG_FORMAT: ${APP_LOG_FORMAT:-json}
+      LOG_DIR: /data/logs
       # The same storage as cms-site, read-write: the studio is the only writer.
       STORAGE_ROOT: /data/storage
       # How a website's own address is spelled from here: the banner previews are framed from the
@@ -245,6 +265,7 @@ services:
   cms-gotenberg:
     image: gotenberg/gotenberg:8.38.1
     container_name: cms-gotenberg
+    logging: *logging
     restart: unless-stopped
     command:
       - gotenberg

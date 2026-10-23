@@ -13,7 +13,9 @@
 #   - request bodies stop at 4 MiB, in step with the studio's multipart limits (Spring's 4MB is
 #     4 MiB; Caddy's MB is decimal, so the unit is MiB);
 #   - / on the studio's host answers 302 to /mgmt/sites;
-#   - /_internal/ answers 404: those questions are asked on pacod-net only.
+#   - /_internal/ answers 404: those questions are asked on pacod-net only;
+#   - each request is logged to stdout with sign-in codes and state, tokens, keys, Referer and the
+#     response's Location removed (CMS_CADDY_LOG_FORMAT below).
 #
 # The addresses come from the environment, a developer machine's by default:
 #   CMS_STUDIO_SITE   the studio's site address(es). cms standalone: `http://<STUDIO_HOST>,
@@ -25,6 +27,9 @@
 #   CMS_PUBLIC_TLS    `import cms-on-demand-tls` where the Caddyfile's global options ask the site
 #                     before an on-demand certificate (cms standalone always sets it); unset, the
 #                     catch-all carries no TLS directive (the full stack, HTTP only).
+#   CMS_CADDY_LOG_FORMAT  the access log's format, `json` (the default) or `console` (Caddy's text);
+#                     every site importing cms-front logs each request to stdout in it, with
+#                     sign-in codes, tokens and keys removed (pacod-demo/docs/LOGGING.md, section 6).
 # A variable set to the empty string is used as such, not replaced by the default: leave it unset.
 
 (cms-forward) {
@@ -33,7 +38,32 @@
 }
 
 (cms-front) {
-	log
+	# Each request, to stdout (pacod-demo/docs/LOGGING.md, section 6), in CMS_CADDY_LOG_FORMAT. The
+	# query parameters and headers that carry sign-in codes, tokens and keys are removed -- the
+	# studio's and pacod-id's sign-in round trips put `code` and `state` in the address, and a
+	# Referer repeats an address whole. Caddy itself leaves out Cookie, Set-Cookie and Authorization.
+	log {
+		output stdout
+		format filter {
+			wrap {$CMS_CADDY_LOG_FORMAT:json}
+			fields {
+				request>uri query {
+					delete token
+					delete code
+					delete state
+					delete next
+					delete flow
+					delete id_token_hint
+					delete login_hint
+					delete key
+				}
+				request>headers>Referer delete
+				request>headers>X-Api-Key delete
+				request>headers>X-Goog-Api-Key delete
+				resp_headers>Location delete
+			}
+		}
+	}
 	encode gzip
 	@internal path /_internal/*
 	respond @internal 404

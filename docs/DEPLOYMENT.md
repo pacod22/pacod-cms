@@ -9,8 +9,8 @@ stack hosts every website. Both applications are built from the root `Dockerfile
 | Service | File | Image built from | Listens on (inside) | Published as | Log file |
 |---|---|---|---|---|---|
 | `cms-mongo` | app | `mongo:8.3.13` | 27017 | `${MONGO_PORT:-27017}` | — |
-| `cms-site` | app | `pacod-cms-site` | 8443 | `${WEB_PORT:-8080}` | `pacod-cms-site.log` |
-| `cms-studio` | app | `pacod-cms-studio` | 7443 | `${MGMT_PORT:-7070}` | `pacod-cms-studio.log` |
+| `cms-site` | app | `pacod-cms-site` | 8443 | `${WEB_PORT:-8080}` | `cms-site.log` |
+| `cms-studio` | app | `pacod-cms-studio` | 7443 | `${MGMT_PORT:-7070}` | `cms-studio.log` |
 | `cms-gotenberg` | app | `gotenberg/gotenberg:8.38.1` | 3000 | — (the studio's PDF export only) | — |
 | `pacod-id` | standalone | `${PACOD_ID_IMAGE:-pacod-id:dev}` | 8070 (public), 8071 (internal) | — (through Caddy) | — (`make logs-pacod-id`) |
 | `pacod-postgres` | standalone | `postgres:18.6-alpine3.24` | 5432 | — | — |
@@ -24,8 +24,14 @@ which holds every account, session and role in `pacod-postgres` (volume `pacod-p
 `pacod-db-init` creates its role and database at every start (`platform/postgres/id-db.sh`);
 `pacod-mailpit` catches every mail pacod-id sends; `pacod-gw` and `gw-mock` are the development AI
 gateway (profile `dev-gateway`); `pacod-caddy` is the front door for every host.
-The log files are written under `LOG_DIR` (`/data/logs` in the containers), mounted from
-`LOG_DIR_HOST`. The application ports are published only for bypassing Caddy while debugging — the
+Logging follows the pacod convention, [`pacod-demo/docs/LOGGING.md`](../../pacod-demo/docs/LOGGING.md).
+Both applications write one event per line to stdout (`make logs`), JSON by default or text with
+`APP_LOG_FORMAT=text` (`env/dev.env` sets it), at the level `APP_LOG_LEVEL` (`debug`, `info`, `warn`,
+`error`; default `info`); `SERVICE_NAME` (`cms-site`, `cms-studio`) is the event's `service`. They
+also write a JSON file, `<service>.log`, under `LOG_DIR` (`/data/logs` in the containers), mounted
+from `LOG_DIR_HOST`: rotated at midnight UTC and at 20 MB to `<service>.<yyyy-mm-dd>.<n>.log.gz`,
+kept 30 days and 600 MB in all. Every container's own log is rotated by Docker (`json-file`, 10 MB,
+five files). The application ports are published only for bypassing Caddy while debugging — the
 studio's sign-in does not work there — and in production should be bound to loopback or not
 published.
 
@@ -320,8 +326,11 @@ certificates on. The full stack imports the same fragment behind its own HTTP-on
 - **Request bodies stop at 4 MiB**, the same as the studio's multipart limits — `4MiB` in
   `cms.caddy`, never `4MB`, which Caddy reads as 4,000,000 bytes. Raise them together.
   pacod-id's host takes 1 MiB.
-- Each request is logged to the container's output (`make logs-pacod-caddy`), the `Cookie` and
-  `Authorization` headers redacted.
+- Each request is logged to Caddy's stdout (`make logs-pacod-caddy`), JSON or `console` by
+  `CMS_CADDY_LOG_FORMAT` (default `json`). Caddy leaves out `Cookie`, `Set-Cookie` and
+  `Authorization`; `cms.caddy` also removes the query parameters `token`, `code`, `state`, `next`,
+  `flow`, `id_token_hint`, `login_hint` and `key` (the sign-in round trips carry `code` and
+  `state`), the `Referer`, `X-Api-Key` and `X-Goog-Api-Key` headers and the response's `Location`.
 
 ## TLS
 

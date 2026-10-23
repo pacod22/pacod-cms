@@ -355,6 +355,7 @@ every setting a `.env` may hold. The secrets have no published default; `make ch
 | CORS | `CORS_ALLOWED_ORIGINS` |
 | TLS in the JVM | `SSL_ENABLED` `SSL_KEYSTORE` `SSL_KEYSTORE_PASSWORD` `SSL_KEY_ALIAS` |
 | Paths | `LOG_DIR` `STORAGE_ROOT` (container side) · `MONGO_DATA_DIR` `LOG_DIR_HOST` `STORAGE_HOST` (host side) |
+| Logging | `APP_LOG_LEVEL` (`debug`, `info`, `warn`, `error`; default `info`) `APP_LOG_FORMAT` (stdout `json` or `text`; default `json`, `text` on dev) · `CMS_CADDY_LOG_FORMAT` (Caddy's access log, `json` or `console`) · files `cms-site.log`, `cms-studio.log` (JSON) under `LOG_DIR_HOST`. The convention: [`pacod-demo/docs/LOGGING.md`](../pacod-demo/docs/LOGGING.md) |
 | Caddy | `HTTP_PORT` `HTTPS_PORT` · `CADDYFILE` (the preset's: `Caddyfile.dev` on dev, `Caddyfile` else) · `CMS_STUDIO_SITE` `CMS_PUBLIC_SITE` (its site addresses, derived from `STUDIO_HOST` and the preset) · `SSL_CERT_FILE` `SSL_KEY_FILE` (a certificate pair of your own, optional) · `CADDY_GLOBAL_OPTIONS` · `MAILPIT_PORT` (the mail catcher's page) |
 | Environment | `ENV` (`dev`, `stage`, `prod`) · `PUBLISH_IP` (where the applications' and MongoDB's own ports listen: every interface on dev, loopback else) · `DEMO_WEBSITES` (the demo websites on an empty platform: on for dev and stage) · `COMPOSE_PROFILES` (`dev-gateway`, `mailpit`) |
 

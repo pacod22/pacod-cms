@@ -1984,9 +1984,21 @@ application's account without one.
   refused at startup (credentials are allowed). Unset it is `http://localhost:[*]` everywhere — set
   it in production. Compose declares it without a value so unset stays unset.
 - **No keystore is committed** (`make keystore` makes one; see `docs/DEPLOYMENT.md`).
-  `logback-spring.xml` takes its directory from `app.log.dir`; files are
-  `pacod-cms-{site,studio}.log`. Each base `application.properties` hardcodes
-  `spring.profiles.active=prod`.
+  Each base `application.properties` hardcodes `spring.profiles.active=prod`.
+- **Logging is the pacod convention** (`pacod-demo/docs/LOGGING.md`). Both `logback-spring.xml`
+  use core's `core.logging.PacodLogEncoder`: one event per line on stdout, JSON (`timestamp`,
+  `level`, `service`, `logger`, `message`, then the MDC and SLF4J's `addKeyValue` pairs flat, then
+  `error`/`stack_trace`) or text by `app.log.format` (`APP_LOG_FORMAT`, default `json`; `env/dev.env`
+  sets `text`), never coloured. The file appender is always JSON: `${app.log.dir}/<service>.log`
+  (`app.log.service`, `SERVICE_NAME`, default `cms-site`/`cms-studio`), rolled at midnight UTC and
+  20MB to `<service>.<date>.<n>.log.gz`, 30 days, 600MB. The root level is `app.log.level`
+  (`APP_LOG_LEVEL`) through `LogLevelDefiner` — **logback reads an unknown level, `warning`
+  included, as DEBUG**, so do not put the raw value on `<root>`, and **never set
+  `logging.level.root`**: Boot applies it over logback's, and its own parser fails on `warning`.
+  Boot's `logging.file.*`/`logging.pattern.*` do nothing beside a `logback-spring.xml`; the banner
+  is off (`spring.main.banner-mode`), as it is no event. `PacodLogEncoderTest` pins the shapes. A
+  run with `-pl <app>` and no `-am` uses the core jar in `~/.m2`: an old one lacks the encoder, and
+  the context then fails to start.
 
 ## Docker
 
@@ -2092,6 +2104,19 @@ and `docs/RUNNING.md` (*Moving to pacod-net*) copies them.
   sign-in throttle covers all. **SMTP defaults to `pacod-mailpit`** (`PID_SMTP_HOST`, port 1025,
   `PID_SMTP_TLS: none`); production names a relay. `make destroy` drops `pacod-postgres-data`: every
   account and binding.
+- **Logs (`pacod-demo/docs/LOGGING.md`).** Each compose file declares its own `x-logging` anchor
+  (`json-file`, 10m, five files; anchors do not cross files) and **every service carries `logging:
+  *logging`**, third-party ones and the profile-gated ones included — a new service gets it too.
+  `cms-site` and `cms-studio` take `SERVICE_NAME`, `APP_LOG_LEVEL`, `APP_LOG_FORMAT` and `LOG_DIR:
+  /data/logs` (the container's side of `LOG_DIR_HOST`; the studio once got the host path). The
+  standalone file passes `PID_LOG_FORMAT`/`PGW_LOG_FORMAT` through with `text` as the default.
+  `cms-front`'s `log` writes each request to stdout in `CMS_CADDY_LOG_FORMAT` (`json`, or `console`;
+  compose never passes it blank) and **deletes the query parameters `token`, `code`, `state`,
+  `next`, `flow`, `id_token_hint`, `login_hint`, `key`, the `Referer`/`X-Api-Key`/`X-Goog-Api-Key`
+  headers and the response's `Location`**: the studio's and pacod-id's sign-in round trips carry
+  `code` and `state` in the address, which a bare `log` recorded. Gotenberg logs at
+  `--log-level=info`; MongoDB keeps its default (`docker/mongo/config/mongod.conf` is mounted but
+  not passed with `--config`).
 - **Caddy serves no files.** `/assets/**` and `/resources/**` are the site's `MediaController`, out
   of the folder of the website the Host names (the proxy cannot know which), kept inside that root
   (`StorageIsolationIT`), public 10-minute cache. `${STORAGE_HOST:-./.data/storage}` is mounted at
