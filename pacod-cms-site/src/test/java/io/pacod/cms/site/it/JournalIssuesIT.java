@@ -99,7 +99,7 @@ class JournalIssuesIT extends TwoWebsitesIT {
         assertThat(archive.body()).contains("Nu autumn issue", "/issues/1").doesNotContain("Nu secret draft issue");
         HttpResponse<String> one = get(HOST, "/issues/1");
         assertThat(one.statusCode()).isEqualTo(200);
-        assertThat(one.body()).contains("Nu printed paper", "/article/1");
+        assertThat(one.body()).contains("Nu printed paper", "/article/1", "class=\"issue-contents\"", "What nu found.");
         assertThat(get(HOST, "/issues/2").statusCode()).isEqualTo(404);
         assertThat(get(HOST, "/sitemap.xml").body()).contains("/issues/1<").doesNotContain("/issues/2<");
         assertThat(get(HOST, "/robots.txt").body()).contains("Disallow: /issue-print/");

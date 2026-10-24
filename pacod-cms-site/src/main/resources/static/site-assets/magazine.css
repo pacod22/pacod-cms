@@ -695,6 +695,46 @@ a.mz-kicker:hover { color: var(--ink); }
 .list-row:hover { background: transparent; }
 .list-row__title { font-family: var(--font-display); }
 
+/* ---------- a journal issue: the contents set as a magazine's, numbered, the picture beside --- */
+
+.issue-subtitle {
+    margin-top: -14px;
+    font: italic 400 clamp(22px, 2.3vw, 30px)/1.3 var(--font-display);
+    letter-spacing: -.01em;
+    color: var(--muted);
+}
+.issue-issn { color: var(--faint); }
+
+.issue-downloads .button-ghost {
+    padding: 13px 22px;
+    border-color: var(--line);
+    border-radius: 999px;
+    font: 700 12px/1 var(--font-label);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink);
+}
+.issue-downloads .button-ghost:hover { background: transparent; border-color: var(--highlight); color: var(--highlight); }
+
+.issue-part { padding-top: 64px; }
+
+.issue-contents__item { grid-template-columns: 64px minmax(0, 1fr) auto; gap: 32px; padding: 32px 0; }
+.issue-contents__item:first-child { padding-top: 8px; }
+.issue-contents__no {
+    font: 500 44px/.92 var(--font-display);
+    letter-spacing: -.02em;
+    font-variant-numeric: lining-nums tabular-nums;
+    color: var(--highlight);
+}
+.issue-contents__body { gap: 10px; }
+.issue-contents__section { font: 700 11px/1.2 var(--font-label); letter-spacing: .15em; }
+.issue-contents__title { font: 600 clamp(23px, 2.2vw, 30px)/1.15 var(--font-display); letter-spacing: -.015em; }
+.issue-contents__dek { font: 400 16.5px/1.6 var(--font-text); color: var(--muted); }
+.issue-contents__byline { font: 500 13.5px/1.4 var(--font-text); color: var(--faint); }
+.issue-contents__media { width: 264px; border: 0; background: var(--tint); }
+.issue-contents__media img { transition: transform .7s cubic-bezier(.2, .7, .2, 1); }
+.issue-contents__item:hover .issue-contents__media img { transform: scale(1.045); }
+
 .search-form__input { border-radius: 999px; padding-left: 20px; }
 .search-form__button { border-radius: 999px; }
 
@@ -751,6 +791,9 @@ a.mz-kicker:hover { color: var(--ink); }
 @media (max-width: 1180px) {
     .mz-layout { gap: 40px; }
     .mz-search.site-search { width: 170px; flex-basis: 170px; }
+    .issue-contents__item { grid-template-columns: 48px minmax(0, 1fr) auto; gap: 24px; }
+    .issue-contents__no { font-size: 34px; }
+    .issue-contents__media { width: 200px; }
 }
 
 @media (max-width: 1080px) {
@@ -840,9 +883,17 @@ a.mz-kicker:hover { color: var(--ink); }
     .article-body .body-lead { font-size: 20px; }
     .mz-byline__actions { margin-left: 0; }
     .mz-footer__grid { grid-template-columns: 1fr; }
+
+    .issue-part { padding-top: 48px; }
+    .issue-contents__item { grid-template-columns: 32px minmax(0, 1fr); gap: 16px 14px; padding: 28px 0; }
+    .issue-contents__no { font-size: 26px; }
+    .issue-contents__title { font-size: 21px; }
+    .issue-contents__dek { font-size: 15.5px; }
+    .issue-contents__media { grid-column: 1 / -1; grid-row: 1; width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .mz-cover__media img { animation: none; }
-    .mz-card:hover .mz-card__media img { transform: none; }
+    .mz-card:hover .mz-card__media img,
+    .issue-contents__item:hover .issue-contents__media img { transform: none; }
 }

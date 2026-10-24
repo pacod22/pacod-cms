@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -72,7 +71,7 @@ public class IssueController {
         }
         model.addAttribute("lang", resolved);
         model.addAttribute("view", reader.view(issue, resolved));
-        model.addAttribute("entries", reader.contents(issue.getArticleIds(), List.of(), resolved));
+        model.addAttribute("entries", reader.pageContents(issue.getArticleIds(), resolved));
         model.addAttribute("pdfs", files);
         rendered(model, request);
         return "issue";

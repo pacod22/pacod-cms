@@ -72,6 +72,8 @@ class IssueControllerTest {
                 .andExpect(model().attribute("lang", "en")).andExpect(model().attributeExists("view", "entries", "pdfs"));
         mockMvc.perform(get("/issues/4")).andExpect(status().isNotFound());
         verify(metrics, org.mockito.Mockito.times(2)).recordPageView(eq(BannerPage.LIST), any());
+        verify(reader).pageContents(anyList(), eq("en"));
+        verify(reader, never()).contents(anyList(), anyList(), anyString());
     }
 
     @Test

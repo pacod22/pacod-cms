@@ -727,6 +727,61 @@ a.kicker:hover { background: var(--greenDark); color: var(--onPanel); }
 
 .list-row__author { font: 400 12px/1.5 var(--font-text); color: var(--muted2); }
 
+/* ---------- a journal issue (fragments/issues :: detail) ------------------------------ */
+
+.issue-subtitle { font: italic 400 22px/1.35 var(--font-display); color: var(--muted); text-wrap: pretty; }
+.issue-issn { margin-top: 8px; font-size: 13px; }
+
+.issue-downloads { display: flex; flex-wrap: wrap; gap: 10px; }
+.issue-part { padding-top: 44px; }
+.issue-back { padding-top: 36px; }
+
+/* The entry's picture column is `auto`: an entry without one gives its width to the text. */
+.issue-contents { list-style: none; margin: 0; padding: 0; }
+
+.issue-contents__item {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    gap: 24px;
+    align-items: start;
+    padding: 24px 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.issue-contents__item:first-child { padding-top: 4px; }
+
+.issue-contents__no {
+    font: 400 var(--mono-sm)/1.9 var(--font-label);
+    letter-spacing: .06em;
+    color: var(--highlight);
+}
+
+.issue-contents__body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+.issue-contents__section {
+    font: 400 var(--mono-xs)/1.5 var(--font-label);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--highlight);
+}
+
+.issue-contents__title { font: 600 24px/1.22 var(--font-display); color: var(--ink); text-wrap: pretty; }
+.issue-contents__title a { color: inherit; }
+.issue-contents__title a:hover { color: var(--highlight); }
+
+.issue-contents__dek { max-width: 68ch; font: 400 15px/1.55 var(--font-text); color: var(--ink2); }
+.issue-contents__byline { font: 500 13px/1.4 var(--font-text); color: var(--muted2); }
+
+.issue-contents__media {
+    display: block;
+    width: 200px;
+    border: 1px solid var(--line);
+    background: repeating-linear-gradient(135deg, var(--ph1) 0 8px, var(--ph2) 8px 16px);
+    overflow: hidden;
+}
+
+.issue-contents__media img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; }
+
 /* ---------- stacked widget lists (verticals, most read) ----------------------------- */
 
 .stack { display: flex; flex-direction: column; }
@@ -1396,6 +1451,11 @@ a.kicker:hover { background: var(--greenDark); color: var(--onPanel); }
     .card-grid, .card-grid--four, .card-grid--two { grid-template-columns: 1fr; }
 
     .list-row { grid-template-columns: 110px minmax(0, 1fr); gap: 16px; }
+
+    /* The picture above the entry, full width: beside it, the summary ran in a thin column. */
+    .issue-contents__item { grid-template-columns: 28px minmax(0, 1fr); gap: 14px; }
+    .issue-contents__title { font-size: 19px; }
+    .issue-contents__media { grid-column: 1 / -1; grid-row: 1; width: 100%; }
 
     .lead__title { font-size: 20px; max-width: none; word-break: break-word }
     .article-title { font-size: 30px; max-width: none; }

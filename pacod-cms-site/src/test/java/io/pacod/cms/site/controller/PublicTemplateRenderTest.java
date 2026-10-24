@@ -438,7 +438,10 @@ class PublicTemplateRenderTest {
 
     private static Map<String, Object> issueModel(String lang) {
         return Map.of("lang", lang, "view", issueView(),
-                "entries", List.of(new io.pacod.cms.site.services.IssueReader.Entry(12, "Първа <em>статия</em>", "Иван Петров", 0)),
+                "entries", List.of(
+                        new io.pacod.cms.site.services.IssueReader.Entry(12, "Първа <em>статия</em>", "Иван Петров", 0,
+                                "Какво намерихме на брега.", "Пътувания", "first.jpg", "Брегът на залез"),
+                        new io.pacod.cms.site.services.IssueReader.Entry(14, "Втора статия", "", 0)),
                 "pdfs", Map.of("bg", "/resources/pdfs/issues/bg/issue-3.pdf"));
     }
 
@@ -452,6 +455,14 @@ class PublicTemplateRenderTest {
         String issue = render("issue", issueModel("bg"));
         assertThat(issue).contains("Том 2, брой 5", "Есенен брой", "ISSN 1234-567X", "Уводни думи.",
                 "href=\"/article/12?lang=bg\"", "Първа <em>статия</em>", "href=\"/resources/pdfs/issues/bg/issue-3.pdf\"");
+        // The contents are a numbered list of their own: never .list-row, whose thumbnail column
+        // squeezed an entry without one into 160 px. The picture, section and summary show where
+        // an entry has them, and nothing stands in where it has not.
+        assertThat(issue).contains("class=\"issue-contents\"", ">01<", ">02<", "Пътувания", "Какво намерихме на брега.",
+                        "src=\"/assets/img/articles/first.jpg\"", "alt=\"Брегът на залез\"", "Втора статия")
+                .doesNotContain("list-row");
+        assertThat(issue.split("issue-contents__media", -1)).hasSize(2);
+        assertThat(issue.split("issue-contents__byline", -1)).hasSize(2);
         String empty = render("issues", Map.of("lang", "en", "views", List.of(),
                 "issues", org.springframework.data.domain.Page.empty()));
         assertThat(empty).contains("empty-note").doesNotContain("pager__item");

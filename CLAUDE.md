@@ -1831,6 +1831,14 @@ a cover, an editorial and an ordered list of articles, generated into one PDF pe
   `/{lang}/` prefix, counted and advertised as `BannerPage.LIST`. A PDF is linked once its public
   file exists (`SitePdfs.issue`). Both are in the sitemap; robots disallows `/issue-print/`. The
   content is `fragments/issues :: list`/`:: detail`, each set's page around it.
+- **An issue's contents are `ol.issue-contents`, never `.list-row`**: that row is a grid whose
+  first column is a thumbnail's, and an entry without one was squeezed into 160 px. Each entry
+  is numbered, then section, title, summary and the authors' names, its picture in an `auto`
+  column (none, and the text takes the width). `IssueReader.pageContents`
+  (`findPublishedContentsByIdIn`) reads the summary -- the article's own description, never
+  `ArticleModel.getDescription()`, which makes one up -- the first category and the first
+  visible picture; the print front keeps the outline query. Both list names alone
+  (`authorNames()`), never `getAuthorsAsText()`'s job titles and bios.
 - **Tests:** `IssuePdfAssemblerTest` (real PDFBox documents: order, bookmarks, digits from page
   2), `PdfIssueHandlerTest` (the front settling, draft vs published files, a failed language,
   refusals), `MgmtScreenRenderTest.issueScreens`/`pdfSettingsScreen`, `IssueRolesTest` (an author

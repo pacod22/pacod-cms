@@ -90,7 +90,8 @@ renders with the print media type), font stacks that exist in Gotenberg's image 
 load there), the scientific format's two columns with guards for legacy bodies, and the issue's
 cover and contents. They load no `fragments/head`, so they always print light. The issue pages'
 content is `fragments/issues :: list` and `:: detail`, shared by every set's `issues.html` and
-`issue.html`.
+`issue.html`; a set restyles the contents (`.issue-contents` and its `__no`, `__section`,
+`__title`, `__dek`, `__byline`, `__media`) in its own stylesheet, as `magazine.css` does.
 
 Every page also has `site` (the website's identity, menus and validated third-party ids), `lang`
 (the content language in force) and the advertising lists `topBanners` and `sidebarBanners`.

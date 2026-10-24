@@ -40,14 +40,19 @@
     </nav>
 </th:block>
 
-<!--/* One issue: its cover, title, editorial, contents linking to the articles, and its PDFs. */-->
+<!--/* One issue: its cover, title, editorial, contents linking to the articles, and its PDFs.
+
+       The contents are a list of their own, never .list-row: that row is a grid whose first column
+       is a thumbnail's, and a row without one squeezed the whole entry into it. Each entry is
+       numbered, then the section, the title, the summary and the authors' names, with the
+       article's picture beside them where it has one (IssueReader.pageContents). */-->
 <th:block th:fragment="detail(view, entries, pdfs, lang)">
     <div class="page-head">
         <span class="page-head__kicker" th:text="${view.monthName()} + ' ' + ${view.issue().year}">October 2026</span>
         <h1 class="page-head__title" th:text="#{issues.volumeNumber(${view.issue().volume}, ${view.issue().number})}">Volume 1, number 1</h1>
     </div>
     <p class="issue-subtitle" th:if="${!#strings.isEmpty(view.title())}" th:text="${view.title()}">Autumn</p>
-    <p class="muted" th:if="${view.issn() != null}" th:text="#{issues.issn(${view.issn()})}">ISSN 1234-5678</p>
+    <p class="muted issue-issn" th:if="${view.issn() != null}" th:text="#{issues.issn(${view.issn()})}">ISSN 1234-5678</p>
 
     <figure class="figure" th:if="${view.coverPath() != null}">
         <div class="figure__frame"><img th:src="${view.coverPath()}" alt=""/></div>
@@ -58,24 +63,37 @@
            th:hreflang="${p.key}" th:text="#{issues.pdf} + ' · ' + ${#strings.toUpperCase(p.key)}">PDF</a>
     </p>
 
-    <section th:if="${!#strings.isEmpty(view.editorial())}">
-        <h2 th:text="#{print.editorial}">Editorial</h2>
+    <section class="issue-part" th:if="${!#strings.isEmpty(view.editorial())}">
+        <div class="section-head">
+            <h2 class="section-head__title" th:text="#{print.editorial}">Editorial</h2>
+        </div>
         <div class="article-body" th:utext="${view.editorial()}"></div>
     </section>
 
-    <section>
-        <h2 th:text="#{print.contents}">Contents</h2>
-        <article class="list-row" th:each="e : ${entries}">
-            <div class="list-row__body">
-                <h3 class="list-row__title">
-                    <a th:href="@{/article/{id}(id=${e.articleId()}, lang=${lang})}" th:utext="${e.title()}">Title</a>
-                </h3>
-                <span class="list-row__author" th:if="${!#strings.isEmpty(e.authors())}" th:text="${e.authors()}">Author</span>
-            </div>
-        </article>
+    <section class="issue-part" th:if="${!entries.isEmpty()}">
+        <div class="section-head">
+            <h2 class="section-head__title" th:text="#{print.contents}">Contents</h2>
+        </div>
+        <ol class="issue-contents">
+            <li class="issue-contents__item" th:each="e, i : ${entries}">
+                <span class="issue-contents__no" aria-hidden="true" th:text="${#numbers.formatInteger(i.count, 2)}">01</span>
+                <div class="issue-contents__body">
+                    <span class="issue-contents__section" th:if="${e.section() != null}" th:text="${e.section()}">Section</span>
+                    <h3 class="issue-contents__title">
+                        <a th:href="@{/article/{id}(id=${e.articleId()}, lang=${lang})}" th:utext="${e.title()}">Title</a>
+                    </h3>
+                    <p class="issue-contents__dek" th:if="${e.description() != null}" th:utext="${e.description()}">Summary</p>
+                    <p class="issue-contents__byline" th:if="${!#strings.isEmpty(e.authors())}" th:text="${e.authors()}">Author</p>
+                </div>
+                <a class="issue-contents__media" th:if="${e.imageFilename() != null}" tabindex="-1" aria-hidden="true"
+                   th:href="@{/article/{id}(id=${e.articleId()}, lang=${lang})}">
+                    <img th:src="'/assets/img/articles/' + ${e.imageFilename()}" th:alt="${e.imageAlt()}" loading="lazy"/>
+                </a>
+            </li>
+        </ol>
     </section>
 
-    <p><a th:href="@{/issues(lang=${lang})}" th:text="#{issues.back}">All issues</a></p>
+    <p class="issue-back"><a th:href="@{/issues(lang=${lang})}" th:text="#{issues.back}">All issues</a></p>
 </th:block>
 
 </body>

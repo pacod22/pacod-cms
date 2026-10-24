@@ -80,6 +80,17 @@ public interface ArticleRepository extends MongoRepository<Article, Integer> {
     List<Article> findPublishedOutlineByIdIn(Collection<Integer> ids);
 
     /**
+     * {@link #findPublishedOutlineByIdIn} plus what a row of an issue's public contents shows: the
+     * summary, the first category and the first visible picture. Two eager {@code @DBRef} lists a
+     * row, the price of any listing; the print front, rendered several times a job, keeps the
+     * outline.
+     */
+    @Query(value = "{ '_id': { $in: ?0 }, status: 'PUBLISHED' }",
+           fields = "{ '_id': 1, 'title': 1, 'titles': 1, 'authors': 1, 'date': 1, 'description': 1, "
+                   + "'descriptions': 1, 'categories': 1, 'images': 1, 'hiddenImageIds': 1 }")
+    List<Article> findPublishedContentsByIdIn(Collection<Integer> ids);
+
+    /**
      * The ids of the articles published with a date in {@code [from, to)}, oldest first: what
      * "fill from month" puts in an issue. A closed-open range, written by hand (a derived
      * {@code Between} is exclusive at both ends on Mongo).
