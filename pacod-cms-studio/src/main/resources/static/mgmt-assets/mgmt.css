@@ -2439,6 +2439,15 @@ a.chip.active { border-color: var(--accent-line); color: var(--accent); backgrou
     border-radius: var(--r-sm);
     background: var(--surface-2);
 }
+/* Above a writing-help answer: the numbers and names its material did not have. */
+.ai-unverified {
+    margin: 8px 0 0;
+    padding: 8px 12px;
+    border: 1px solid var(--warn-line);
+    border-radius: var(--r-sm);
+    background: var(--warn-soft);
+    color: var(--warn);
+}
 /* The title candidates: whole headlines, so they wrap rather than run off the field. */
 .ai-title-choice { white-space: normal; text-align: left; height: auto; }
 .ai-preview > :first-child { margin-top: 0; }

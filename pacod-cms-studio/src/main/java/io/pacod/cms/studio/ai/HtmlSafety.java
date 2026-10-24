@@ -9,7 +9,10 @@ import org.jsoup.safety.Safelist;
 import io.pacod.cms.core.design.BodyBlocks;
 
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * What a writing-assist answer may contain once cleaned: text structure and emphasis, lists,
@@ -24,11 +27,15 @@ import java.util.Set;
  *
  * <p>An article body ({@link #body}) may also hold the styled blocks of {@link BodyBlocks}: a
  * {@code class} survives only where it names a block on that block's own element, and a
- * {@code div} left with none is unwrapped.
+ * {@code div} left with none is unwrapped. Its links, like its images, are the source's: a link to
+ * an address the source neither links nor writes out is unwrapped, its text kept -- a model asked
+ * to lay out, extend or draft a text has no address of its own to give.
  */
 public final class HtmlSafety {
 
     private static final String BASE = "https://pacod.invalid/";
+    private static final Pattern URL = Pattern.compile("(?i)\\bhttps?://[^\\s<>\"']+");
+    private static final Pattern EMAIL = Pattern.compile("[\\p{L}\\p{N}._%+-]+@[\\p{L}\\p{N}-]+(?:\\.[\\p{L}\\p{N}-]+)+");
 
     private static final Safelist SAFELIST = new Safelist()
             .addTags("p", "br", "b", "strong", "i", "em", "u", "s", "sub", "sup", "small", "mark",
@@ -62,7 +69,8 @@ public final class HtmlSafety {
 
     /**
      * {@code html} cleaned for an article body: {@link #clean}'s allow-list plus the blocks of
-     * {@link BodyBlocks}, every other class removed and a {@code div} without one unwrapped.
+     * {@link BodyBlocks}, every other class removed and a {@code div} without one unwrapped, and a
+     * link kept only to an address {@code source} links or writes out.
      */
     public static String body(String source, String html) {
         Document clean = cleaned(source, html, BODY);
@@ -82,7 +90,42 @@ public final class HtmlSafety {
         for (Element div : clean.body().select("div:not([class])")) {
             div.unwrap();
         }
+        Set<String> addresses = addresses(source);
+        for (Element link : clean.body().select("a[href]")) {
+            if (!addresses.contains(address(link.attr("href")))) {
+                link.unwrap();
+            }
+        }
         return clean.body().html();
+    }
+
+    /** The addresses {@code source} gives: its links, and the web and e-mail addresses in its text. */
+    private static Set<String> addresses(String source) {
+        Document parsed = Jsoup.parseBodyFragment(source == null ? "" : source, BASE);
+        Set<String> addresses = new HashSet<>();
+        for (Element link : parsed.select("a[href]")) {
+            addresses.add(address(link.attr("href")));
+        }
+        String text = parsed.body().text();
+        Matcher url = URL.matcher(text);
+        while (url.find()) {
+            addresses.add(address(url.group().replaceAll("[.,;:!?)\\]}]+$", "")));
+        }
+        Matcher email = EMAIL.matcher(text);
+        while (email.find()) {
+            addresses.add(address("mailto:" + email.group().replaceAll("\\.+$", "")));
+        }
+        return addresses;
+    }
+
+    /** An address as compared: ignoring case and a trailing slash; a {@code mailto:} by its address alone. */
+    private static String address(String href) {
+        String address = href.strip().toLowerCase(Locale.ROOT);
+        if (address.startsWith("mailto:")) {
+            int query = address.indexOf('?');
+            return query < 0 ? address : address.substring(0, query);
+        }
+        return address.endsWith("/") && address.length() > 1 ? address.substring(0, address.length() - 1) : address;
     }
 
     private static Document cleaned(String source, String html, Safelist safelist) {

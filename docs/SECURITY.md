@@ -90,9 +90,12 @@ Every answer from the gateway is treated as hostile input:
 - **Writing help** — rewrites, drafted articles, passages, laid-out bodies — is held to a small
   allow-list of tags and of link schemes (http, https, mailto, relative); a `class` survives only
   where it names one of the body's styled blocks on its own element, never a `style`; images survive
-  only where the author's own text already had them. A laid-out body must keep every word of the
-  author's in order, and a body holding a frame or script is not sent to be laid out at all. Nothing
-  is saved until the author saves.
+  only where the author's own text already had them, and links only to addresses the author's text,
+  brief or article gave. A laid-out body must keep every word of the author's in order, and a body
+  holding a frame or script is not sent to be laid out at all. Numbers, names and pull quotes an
+  answer holds that its material does not are listed beside it for the author to check. That check
+  is a heuristic, not proof: the author's review is the last guard. Nothing is saved until the author
+  saves.
 - **Design assist** answers are validated exactly as if an operator had typed them, and only reach
   a draft, which one click restores to what it was.
 - Attribution to the gateway uses opaque ids only: a website's id, a feature, a job, a person's

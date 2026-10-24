@@ -1919,7 +1919,11 @@ feature's model is `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, 
     `src`. Never `style`, `on*`, scripts, frames or forms. **`HtmlSafety.body`** (rewrites,
     drafts, writes, layouts) adds `div`, `figure`, `figcaption` and a `class` that names a
     **`BodyBlocks`** block on that block's own element; every other class goes and a `div` left
-    without one is unwrapped. `clean` (section settings) takes no class at all.
+    without one is unwrapped. `clean` (section settings) takes no class at all. **`body` keeps a
+    link only to an address its source gives** — the source's own `href`s, or a web or e-mail
+    address written in its text (case and a trailing `/` ignored, a `mailto:` by its address) — and
+    unwraps any other, keeping its text. The source is the passage, the brief (a draft), or the
+    brief plus the article (a write), so a model has no address of its own to link.
   - **Drafts and written passages invent nothing**: the prompt allows only the brief's (and the
     body's) facts and asks for a `[placeholder]` where one is missing. A draft is in
     `original()`'s language.
@@ -1929,6 +1933,29 @@ feature's model is `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, 
     is refused **before any call** for a body holding a frame, video, embed, script, style block or
     form (`HtmlSafety.holdsEmbeds`): cleaning would drop it, and the wording check reads only text.
     At most `MAX_BODY` (40,000) characters.
+  - **What an answer states that its material does not is listed, never refused** (`Grounding`;
+    `Written.unverified`, `Draft.unverified`, the JSON's `unverified`). This covers every answer
+    written as a body: rewrites, drafts, writes and layouts. The material is the passage, the
+    brief, the brief and the article, or the body laid out. Its checks:
+    - **Numbers.** Digit groups, separators and leading zeros ignored. `1,200`, `1 200` and
+      `1200` are one number, `09:00` is `9:00`, and `12.05.2026` matches `2026-05-12`.
+    - **Names.** A capitalised word that is not the first of its sentence (block starts and
+      `.!?…` count as sentence breaks, a colon does not) is a name. It must appear in the
+      material, ignoring case and up to three trailing letters past a shared four (so
+      Москве/Москва and Bulgarian/Bulgaria match). Exempt: a title-case heading, and a word the
+      answer also writes in lower case.
+    - **Pull quotes.** A pull quote must be a contiguous run of the material's words or of the
+      rest of the answer's.
+    - **What is skipped.** `[placeholders]`. Names entirely in `de`/`lb` (every noun is
+      capitalised), or when a piece of the material is in another script than the answer (an
+      English brief for Bulgarian content).
+    - **Where it shows.** Alt and title attributes are checked. At most `MAX_LISTED` (12) entries,
+      listed rather than refused (layouts included), because the checks are heuristics and the
+      operator reviews every answer. `mgmt.js` shows the list above the dialog's preview
+      (`.ai-unverified`) and after the draft card's note (`js.ai.unverified`).
+    - **It narrows the gap, it does not close it.** These all pass: numbers written as words, a
+      name that opens a sentence or sits in a title-case heading, German names, and a claim made
+      with neither. The operator's review is still the last guard.
   - A summary, tags and titles are text only. Tags are at most eight, without commas.
   - Without AI the endpoints answer 409 with `{error}` saying why, which `readJson` shows.
 - **In the editor** (`mgmt.js`), the toolbar's **first** button is "AI". At the end it fell into
@@ -1965,7 +1992,8 @@ feature's model is `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, 
     selection and write / lay out all without one, an image-only selection collapsed before the
     bookmark (or "write at the cursor" replaces the image). **Not yet checked on a running stack**:
     the fetch round trips, the draft card, the title list, design assist's refine and undo, the
-    design job.
+    design job, and the `unverified` warning (the dialog's `.ai-unverified` paragraph and the draft
+    card's note; `node --check` only).
 - **The installation screen tests the gateway** (`POST /mgmt/platform/ai-test`, `platform.manage`):
   `AiGateway.ping`, one call of at most 64 tokens with the default model and **no website or person
   attributed** (nothing is bound there; the headers are left out). The flash names the time, the
@@ -1989,8 +2017,10 @@ feature's model is `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, 
     mock does;
   - `TranslationWriterIT` uses real MongoDB: every id shape (int, slug, name), an absent list, a
     `$` value, case, and the compare-and-set refusing a changed menu;
-  - `HtmlSafetyTest` (body mode too) and `WritingAssistTest` (titles, draft, write, the wording
-    check, the embed refusal);
+  - `HtmlSafetyTest` (body mode and its links too) and `WritingAssistTest` (titles, draft, write, the
+    wording check, the embed refusal, what each answer lists);
+  - `GroundingTest`: separators, names mid-sentence, title case, `de`, inflection, another script,
+    placeholders, alt text, pull quotes, the cap;
   - `DesignAssistTest` (refine shows the draft, a theme `null` keeps), `DesignLayoutsTest` and
     `DesignThemeAndMenusTest` (undo, redo, one step, forgotten on other changes, a job's rerun,
     unrendered sections kept), `DesignSiteHandlerTest`, `DesignScreensTest.designWholeSite`/

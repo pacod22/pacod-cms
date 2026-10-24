@@ -2385,7 +2385,7 @@ class MgmtScreenRenderTest {
                 .andExpect(content().string(containsString("PACOD_GW_URL")));
 
         when(aiAccess.refusalHere()).thenReturn(Optional.empty());
-        when(writingAssist.rewrite(eq(io.pacod.cms.studio.ai.WritingAssist.Action.SHORTEN), eq("<p>x</p>"))).thenReturn("<p>y</p>");
+        when(writingAssist.rewrite(eq(io.pacod.cms.studio.ai.WritingAssist.Action.SHORTEN), eq("<p>x</p>"))).thenReturn(new io.pacod.cms.studio.ai.WritingAssist.Written("<p>y</p>", List.of()));
         mockMvc.perform(post("/mgmt/ai/assist").with(csrf()).contentType("application/json")
                         .content("{\"action\":\"shorten\",\"html\":\"<p>x</p>\"}"))
                 .andExpect(status().isOk())
@@ -2404,16 +2404,17 @@ class MgmtScreenRenderTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("\"New title\"")));
         when(writingAssist.draft(eq("A fair"), eq(io.pacod.cms.studio.ai.WritingAssist.Length.SHORT)))
-                .thenReturn(new io.pacod.cms.studio.ai.WritingAssist.Draft("T", "D", "<p class=\"body-lead\">B</p>"));
+                .thenReturn(new io.pacod.cms.studio.ai.WritingAssist.Draft("T", "D", "<p class=\"body-lead\">B</p>", List.of("1998")));
         mockMvc.perform(post("/mgmt/ai/draft").with(csrf()).contentType("application/json")
                         .content("{\"brief\":\"A fair\",\"length\":\"short\"}"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("\"title\":\"T\"")))
-                .andExpect(content().string(containsString("body-lead")));
+                .andExpect(content().string(containsString("body-lead")))
+                .andExpect(content().string(containsString("\"unverified\":[\"1998\"]")));
         mockMvc.perform(post("/mgmt/ai/draft").with(csrf()).contentType("application/json")
                         .content("{\"brief\":\"A fair\",\"length\":\"endless\"}"))
                 .andExpect(status().isBadRequest());
-        when(writingAssist.write(eq("more"), eq("<p>x</p>"))).thenReturn("<p>more</p>");
+        when(writingAssist.write(eq("more"), eq("<p>x</p>"))).thenReturn(new io.pacod.cms.studio.ai.WritingAssist.Written("<p>more</p>", List.of()));
         mockMvc.perform(post("/mgmt/ai/write").with(csrf()).contentType("application/json")
                         .content("{\"brief\":\"more\",\"html\":\"<p>x</p>\"}"))
                 .andExpect(status().isOk())

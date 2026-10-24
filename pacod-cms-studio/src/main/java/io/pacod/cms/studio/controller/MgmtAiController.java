@@ -23,7 +23,8 @@ import java.util.Optional;
  * {@code /mgmt/ai/*}: the editor's writing help -- rewrites, summaries, tags, titles, drafts, a
  * passage at the cursor, a body laid out -- as JSON for {@code fetch}: the editor holds
  * unsaved rich text, and a redirect would lose it. Each answer goes back to the operator, who
- * inserts it, or not; nothing here writes an article.
+ * inserts it, or not; nothing here writes an article. An answer written as a body carries
+ * {@code unverified}: the numbers and names its material did not have, for the operator to check.
  *
  * <p>{@code ai.use} for every call (a person may have it without {@code content.write}; they
  * still cannot save), and AI available here ({@link AiAccess}): otherwise a 409 whose
@@ -49,7 +50,7 @@ public class MgmtAiController {
         this.text = text;
     }
 
-    /** {@code {action, html}}: the selection rewritten, cleaned. */
+    /** {@code {action, html}}: the selection rewritten, cleaned, and what it added. */
     @PostMapping("/assist")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> rewrite(@RequestBody Map<String, String> request) {
@@ -63,7 +64,7 @@ public class MgmtAiController {
         } catch (IllegalArgumentException e) {
             return error(HttpStatus.BAD_REQUEST, text.msg("ai.error.action"));
         }
-        return answer(() -> Map.of("html", assist.rewrite(action, request.get("html"))));
+        return answer(() -> written(assist.rewrite(action, request.get("html"))));
     }
 
     /** {@code {articleId}}: a summary for the description field. */
@@ -123,7 +124,8 @@ public class MgmtAiController {
         }
         return answer(() -> {
             WritingAssist.Draft draft = assist.draft(string(request.get("brief")), length);
-            return Map.of("title", draft.title(), "description", draft.description(), "html", draft.html());
+            return Map.of("title", draft.title(), "description", draft.description(), "html", draft.html(),
+                    "unverified", draft.unverified());
         });
     }
 
@@ -135,7 +137,7 @@ public class MgmtAiController {
         if (refused.isPresent()) {
             return refused.get();
         }
-        return answer(() -> Map.of("html", assist.write(string(request.get("brief")), string(request.get("html")))));
+        return answer(() -> written(assist.write(string(request.get("brief")), string(request.get("html")))));
     }
 
     /** {@code {html}}: the selection or the whole body laid out, every word kept. */
@@ -146,7 +148,7 @@ public class MgmtAiController {
         if (refused.isPresent()) {
             return refused.get();
         }
-        return answer(() -> Map.of("html", assist.designBody(string(request.get("html")))));
+        return answer(() -> written(assist.designBody(string(request.get("html")))));
     }
 
     /** {@code {imageId, lang}}: alt text for that image in that language, from the picture itself. */
@@ -170,6 +172,10 @@ public class MgmtAiController {
         }
         String caption = image.get().getCaption();
         return answer(() -> Map.of("alt", assist.alt(bytes.get(), caption, lang)));
+    }
+
+    private static Map<String, Object> written(WritingAssist.Written written) {
+        return Map.of("html", written.html(), "unverified", written.unverified());
     }
 
     private static String string(Object value) {

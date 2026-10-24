@@ -1434,8 +1434,13 @@
                         .then(function (answer) {
                             state.result = answer.html || '';
                             // Already cleaned by the server (HtmlSafety); shown as it will be
-                            // inserted, the body's blocks styled by body-blocks.css.
+                            // inserted, the body's blocks styled by body-blocks.css. Above it, the
+                            // numbers and names the material did not have (Grounding): a warning,
+                            // never a refusal -- Insert stays the operator's.
+                            var unverified = answer.unverified || [];
                             api.redial(spec('<p>' + escapeHtml(assistResultNote(state.action)) + '</p>'
+                                    + (unverified.length ? '<p class="ai-unverified">'
+                                        + escapeHtml(t('ai.unverified', unverified.join(', '))) + '</p>' : '')
                                     + '<div class="ai-preview">' + state.result + '</div>'));
                         })
                         .catch(function (error) {
@@ -1587,7 +1592,11 @@
                     }
                     title.dispatchEvent(new Event('input', {bubbles: true}));
                     description.dispatchEvent(new Event('input', {bubbles: true}));
-                    note.textContent = t('ai.draft.done');
+                    // What the brief did not give (Grounding), named for the author to check.
+                    var unverified = data.unverified || [];
+                    note.textContent = unverified.length
+                        ? t('ai.draft.done') + ' ' + t('ai.unverified', unverified.join(', '))
+                        : t('ai.draft.done');
                 })
                 .catch(function (error) {
                     note.textContent = error.message;

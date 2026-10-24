@@ -64,6 +64,17 @@ class HtmlSafetyTest {
     }
 
     @Test
+    @DisplayName("a body links only to addresses the source links or writes out; any other link keeps its text alone")
+    void bodyLinks() {
+        String source = "<p>See <a href=\"/article/3\">this</a>, https://fair.example/tickets. or write to info@fair.example.</p>";
+        String cleaned = HtmlSafety.body(source, "<p><a href=\"/article/3\">this</a> <a href=\"https://fair.example/tickets/\">tickets</a> "
+                + "<a href=\"mailto:INFO@fair.example?subject=Hi\">mail</a> <a href=\"https://evil.example/\">elsewhere</a></p>");
+        assertThat(cleaned).contains("<a href=\"/article/3\">this</a>", "<a href=\"https://fair.example/tickets/\">tickets</a>",
+                "<a href=\"mailto:INFO@fair.example?subject=Hi\">mail</a>", "</a> elsewhere</p>").doesNotContain("evil");
+        assertThat(HtmlSafety.body("", "<p><a href=\"https://fair.example/\">site</a></p>")).isEqualTo("<p>site</p>");
+    }
+
+    @Test
     @DisplayName("the plain allow-list still takes no blocks")
     void cleanTakesNoBlocks() {
         assertThat(HtmlSafety.clean("", "<div class=\"body-callout\"><p>x</p></div>")).isEqualTo("<p>x</p>");

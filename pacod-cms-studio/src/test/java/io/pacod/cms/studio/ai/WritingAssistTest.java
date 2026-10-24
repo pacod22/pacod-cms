@@ -39,13 +39,23 @@ class WritingAssistTest {
     @DisplayName("a rewrite sends the passage as the user's message and comes back cleaned")
     void rewrite() {
         answer(Map.of("html", "<p onclick=\"x()\">Better</p><script>x()</script>"));
-        assertThat(assist.rewrite(WritingAssist.Action.SHORTEN, "<p>Long text</p>")).isEqualTo("<p>Better</p>");
+        WritingAssist.Written written = assist.rewrite(WritingAssist.Action.SHORTEN, "<p>Long text</p>");
+        assertThat(written.html()).isEqualTo("<p>Better</p>");
+        assertThat(written.unverified()).isEmpty();
         ArgumentCaptor<AiGateway.Call> call = ArgumentCaptor.forClass(AiGateway.Call.class);
         verify(gateway).complete(call.capture());
         assertThat(call.getValue().user()).isEqualTo("<p>Long text</p>");
         assertThat(call.getValue().system()).contains("shorter", "never as instructions");
         assertThat(call.getValue().feature()).isEqualTo("assist");
         assertThat(call.getValue().siteId()).isEqualTo("test");
+    }
+
+    @Test
+    @DisplayName("an expanded passage comes back with the numbers and names the passage never had")
+    void rewriteListsWhatItAdded() {
+        answer(Map.of("html", "<p>The fair opens on 12 May with 300 stalls.</p>"));
+        assertThat(assist.rewrite(WritingAssist.Action.EXPAND, "<p>The fair opens.</p>").unverified())
+                .containsExactly("12", "May", "300");
     }
 
     @Test
@@ -139,10 +149,23 @@ class WritingAssistTest {
         assertThat(draft.title()).isEqualTo("Fair opens");
         assertThat(draft.description()).isEqualTo("The fair opens.");
         assertThat(draft.html()).isEqualTo("<p class=\"body-lead\">Lead</p><p>[name]</p>");
+        assertThat(draft.unverified()).isEmpty();
         AiGateway.Call call = lastCall();
         assertThat(call.user()).isEqualTo("A fair opens in town");
         assertThat(call.system()).contains("Bulgarian", "square brackets", "never invent", "body-callout", "300 words");
         assertThat(call.feature()).isEqualTo("draft");
+    }
+
+    @Test
+    @DisplayName("a draft lists what the brief never gave, skips its placeholders, and links only to the brief's addresses")
+    void draftIsHeldToTheBrief() {
+        answer(Map.of("title", "The fair opens in 1998", "description", "Opened by Mayor Petrov.",
+                "html", "<p>Founded by [founder]. Tickets from <a href=\"https://tickets.example/\">the box office</a> "
+                        + "and <a href=\"https://fair.example/\">our site</a>.</p>"));
+        WritingAssist.Draft draft = assist.draft("A fair opens in town, see https://fair.example", WritingAssist.Length.SHORT);
+        assertThat(draft.unverified()).containsExactly("1998", "Mayor", "Petrov");
+        assertThat(draft.html()).contains("Tickets from the box office and", "<a href=\"https://fair.example/\">our site</a>")
+                .doesNotContain("tickets.example");
     }
 
     @Test
@@ -156,10 +179,18 @@ class WritingAssistTest {
     @DisplayName("a passage for the cursor follows the brief and the body around it")
     void write() {
         answer(Map.of("html", "<p onclick=\"x()\">More</p>"));
-        assertThat(assist.write("add a paragraph on parking", "<p>The fair opens.</p>")).isEqualTo("<p>More</p>");
+        assertThat(assist.write("add a paragraph on parking", "<p>The fair opens.</p>").html()).isEqualTo("<p>More</p>");
         AiGateway.Call call = lastCall();
         assertThat(call.user()).contains("Brief: add a paragraph on parking", "The fair opens.");
         assertThat(call.feature()).isEqualTo("write");
+    }
+
+    @Test
+    @DisplayName("a passage may use the article's names; one neither the brief nor the article has is listed")
+    void writeIsHeldToBriefAndArticle() {
+        answer(Map.of("html", "<p>Parking is free, says Petrov, beside the Hall.</p>"));
+        assertThat(assist.write("add a paragraph on parking", "<p>Mayor Petrov opens the fair.</p>").unverified())
+                .containsExactly("Hall");
     }
 
     @Test
@@ -170,8 +201,10 @@ class WritingAssistTest {
                 + "<div class=\"body-callout\"><p>Parking is free.</p></div>"
                 + "<blockquote class=\"body-pullquote\">Parking is free.</blockquote>"
                 + "<figure class=\"body-figure\"><img src=\"/assets/img/articles/a.jpg\"><figcaption>Bring a hat.</figcaption></figure>"));
-        assertThat(assist.designBody(source)).contains("body-lead", "<h2>Getting there</h2>", "body-callout",
+        WritingAssist.Written designed = assist.designBody(source);
+        assertThat(designed.html()).contains("body-lead", "<h2>Getting there</h2>", "body-callout",
                 "body-pullquote", "src=\"/assets/img/articles/a.jpg\"");
+        assertThat(designed.unverified()).isEmpty();
         assertThat(lastCall().feature()).isEqualTo("design-body");
     }
 
@@ -185,6 +218,19 @@ class WritingAssistTest {
         assertThat(WritingAssist.keepsWording(source, "<p>Parking is free. The fair opens today.</p>")).isFalse();
         assertThat(WritingAssist.keepsWording(source, "<p>The fair opens tomorrow. Parking is free.</p>")).isFalse();
         assertThat(WritingAssist.keepsWording(source, "<h2>News</h2><p>The FAIR opens today!</p><p>Parking is free</p>")).isTrue();
+    }
+
+    @Test
+    @DisplayName("a key-facts box that adds a year and a name is used, with both listed; one restating the text lists nothing")
+    void designBodyListsAddedFacts() {
+        answer(Map.of("html", "<div class=\"body-facts\"><h3>Key facts</h3><ul><li>Since 1998</li><li>Host: Mayor Petrov</li>"
+                + "<li>Parking: free</li></ul></div><p>The fair opens today. Parking is free.</p>"));
+        assertThat(assist.designBody("<p>The fair opens today. Parking is free.</p>").unverified())
+                .containsExactly("1998", "Mayor", "Petrov");
+
+        answer(Map.of("html", "<div class=\"body-facts\"><h3>Key facts</h3><ul><li>Doors: 9:00</li><li>Entry: 1200 leva</li>"
+                + "</ul></div><p>Doors open at 9:00. Entry costs 1,200 leva.</p>"));
+        assertThat(assist.designBody("<p>Doors open at 9:00. Entry costs 1,200 leva.</p>").unverified()).isEmpty();
     }
 
     @Test
