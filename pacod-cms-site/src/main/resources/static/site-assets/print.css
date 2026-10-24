@@ -80,6 +80,27 @@ body.sci { background: #fff; color: #111; }
 /* A frame prints as an empty box under Gotenberg (no JavaScript, no other origin). */
 .sci-body iframe, .sci-body .video-container { display: none; }
 
+/* ------------------------------------------------------------------ the body's styled blocks */
+
+/* Both print views: a box is a border, never a fill (toner, and a grey that prints as noise);
+   a block is never split across a page or a column. */
+.article-body .body-callout,
+.article-body .body-facts { background: none; border: 0.6pt solid #888; break-inside: avoid; }
+.article-body .body-pullquote,
+.article-body .body-figure { break-inside: avoid; }
+/* Inside the scientific format's two columns, the blocks keep to their column: no columns within
+   a column, no floated figure beside text a few words wide, no display-size quote. */
+.sci-body .body-columns { display: block; }
+.sci-body .body-figure-left,
+.sci-body .body-figure-right { float: none; width: auto; margin: 10px 0; }
+.sci-body .body-lead { font: 600 9.5pt/1.38 var(--print-serif); }
+.sci-body .body-pullquote { margin: 0.8em 0; padding: 6px 0; font: italic 600 11pt/1.3 var(--print-serif); }
+.sci-body .body-callout,
+.sci-body .body-facts { margin: 0.8em 0; padding: 6px 8px 0; font: 8.5pt/1.35 var(--print-sans); }
+.sci-body .body-facts h3 { counter-increment: none; }
+.sci-body .body-facts h3::before { content: none; }
+.sci-body .body-figure figcaption { font: italic 8pt/1.3 var(--print-sans); color: #444; }
+
 /* ------------------------------------------------------------------ an issue's front matter */
 
 body.issue-print { background: #fff; color: #111; font-family: var(--print-serif); }

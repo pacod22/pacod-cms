@@ -50,6 +50,7 @@ import java.util.Properties;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -95,6 +96,8 @@ class DesignScreensTest {
     private io.pacod.cms.studio.ai.AiAccess aiAccess;
     @MockitoBean
     private io.pacod.cms.studio.ai.DesignAssist designAssist;
+    @MockitoBean
+    private io.pacod.cms.core.jobs.JobQueue jobQueue;
 
     private MockMvc mockMvc;
 
@@ -142,6 +145,7 @@ class DesignScreensTest {
         en.setNativeName("English");
         when(languages.findAll()).thenReturn(List.of(en));
         when(websites.findById("alpha")).thenReturn(Optional.of(new Website("alpha", "org_a", "Alpha")));
+        when(jobQueue.forSite(any(), any(), any())).thenReturn(org.springframework.data.domain.Page.empty());
 
         Filter siteFilter = context.getBean("studioSiteFilter", FilterRegistrationBean.class).getFilter();
         mockMvc = MockMvcBuilders.webAppContextSetup(context).addFilters(siteFilter).apply(springSecurity()).build();
@@ -277,20 +281,37 @@ class DesignScreensTest {
         assertThat(render("/sites/alpha/mgmt/design/layouts/home")).contains("/sites/alpha/mgmt/design/layouts/home/assist");
 
         when(aiAccess.refusalHere()).thenReturn(Optional.empty());
-        when(designAssist.theme("calm")).thenReturn(new io.pacod.cms.studio.ai.DesignAssist.Outcome(2, List.of("ink")));
+        when(designAssist.theme(eq("calm"), eq(io.pacod.cms.studio.ai.DesignAssist.Mode.REFINE), any())).thenReturn(new io.pacod.cms.studio.ai.DesignAssist.Outcome(2, List.of("ink")));
         mockMvc.perform(postCsrf("/sites/alpha/mgmt/design/theme/assist").param("brief", "calm").with(oidcLogin()))
                 .andExpect(redirectedUrl("/sites/alpha/mgmt/design/theme"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash().attributeExists("message"));
-        when(designAssist.layout(io.pacod.cms.core.design.PageType.HOME, "x"))
+        when(designAssist.layout(eq(io.pacod.cms.core.design.PageType.HOME), eq("x"),
+                eq(io.pacod.cms.studio.ai.DesignAssist.Mode.REPLACE), any()))
                 .thenThrow(new io.pacod.cms.studio.ai.AiGateway.AiException("The answer held no section the template could take"));
-        mockMvc.perform(postCsrf("/sites/alpha/mgmt/design/layouts/home/assist").param("brief", "x").with(oidcLogin()))
+        mockMvc.perform(postCsrf("/sites/alpha/mgmt/design/layouts/home/assist").param("brief", "x").param("mode", "replace")
+                        .with(oidcLogin()))
                 .andExpect(redirectedUrl("/sites/alpha/mgmt/design/layouts/home"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash().attributeExists("error"));
 
         when(aiAccess.refusalHere()).thenReturn(Optional.of(io.pacod.cms.studio.ai.AiRefusal.ORGANISATION_OFF));
         mockMvc.perform(postCsrf("/sites/alpha/mgmt/design/theme/assist").param("brief", "calm").with(oidcLogin()))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash().attributeExists("error"));
-        verify(designAssist, org.mockito.Mockito.times(1)).theme(any());
+        verify(designAssist, org.mockito.Mockito.times(1)).theme(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("design assist's undo: offered once there is one, refused when there is none")
+    void designAssistUndo() throws Exception {
+        TestSubjects.use(at("cms.designer"));
+        when(aiAccess.availableHere()).thenReturn(true);
+        assertThat(render("/sites/alpha/mgmt/design/theme")).doesNotContain("/design/theme/assist/undo")
+                .contains("name=\"mode\" value=\"refine\" checked");
+        mockMvc.perform(postCsrf("/sites/alpha/mgmt/design/theme/assist/undo").with(oidcLogin()))
+                .andExpect(redirectedUrl("/sites/alpha/mgmt/design/theme"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash().attributeExists("error"));
+        mockMvc.perform(postCsrf("/sites/alpha/mgmt/design/layouts/home/assist/undo").with(oidcLogin()))
+                .andExpect(redirectedUrl("/sites/alpha/mgmt/design/layouts/home"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash().attributeExists("error"));
     }
 
     @Test
@@ -314,5 +335,68 @@ class DesignScreensTest {
                 .andExpect(redirectedUrl("/sites/alpha/mgmt/design"));
         verify(websites).save(org.mockito.ArgumentMatchers.argThat(w -> "minimal".equals(w.getTemplateSet())));
         mockMvc.perform(get("/sites/alpha/mgmt/design/layouts/nonsense").with(oidcLogin())).andExpect(status().isNotFound());
+    }
+
+    private static io.pacod.cms.core.control.data.Job job(io.pacod.cms.core.control.data.JobType type) {
+        io.pacod.cms.core.control.data.Job job = new io.pacod.cms.core.control.data.Job();
+        job.setId("0123456789abcdef01234567");
+        job.setSiteId("alpha");
+        job.setType(type);
+        job.setParams(Map.of());
+        job.setStatus(io.pacod.cms.core.control.data.JobStatus.RUNNING);
+        return job;
+    }
+
+    @Test
+    @DisplayName("the whole website from one description: queued as a job carrying the person's id, one at a time, "
+            + "stopped from the design screen; an author is refused")
+    void designWholeSite() throws Exception {
+        TestSubjects.use(at("cms.designer"));
+        assertThat(render("/sites/alpha/mgmt/design")).doesNotContain("/design/assist");
+        when(aiAccess.availableHere()).thenReturn(true);
+        when(aiAccess.refusalHere()).thenReturn(Optional.empty());
+        assertThat(render("/sites/alpha/mgmt/design")).contains("/sites/alpha/mgmt/design/assist\"");
+
+        mockMvc.perform(postCsrf("/sites/alpha/mgmt/design/assist").param("brief", " ").with(oidcLogin()))
+                .andExpect(redirectedUrl("/sites/alpha/mgmt/design"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash().attributeExists("error"));
+
+        io.pacod.cms.core.control.data.Job queued = job(io.pacod.cms.core.control.data.JobType.DESIGN_SITE);
+        when(jobQueue.enqueue(any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean())).thenReturn(queued);
+        mockMvc.perform(postCsrf("/sites/alpha/mgmt/design/assist").param("brief", "a calm paper").param("mode", "replace")
+                        .with(oidcLogin()))
+                .andExpect(redirectedUrl("/sites/alpha/mgmt/jobs/" + queued.getId()));
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<Map<String, String>> params = org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(jobQueue).enqueue(eq("alpha"), eq("org_a"), eq(io.pacod.cms.core.control.data.JobType.DESIGN_SITE),
+                params.capture(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+        assertThat(params.getValue()).containsEntry("brief", "a calm paper").containsEntry("mode", "replace").containsKey("by");
+        assertThat(params.getValue().get("by")).isNotBlank();
+
+        // While it runs: shown with a way to stop it, and a second is refused.
+        when(jobQueue.forSite(eq("alpha"), eq(io.pacod.cms.core.control.data.JobStatus.RUNNING), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(queued)));
+        assertThat(render("/sites/alpha/mgmt/design")).contains("/sites/alpha/mgmt/design/assist/" + queued.getId() + "/cancel");
+        mockMvc.perform(postCsrf("/sites/alpha/mgmt/design/assist").param("brief", "again").with(oidcLogin()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash().attributeExists("error"));
+        verify(jobQueue, org.mockito.Mockito.times(1)).enqueue(any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+
+        when(jobQueue.find("alpha", queued.getId())).thenReturn(Optional.of(queued));
+        when(jobQueue.cancel("alpha", queued.getId())).thenReturn(true);
+        mockMvc.perform(postCsrf("/sites/alpha/mgmt/design/assist/" + queued.getId() + "/cancel").with(oidcLogin()))
+                .andExpect(redirectedUrl("/sites/alpha/mgmt/design"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash().attributeExists("message"));
+
+        // Another kind of job is not this screen's to stop.
+        io.pacod.cms.core.control.data.Job translation = job(io.pacod.cms.core.control.data.JobType.TRANSLATE_SITE);
+        translation.setId("0123456789abcdef01234568");
+        when(jobQueue.find("alpha", translation.getId())).thenReturn(Optional.of(translation));
+        mockMvc.perform(postCsrf("/sites/alpha/mgmt/design/assist/" + translation.getId() + "/cancel").with(oidcLogin()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash().attributeExists("error"));
+        verify(jobQueue, never()).cancel("alpha", translation.getId());
+
+        TestSubjects.use(at("cms.author"));
+        mockMvc.perform(postCsrf("/sites/alpha/mgmt/design/assist").param("brief", "x").with(oidcLogin()))
+                .andExpect(status().isForbidden());
     }
 }

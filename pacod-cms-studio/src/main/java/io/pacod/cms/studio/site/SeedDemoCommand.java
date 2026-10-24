@@ -17,9 +17,10 @@ import java.util.List;
  * {@code --seed-demo}: gives an existing website the demo content and exits.
  *
  * <pre>
- *   java -jar pacod-cms-studio.jar --spring.main.web-application-type=none --seed-demo --site-id=acme
+ *   java -jar pacod-cms-studio.jar --spring.main.web-application-type=none --seed-demo --site-id=acme [--demo=space]
  * </pre>
- * {@code make seed SITE=acme} runs it in a one-off studio container. It refuses a website that
+ * {@code make seed SITE=acme [DEMO=space]} runs it in a one-off studio container; without
+ * {@code --demo} it writes the journal ({@link DemoContent.Demo}). It refuses a website that
  * already has articles, or whose content language the demo is not written in, and writes nothing
  * then; a run that stopped halfway is finished by running it again ({@link DemoContent}).
  *
@@ -50,20 +51,36 @@ public class SeedDemoCommand implements ApplicationRunner {
         List<String> ids = args.getOptionValues("site-id");
         String id = ids == null || ids.isEmpty() ? null : ids.getFirst();
         Website website = id == null ? null : websites.findById(id).orElse(null);
+        java.util.Optional<DemoContent.Demo> which = demo(args);
         if (website == null) {
             log.error("--seed-demo needs --site-id naming a website that exists{}", id == null ? "" : "; there is no " + id);
             status = 2;
+        } else if (which.isEmpty()) {
+            log.error("--demo names no demo; there are {}", java.util.Arrays.stream(DemoContent.Demo.values())
+                    .map(DemoContent.Demo::id).toList());
+            status = 2;
         } else {
-            status = install(demo, website);
+            status = install(demo, which.get(), website);
         }
         int exit = status;
         System.exit(SpringApplication.exit(context, () -> exit));
     }
 
-    /** Writes the demo content and says what happened; the exit status, 0 when it was written. */
+    /** The demo {@code --demo} names, the journal without it; empty for one that does not exist. */
+    static java.util.Optional<DemoContent.Demo> demo(ApplicationArguments args) {
+        List<String> values = args.getOptionValues("demo");
+        return DemoContent.Demo.of(values == null || values.isEmpty() ? null : values.getFirst());
+    }
+
+    /** Writes the journal; see {@link #install(StudioDemo, DemoContent.Demo, Website)}. */
     static int install(StudioDemo demo, Website website) {
+        return install(demo, DemoContent.Demo.JOURNAL, website);
+    }
+
+    /** Writes the demo content and says what happened; the exit status, 0 when it was written. */
+    static int install(StudioDemo demo, DemoContent.Demo which, Website website) {
         try {
-            StudioDemo.Outcome outcome = demo.install(website);
+            StudioDemo.Outcome outcome = demo.install(which, website);
             DemoContent.Result content = outcome.content();
             log.info("Demo content in website {}: {} articles, {} pictures, {} sections, {} authors, {} tags, {} bookings{}",
                     website.getId(), content.articles(), content.images(), content.categories(), content.authors(),

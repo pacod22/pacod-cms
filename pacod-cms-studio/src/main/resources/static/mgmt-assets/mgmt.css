@@ -2295,7 +2295,7 @@ td .path-row .path { max-width: 320px; }
  * vendored skin, which renders in this document.
  *
  * This list is load-bearing -- anything rendered `hidden` that is *also* styled with `display`
- * belongs in it. Deliberately absent: #embedded and .field-hint, whose rules set width, padding
+ * belongs in it (the editor's AI draft card and title list are a .card and a .field-actions). Deliberately absent: #embedded and .field-hint, whose rules set width, padding
  * and border but no display, so `hidden` works on them unaided. .embed-visual is listed even
  * though it declares no display today, because hiding it *is* the video field's mode mechanism
  * and a later `display: grid` on it would break that silently.
@@ -2305,7 +2305,9 @@ td .path-row .path { max-width: 320px; }
 .embed-visual[hidden],
 .slide-swap[hidden],
 .empty[hidden],
-.picker-list label[hidden] { display: none; }
+.picker-list label[hidden],
+.field-actions[hidden],
+.card[hidden] { display: none; }
 
 .sr-only {
     position: absolute;
@@ -2437,6 +2439,8 @@ a.chip.active { border-color: var(--accent-line); color: var(--accent); backgrou
     border-radius: var(--r-sm);
     background: var(--surface-2);
 }
+/* The title candidates: whole headlines, so they wrap rather than run off the field. */
+.ai-title-choice { white-space: normal; text-align: left; height: auto; }
 .ai-preview > :first-child { margin-top: 0; }
 .ai-preview > :last-child { margin-bottom: 0; }
 

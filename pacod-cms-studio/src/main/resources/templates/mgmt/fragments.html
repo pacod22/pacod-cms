@@ -40,6 +40,9 @@
     <link rel="icon" type="image/svg+xml" th:href="@{/mgmt-assets/favicon.svg}">
 
     <link rel="stylesheet" th:href="@{/mgmt-assets/mgmt.css}">
+    <!--/* The article body's styled blocks, for the AI dialog's preview here and -- read off this
+           element by mgmt.js -- as the editor's content_css. Scoped; it styles nothing else. */-->
+    <link rel="stylesheet" data-body-blocks th:href="@{/mgmt-assets/body-blocks.css}">
 
     <!--/*
       The script strings in the operator's language, read once by t() in mgmt.js: every js.* key

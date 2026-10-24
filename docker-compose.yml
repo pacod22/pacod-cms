@@ -226,6 +226,7 @@ services:
       PACOD_BOOTSTRAP_DEMO_ENABLED: ${DEMO_WEBSITES:-true}
       PACOD_BOOTSTRAP_DEMO_HOSTS: ${DEMO_HOSTS:-demo.localhost,localhost}
       PACOD_BOOTSTRAP_DEMO_MINIMAL_HOSTS: ${DEMO_MINIMAL_HOSTS:-minimal.localhost}
+      PACOD_BOOTSTRAP_DEMO_SPACE_HOSTS: ${DEMO_SPACE_HOSTS:-space.localhost}
       # What an article image must be. Set on this service only: it is the one application with
       # an upload endpoint an operator reaches.
       #

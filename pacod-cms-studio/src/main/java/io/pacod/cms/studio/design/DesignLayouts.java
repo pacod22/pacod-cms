@@ -82,7 +82,7 @@ public class DesignLayouts {
 
     public record Editor(PageType pageType, TemplateSetManifest set, List<RegionView> regions,
                          List<LayoutResolver.Issue> issues, boolean unpublished, boolean custom,
-                         List<SectionType> addable) {
+                         List<SectionType> addable, boolean assistUndoable) {
     }
 
     public Editor editor(PageType type) {
@@ -105,7 +105,8 @@ public class DesignLayouts {
         List<SectionType> addable = set.sections().stream().filter(t -> t != SectionType.PRIMARY)
                 .sorted().toList();
         return new Editor(type, set, regions, resolved.issues(), doc.map(Layout::hasUnpublishedChanges).orElse(false),
-                doc.map(d -> d.getPublished() != null).orElse(false), addable);
+                doc.map(d -> d.getPublished() != null).orElse(false), addable,
+                doc.map(Layout::assistUndoable).orElse(false));
     }
 
     /** The draft: as saved, else what is published, else the set's default -- a copy, never the stored one. */
@@ -254,7 +255,8 @@ public class DesignLayouts {
     public void discard(PageType type) {
         layouts.findById(type.name()).ifPresent(doc -> {
             doc.setDraft(null);
-            stamp(doc);
+            forgetAssist(doc);
+            stamp(doc, StudioPrincipals.currentSubject());
             layouts.save(doc);
         });
     }
@@ -267,36 +269,77 @@ public class DesignLayouts {
         doc.setDraft(Layout.copy(draft));
         doc.setPublishedOn(Instant.now());
         doc.setPublishedBy(StudioPrincipals.currentSubject());
-        stamp(doc);
+        forgetAssist(doc);
+        stamp(doc, StudioPrincipals.currentSubject());
         layouts.save(doc);
     }
 
     /**
-     * The whole draft at once, for design assist: sections already checked against the set and
-     * their settings. A page with content of its own keeps its {@code primary} section -- the one
-     * the draft had, id and all -- first in the region it was in, else in the first.
+     * Design assist's draft: the whole draft at once, sections already checked against the set
+     * and their settings, and what the draft was kept for {@link #undoAssist}. A page with content
+     * of its own keeps its {@code primary} section -- the one the draft had, id and all -- first
+     * in the region it was in, else in the first. Sections the current set cannot render (kept for
+     * a switch back, {@code LayoutResolver}) stay, at the end of their regions: the model was never
+     * shown them.
+     *
+     * <p>A person's assist always refills the undo slot; a job ({@code jobId}) refills it unless it
+     * is its own, so a job run again from the start still undoes to the draft before its first try.
+     *
+     * @param updatedBy who the change is recorded as: the person, or the one who queued the job
      */
-    public void replaceDraft(PageType type, Map<String, List<Section>> regions) {
-        mutate(type, draft -> {
-            Section primary = null;
-            String primaryRegion = null;
-            for (Map.Entry<String, List<Section>> region : draft.entrySet()) {
-                for (Section section : region.getValue()) {
-                    if (SectionType.PRIMARY.id().equals(section.getType())) {
-                        primary = section;
-                        primaryRegion = region.getKey();
-                    }
+    public void assistDraft(PageType type, Map<String, List<Section>> regions, String updatedBy, String jobId) {
+        Layout doc = layouts.findById(type.name()).orElseGet(() -> new Layout(type));
+        Map<String, List<Section>> before = draftOf(type);
+        Map<String, List<Section>> draft = new LinkedHashMap<>(Layout.copy(before));
+        TemplateSetManifest set = currentSet();
+        List<String> setRegions = set.spec(type).regions();
+        Section primary = null;
+        String primaryRegion = null;
+        Map<String, List<Section>> unrendered = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Section>> region : draft.entrySet()) {
+            for (Section section : region.getValue()) {
+                if (SectionType.PRIMARY.id().equals(section.getType())) {
+                    primary = section;
+                    primaryRegion = region.getKey();
+                } else if (!setRegions.contains(region.getKey())
+                        || SectionType.byId(section.getType()).filter(set::renders).isEmpty()) {
+                    unrendered.computeIfAbsent(region.getKey(), r -> new ArrayList<>()).add(section);
                 }
             }
-            draft.clear();
-            regions.forEach((region, sections) -> draft.put(region, new ArrayList<>(sections)));
-            if (type.hasPrimary()) {
-                String region = primaryRegion != null && currentSet().spec(type).regions().contains(primaryRegion)
-                        ? primaryRegion : currentSet().spec(type).regions().getFirst();
-                Section kept = primary != null ? primary : new Section("primary", SectionType.PRIMARY.id(), Map.of());
-                draft.computeIfAbsent(region, r -> new ArrayList<>()).addFirst(kept);
-            }
-        });
+        }
+        draft.clear();
+        regions.forEach((region, sections) -> draft.put(region, new ArrayList<>(sections)));
+        if (type.hasPrimary()) {
+            String region = primaryRegion != null && setRegions.contains(primaryRegion) ? primaryRegion : setRegions.getFirst();
+            Section kept = primary != null ? primary : new Section("primary", SectionType.PRIMARY.id(), Map.of());
+            draft.computeIfAbsent(region, r -> new ArrayList<>()).addFirst(kept);
+        }
+        unrendered.forEach((region, sections) -> draft.computeIfAbsent(region, r -> new ArrayList<>()).addAll(sections));
+
+        if (jobId == null || !jobId.equals(doc.getBeforeAssistJob())) {
+            doc.setBeforeAssist(Layout.copy(before));
+            doc.setBeforeAssistJob(jobId);
+        }
+        doc.setDraft(draft);
+        stamp(doc, updatedBy);
+        layouts.save(doc);
+    }
+
+    /**
+     * The draft and what it was before design assist swap places: an undo, and undoing again
+     * redoes.
+     *
+     * @throws MgmtOperationException {@code design.assist.undo.none} when there is nothing to undo
+     */
+    public void undoAssist(PageType type) {
+        Layout doc = layouts.findById(type.name()).filter(Layout::assistUndoable)
+                .orElseThrow(() -> new MgmtOperationException("design.assist.undo.none"));
+        Map<String, List<Section>> draft = draftOf(type);
+        doc.setDraft(Layout.copy(doc.getBeforeAssist()));
+        doc.setBeforeAssist(draft);
+        doc.setBeforeAssistJob(null);
+        stamp(doc, StudioPrincipals.currentSubject());
+        layouts.save(doc);
     }
 
     private void mutate(PageType type, java.util.function.Consumer<Map<String, List<Section>>> change) {
@@ -305,13 +348,20 @@ public class DesignLayouts {
         draft.replaceAll((k, v) -> new ArrayList<>(v));
         change.accept(draft);
         doc.setDraft(draft);
-        stamp(doc);
+        forgetAssist(doc);
+        stamp(doc, StudioPrincipals.currentSubject());
         layouts.save(doc);
     }
 
-    private static void stamp(Layout doc) {
+    private static void stamp(Layout doc, String updatedBy) {
         doc.setUpdatedOn(Instant.now());
-        doc.setUpdatedBy(StudioPrincipals.currentSubject());
+        doc.setUpdatedBy(updatedBy);
+    }
+
+    /** Any change but design assist's own: the undo would bring back a stale draft. */
+    private static void forgetAssist(Layout doc) {
+        doc.setBeforeAssist(null);
+        doc.setBeforeAssistJob(null);
     }
 
     private static Section find(Map<String, List<Section>> draft, String sectionId) {

@@ -82,6 +82,10 @@ class PortalScreensTest {
     private PortalIdentity identity;
     @MockitoBean
     private io.pacod.cms.studio.ai.AiGateway gateway;
+    @MockitoBean
+    private io.pacod.cms.core.archive.SiteArchives archives;
+    @MockitoBean
+    private io.pacod.cms.studio.archive.PortalRestore restore;
 
     private MockMvc mockMvc;
 
@@ -351,7 +355,7 @@ class PortalScreensTest {
         TestSubjects.use(orgAdminOfAlpha());
         Website created = new Website("gamma", "org_alpha", "Gamma");
         when(websites.create(any())).thenReturn(created);
-        when(websites.addDemo(created)).thenReturn(new io.pacod.cms.studio.demo.StudioDemo.Outcome(
+        when(websites.addDemo(eq(created), any())).thenReturn(new io.pacod.cms.studio.demo.StudioDemo.Outcome(
                 new io.pacod.cms.core.seed.DemoContent.Result(20, 24, 6, 4, 12, true, true), 2, null));
 
         mockMvc.perform(postCsrf("/mgmt/sites/new").with(oidcLogin())
@@ -364,7 +368,7 @@ class PortalScreensTest {
         verify(websites).create(request.capture());
         assertThat(request.getValue().demo()).isTrue();
         assertThat(request.getValue().templateSet()).isEqualTo("minimal");
-        verify(websites).addDemo(created);
+        verify(websites).addDemo(eq(created), any());
     }
 
     @Test
@@ -376,9 +380,9 @@ class PortalScreensTest {
         mockMvc.perform(postCsrf("/mgmt/sites/new").with(oidcLogin())
                         .param("organisationId", "org_alpha").param("id", "gamma").param("name", "Gamma"))
                 .andExpect(redirectedUrl("/sites/gamma/mgmt/dashboard"));
-        verify(websites, never()).addDemo(any());
+        verify(websites, never()).addDemo(any(), any());
 
-        when(websites.addDemo(created)).thenThrow(new IllegalStateException("disk full"));
+        when(websites.addDemo(eq(created), any())).thenThrow(new IllegalStateException("disk full"));
         mockMvc.perform(postCsrf("/mgmt/sites/new").with(oidcLogin())
                         .param("organisationId", "org_alpha").param("id", "gamma").param("name", "Gamma")
                         .param("demo", "true"))
@@ -473,5 +477,79 @@ class PortalScreensTest {
             assertThat(access.allowed("content.delete")).isTrue();
         });
         org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
+    // ------------------------------------------------------------------ export and restore
+
+    private static Subject authorOfAlpha() {
+        return Subject.user(List.of(new Binding("cms.author", List.of("platform", "organisation:org_alpha", "cms.website:alpha"))));
+    }
+
+    @Test
+    @DisplayName("export: a website's archive for website.manage, an organisation's for org.manage; streamed as an attachment")
+    void exports() throws Exception {
+        TestSubjects.use(websiteAdminOfAlpha());
+        mockMvc.perform(get("/sites/alpha/mgmt/settings/export").with(oidcLogin()))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Content-Disposition", org.hamcrest.Matchers.startsWith("attachment; filename=\"website-alpha-")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().contentType("application/zip"));
+        verify(archives).exportSite(any(), any());
+        // A website admin is not the organisation's admin.
+        mockMvc.perform(get("/mgmt/organisations/org_alpha/export").with(oidcLogin())).andExpect(status().isForbidden());
+
+        TestSubjects.use(authorOfAlpha());
+        mockMvc.perform(get("/sites/alpha/mgmt/settings/export").with(oidcLogin())).andExpect(status().isForbidden());
+
+        TestSubjects.use(orgAdminOfAlpha());
+        mockMvc.perform(get("/mgmt/organisations/org_alpha/export").with(oidcLogin())).andExpect(status().isOk());
+        verify(archives).exportOrganisation(eq(ALPHA), any());
+        mockMvc.perform(get("/mgmt/organisations/org_beta/export").with(oidcLogin())).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("the restore screens and the export cards render in both languages, linked from the lists")
+    void restoreScreensRender() throws Exception {
+        TestSubjects.use(orgAdminOfAlpha());
+        when(archives.maxBytes()).thenReturn(2048L * 1024 * 1024);
+        assertThat(render(get("/mgmt/sites/restore"))).contains("data-archive-restore", "data-archive-file", "Alpha Media",
+                "/mgmt/sites/restore");
+        assertThat(renderEnglish("/mgmt/sites/restore")).contains("Restore a website", "2048 MB");
+        assertThat(render(get("/mgmt/organisations/restore"))).contains("data-archive-restore", "/mgmt/organisations/restore");
+        assertThat(renderEnglish("/mgmt/organisations/restore")).contains("Restore an organisation");
+        assertThat(render(get("/mgmt/sites"))).contains("/mgmt/sites/restore");
+        assertThat(render(get("/mgmt/organisations"))).contains("/mgmt/organisations/restore");
+        assertThat(render(get("/mgmt/organisations/org_alpha"))).contains("/mgmt/organisations/org_alpha/export");
+        assertThat(renderEnglish("/sites/alpha/mgmt/settings")).contains("/sites/alpha/mgmt/settings/export", "Download");
+    }
+
+    @Test
+    @DisplayName("a restore takes the archive as the body and answers where to go, or why not; the staged file always goes")
+    void restorePosts() throws Exception {
+        TestSubjects.use(orgAdminOfAlpha());
+        java.nio.file.Path staged = java.nio.file.Path.of("target/staged.zip");
+        when(archives.stage(any())).thenReturn(staged);
+        Website restored = new Website("alpha-2", "org_alpha", "Alpha News");
+        when(restore.restoreSite(staged, "org_alpha", "", "")).thenReturn(
+                new io.pacod.cms.studio.archive.PortalRestore.RestoredSite(restored,
+                        List.of(new io.pacod.cms.studio.archive.PortalRestore.Note("portal.archive.note.renamed", "alpha", "alpha-2"))));
+        mockMvc.perform(postCsrf("/mgmt/sites/restore").param("org", "org_alpha").contentType("application/zip")
+                        .content(new byte[]{1, 2, 3}).with(oidcLogin()))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.location")
+                        .value("/sites/alpha-2/mgmt/dashboard"));
+        verify(archives).discard(staged);
+
+        when(restore.restoreOrganisation(staged, "")).thenThrow(
+                new io.pacod.cms.studio.MgmtOperationException("portal.archive.error.isWebsite"));
+        mockMvc.perform(postCsrf("/mgmt/organisations/restore").contentType("application/zip")
+                        .content(new byte[]{1}).with(oidcLogin()).cookie(new Cookie("mgmt-lang", "en")))
+                .andExpect(status().is(422))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.error")
+                        .value("This is a single website's archive: restore it under Websites."));
+
+        when(archives.stage(any())).thenThrow(new io.pacod.cms.core.archive.ArchiveException("portal.archive.error.tooLarge", 1L));
+        mockMvc.perform(postCsrf("/mgmt/sites/restore").contentType("application/zip").content(new byte[]{1}).with(oidcLogin()))
+                .andExpect(status().is(413));
     }
 }

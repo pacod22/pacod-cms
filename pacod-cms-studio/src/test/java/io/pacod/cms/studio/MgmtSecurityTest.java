@@ -337,7 +337,8 @@ class MgmtSecurityTest {
     @DisplayName("the writing help needs sign-in and CSRF: every call spends the installation's AI budget")
     @WithAnonymousUser
     void writingHelpRequiresAuthentication() throws Exception {
-        for (String path : java.util.List.of("/mgmt/ai/assist", "/mgmt/ai/describe", "/mgmt/ai/tags")) {
+        for (String path : java.util.List.of("/mgmt/ai/assist", "/mgmt/ai/describe", "/mgmt/ai/tags",
+                "/mgmt/ai/titles", "/mgmt/ai/draft", "/mgmt/ai/write", "/mgmt/ai/design-body")) {
             mockMvc.perform(post(path).contentType("application/json").content("{}"))
                     .andExpect(status().isForbidden());
             mockMvc.perform(post(path).with(csrf()).contentType("application/json").content("{}"))

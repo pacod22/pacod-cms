@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Creates websites, and brings an existing website's database up to the layout this release
@@ -89,6 +90,16 @@ public class SiteProvisioner {
      * @throws IllegalStateException    when a host already belongs to another website
      */
     public Website create(NewWebsite request) {
+        return create(request, null);
+    }
+
+    /**
+     * {@link #create(NewWebsite)}, with {@code fill} writing the website's content -- a restored
+     * archive's -- once its indexes exist and before the seed steps, which then write only what the
+     * content lacks. The website answers at its hosts only after {@code fill} returns; a
+     * {@code fill} that throws leaves it {@code PROVISIONING} for the caller to remove.
+     */
+    public Website create(NewWebsite request, Consumer<Website> fill) {
         if (websites.existsById(request.siteId())) {
             throw new IllegalArgumentException("A website with the id " + request.siteId() + " already exists");
         }
@@ -134,18 +145,25 @@ public class SiteProvisioner {
             primary = false;
         }
 
-        provision(website);
+        provision(website, fill);
         return websites.findById(website.getId()).orElse(website);
     }
 
     /** Applies indexes and seeds to one website, then marks it current and active. */
     public void provision(Website website) {
+        provision(website, null);
+    }
+
+    private void provision(Website website, Consumer<Website> fill) {
         Tenant tenant = TenantDirectory.tenantOf(website);
         log.info("Provisioning website {} (database {})", website.getId(), website.getDbName());
         SiteSeedStep.Website about = new SiteSeedStep.Website(website.getId(), website.getName(),
                 website.getDefaultLanguage());
         SiteIndexes.Result built = TenantContext.callAs(tenant, () -> {
             SiteIndexes.Result result = indexes.ensureSiteIndexes();
+            if (fill != null) {
+                fill.accept(website);
+            }
             for (SiteSeedStep step : seeds) {
                 try {
                     step.seed(about);

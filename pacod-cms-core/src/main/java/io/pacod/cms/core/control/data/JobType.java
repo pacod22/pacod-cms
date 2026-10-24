@@ -18,7 +18,10 @@ public enum JobType {
     TRANSLATE_SITE(true),
 
     /** A journal issue: cover, contents and its articles in one PDF per language, through Gotenberg. */
-    PDF_ISSUE(false);
+    PDF_ISSUE(false),
+
+    /** The website's theme and every page type's layout drafted from one brief, through the AI gateway. */
+    DESIGN_SITE(true);
 
     private final boolean usesAi;
 

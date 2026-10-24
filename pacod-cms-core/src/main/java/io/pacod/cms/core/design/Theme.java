@@ -38,6 +38,20 @@ public class Theme {
     private Instant publishedOn;
     private String publishedBy;
 
+    /**
+     * The draft's values before design assist last replaced them, for one click to bring back (a
+     * swap). Null when there is nothing to undo; any other change, publishing or discarding clears
+     * it. As {@link Layout#getBeforeAssist()}, with {@link #beforeAssistJob} the job that filled it.
+     */
+    private Map<String, String> beforeAssist;
+    private String beforeAssistCss;
+    private String beforeAssistJob;
+
+    /** Whether design assist's last change to the draft can be undone. */
+    public boolean assistUndoable() {
+        return beforeAssist != null;
+    }
+
     public boolean hasUnpublishedChanges() {
         return !java.util.Objects.equals(draft, published) || !java.util.Objects.equals(draftCss, publishedCss);
     }

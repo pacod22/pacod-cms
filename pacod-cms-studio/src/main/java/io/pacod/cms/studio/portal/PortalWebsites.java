@@ -30,6 +30,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 /**
@@ -92,10 +93,16 @@ public class PortalWebsites {
      * What the new-website form posts.
      *
      * @param demo        whether to start it with the demo content ({@link StudioDemo})
+     * @param demoKind    which demo ({@link DemoContent.Demo#of}); null or blank for the journal
      * @param templateSet the template set it renders with; blank for the default
      */
     public record NewSite(String organisationId, String id, String name, String language, String timezone,
-                          List<String> extraHosts, boolean demo, String templateSet) {
+                          List<String> extraHosts, boolean demo, String templateSet, String demoKind) {
+
+        public NewSite(String organisationId, String id, String name, String language, String timezone,
+                       List<String> extraHosts, boolean demo, String templateSet) {
+            this(organisationId, id, name, language, timezone, extraHosts, demo, templateSet, null);
+        }
 
         public NewSite(String organisationId, String id, String name, String language, String timezone,
                        List<String> extraHosts) {
@@ -133,8 +140,43 @@ public class PortalWebsites {
     }
 
     public Website create(NewSite request) {
+        return create(request, null, false);
+    }
+
+    /**
+     * A new website whose content comes from {@code fill} -- a restored archive's -- written once
+     * its indexes exist and before the seed steps, which then add only what the content lacks.
+     * Every check of {@link #create(NewSite)} applies, but {@code website.create} where
+     * {@code ownOrganisation} says the organisation was made in this same request by this person
+     * (an organisation's restore), who is its admin before the feed may say so. If {@code fill}
+     * fails the website is removed again, and its id is free once the retirement has settled.
+     */
+    public Website restore(NewSite request, Consumer<Website> fill, boolean ownOrganisation) {
+        return create(request, fill, ownOrganisation);
+    }
+
+    /** The id {@code wanted}, else the first of {@code wanted-2}, {@code -3}… that is free, with its host. */
+    public String freeId(String wanted) {
+        String base = wanted == null ? "" : wanted.strip().toLowerCase(java.util.Locale.ROOT);
+        if (!Website.ID.matcher(base).matches()) {
+            base = "site";
+        }
+        for (int n = 1; n < 1000; n++) {
+            String suffix = n == 1 ? "" : "-" + n;
+            String candidate = (base.length() + suffix.length() > 40 ? base.substring(0, 40 - suffix.length()) : base) + suffix;
+            String host = automaticHost(candidate);
+            if (Website.ID.matcher(candidate).matches() && !websites.existsById(candidate)
+                    && (deleted == null || !deleted.existsById(candidate))
+                    && (host == null || domains.findById(host).isEmpty())) {
+                return candidate;
+            }
+        }
+        throw new MgmtOperationException("portal.site.error.idTaken", base);
+    }
+
+    private Website create(NewSite request, Consumer<Website> fill, boolean ownOrganisation) {
         Organisation organisation = organisations.require(request.organisationId());
-        if (!access.allowedAt("website.create", StudioAccess.pathOfOrganisation(organisation.getId()))) {
+        if (!ownOrganisation && !access.allowedAt("website.create", StudioAccess.pathOfOrganisation(organisation.getId()))) {
             throw new StudioForbiddenException("Not allowed: website.create");
         }
         if (!access.isPlatformAdmin()) {
@@ -159,8 +201,12 @@ public class PortalWebsites {
             throw new MgmtOperationException("portal.site.error.templateSet", templateSet);
         }
         // Before anything exists: a refused demo must not leave a website half-made.
-        if (request.demo() && (demo == null || !demo.supports(language))) {
-            throw new MgmtOperationException("portal.site.error.demoLanguage", demoLanguages());
+        if (request.demo()) {
+            DemoContent.Demo kind = DemoContent.Demo.of(request.demoKind())
+                    .orElseThrow(() -> new MgmtOperationException("portal.site.error.demoKind", request.demoKind()));
+            if (demo == null || !demo.supports(kind, language)) {
+                throw new MgmtOperationException("portal.site.error.demoLanguage", demoLanguages(kind));
+            }
         }
 
         Set<String> hosts = new LinkedHashSet<>();
@@ -181,15 +227,48 @@ public class PortalWebsites {
 
         Website website;
         try {
-            website = provisioner.create(new SiteProvisioner.NewWebsite(organisation.getId(), null, id, name,
-                    language, timezone, new ArrayList<>(hosts), StudioPrincipals.currentSubject(), templateSet));
+            SiteProvisioner.NewWebsite created = new SiteProvisioner.NewWebsite(organisation.getId(), null, id, name,
+                    language, timezone, new ArrayList<>(hosts), StudioPrincipals.currentSubject(), templateSet);
+            website = fill == null ? provisioner.create(created) : provisioner.create(created, fill);
         } catch (IllegalArgumentException | IllegalStateException e) {
+            if (fill != null && halfMade(id)) {
+                abandon(id, e);
+                throw new MgmtOperationException("portal.archive.error.restore", e.getMessage());
+            }
             throw new MgmtOperationException("portal.site.error.create", e.getMessage());
+        } catch (RuntimeException e) {
+            if (fill != null && halfMade(id)) {
+                abandon(id, e);
+                throw e instanceof MgmtOperationException m ? m
+                        : new MgmtOperationException("portal.archive.error.restore", e.getMessage());
+            }
+            throw e;
         }
         register(website);
         studioSites.evict();
         log.info("Website {} created in organisation {} by {}", id, organisation.getId(), StudioPrincipals.currentSubject());
         return website;
+    }
+
+    /**
+     * Whether {@code id} is a website this request began and did not finish: still
+     * {@code PROVISIONING}, which a website is only until its content and seeds are written. Never
+     * another one that happens to have the id.
+     */
+    private boolean halfMade(String id) {
+        return websites.findById(id).filter(w -> w.getStatus() == WebsiteStatus.PROVISIONING).isPresent();
+    }
+
+    /** A restore that failed halfway: the website, its domains, database and files go again. */
+    private void abandon(String id, RuntimeException cause) {
+        log.error("Restoring website {} failed; removing it again: {}", id, cause.getMessage(), cause);
+        try {
+            retirement.retire(id);
+            retirement.erase(id, StudioPrincipals.currentSubject());
+        } catch (RuntimeException e) {
+            log.error("Could not remove the half-restored website {}: {}", id, e.getMessage());
+        }
+        changed();
     }
 
     /** The general settings. Only active and suspended can be chosen here. */
@@ -280,7 +359,11 @@ public class PortalWebsites {
 
     /** The languages a website can have demo content in, named in the UI language; "-" where there is none. */
     public String demoLanguages() {
-        return demo == null ? "-" : demo.languageNames(org.springframework.context.i18n.LocaleContextHolder.getLocale());
+        return demoLanguages(DemoContent.Demo.JOURNAL);
+    }
+
+    public String demoLanguages(DemoContent.Demo kind) {
+        return demo == null ? "-" : demo.languageNames(kind, org.springframework.context.i18n.LocaleContextHolder.getLocale());
     }
 
     /**
@@ -292,10 +375,23 @@ public class PortalWebsites {
      * @throws IllegalStateException when a picture could not be stored
      */
     public StudioDemo.Outcome addDemo(Website website) {
+        return addDemo(website, DemoContent.Demo.JOURNAL);
+    }
+
+    /** {@link #addDemo(Website)}, of the demo named. */
+    public StudioDemo.Outcome addDemo(Website website, DemoContent.Demo kind) {
         if (demo == null) {
             throw new IllegalStateException("Demo content is not available here");
         }
-        return demo.install(website);
+        return demo.install(kind, website);
+    }
+
+    private io.pacod.cms.core.control.repository.DeletedWebsiteRepository deleted;
+
+    /** The tombstones, whose ids {@link #freeId} skips; optional for hand-built tests. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void useTombstones(io.pacod.cms.core.control.repository.DeletedWebsiteRepository deleted) {
+        this.deleted = deleted;
     }
 
     /** The jobs queue, whose unfinished jobs a deleted website must not keep; optional for hand-built tests. */

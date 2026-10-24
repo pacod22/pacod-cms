@@ -69,9 +69,9 @@ class StudioDemoTest {
         DemoContent.Seed seed = new DemoContent(null, null, null, null, null, null, null, null,
                 JsonMapper.builder().build()).seed();
         content = mock(DemoContent.class);
-        when(content.seed()).thenReturn(seed);
-        when(content.install(any())).thenReturn(new DemoContent.Result(20, 24, 6, 4, 12, true, true));
-        when(content.languages()).thenReturn(java.util.Set.of("en"));
+        when(content.seed(org.mockito.ArgumentMatchers.eq(io.pacod.cms.core.seed.DemoContent.Demo.JOURNAL))).thenReturn(seed);
+        when(content.install(org.mockito.ArgumentMatchers.eq(io.pacod.cms.core.seed.DemoContent.Demo.JOURNAL), any())).thenReturn(new DemoContent.Result(20, 24, 6, 4, 12, true, true));
+        when(content.languages(org.mockito.ArgumentMatchers.eq(io.pacod.cms.core.seed.DemoContent.Demo.JOURNAL))).thenReturn(java.util.Set.of("en"));
 
         sites = mock(StudioSites.class);
         when(sites.current()).thenReturn(Optional.of(new StudioSites.SiteView("gamma", "org_g", "Gamma",
@@ -105,9 +105,9 @@ class StudioDemoTest {
     @Test
     @DisplayName("the content is written with the website bound, then an image booking and an HTML5 rotator on its own origin")
     void writesTheContentAndThePromotions() throws Exception {
-        when(content.install(any())).thenAnswer(call -> {
+        when(content.install(org.mockito.ArgumentMatchers.eq(io.pacod.cms.core.seed.DemoContent.Demo.JOURNAL), any())).thenAnswer(call -> {
             assertThat(TenantContext.current().siteId()).isEqualTo("gamma");
-            assertThat(call.<SiteSeedStep.Website>getArgument(0).defaultLanguage()).isEqualTo("en");
+            assertThat(call.<SiteSeedStep.Website>getArgument(1).defaultLanguage()).isEqualTo("en");
             return new DemoContent.Result(20, 24, 6, 4, 12, true, true);
         });
 
@@ -163,7 +163,7 @@ class StudioDemoTest {
         assertThat(outcome.promotions()).isZero();
         assertThat(outcome.promotionsSkipped()).contains("no address");
 
-        verify(content, times(2)).install(any());
+        verify(content, times(2)).install(any(), any());
         verify(bannerService, never()).create(any());
         verify(layoutService, never()).create(anyString(), anyString(), anyString());
     }

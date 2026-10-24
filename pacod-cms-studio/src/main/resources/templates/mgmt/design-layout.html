@@ -64,11 +64,27 @@
                     <div class="card-body">
                         <span class="hint" th:text="#{design.assist.layout.intro}">Describe the page; AI drafts the sections.</span>
                         <textarea name="brief" rows="3" maxlength="1000" th:placeholder="#{design.assist.layout.example}"></textarea>
+                        <div class="checkline">
+                            <input type="radio" id="assist-refine" name="mode" value="refine" checked>
+                            <label for="assist-refine" th:text="#{design.assist.mode.refine}">Change the current draft</label>
+                        </div>
+                        <div class="checkline">
+                            <input type="radio" id="assist-replace" name="mode" value="replace">
+                            <label for="assist-replace" th:text="#{design.assist.mode.replace}">Start over</label>
+                        </div>
                     </div>
                     <div class="card-foot">
                         <button class="btn" type="submit"><svg class="i"><use href="#i-play"></use></svg> <span th:text="#{design.assist.submit}">Draft it</span></button>
                     </div>
                 </form>
+                <!--/* The draft before the AI's last change, one click away (a swap: again redoes). Its own
+                       POST, beside the form above rather than in it. */-->
+                <div class="card-foot" th:if="${editor.assistUndoable()}">
+                    <form method="post" class="inline-form" th:action="@{/mgmt/design/layouts/{t}/assist/undo(t=${pageTypeSlug})}">
+                        <button class="btn btn-ghost" type="submit"><svg class="i"><use href="#i-undo"></use></svg> <span th:text="#{design.assist.undo}">Undo the AI's change</span></button>
+                    </form>
+                    <span class="hint" th:text="#{design.assist.undo.hint}">Swaps the draft with the one before.</span>
+                </div>
             </div>
 
 

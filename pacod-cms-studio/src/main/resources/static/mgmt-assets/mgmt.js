@@ -1048,7 +1048,15 @@
             branding: false,
             promotion: false,
             skin: darkMode() ? 'oxide-dark' : 'oxide',
-            content_css: darkMode() ? 'dark' : 'default',
+            // The body's styled blocks (body-blocks.css, linked by the head fragment) drawn in
+            // the editor as on the site. An array: the editor's own sheet stays first.
+            content_css: bodyBlocksCss() ? [darkMode() ? 'dark' : 'default', bodyBlocksCss()]
+                                         : (darkMode() ? 'dark' : 'default'),
+            // importcss would offer every class of every content_css file in the Format menu;
+            // the blocks have their own menu (registerBodyBlocks), so it reads what it read before.
+            importcss_file_filter: function (href) {
+                return href.indexOf('body-blocks.css') === -1;
+            },
 
             /* ------------------------------------------- schema: allow it all */
             // '*[*]' is every element with every attribute. Identical in effect to
@@ -1115,6 +1123,7 @@
                 if (aiAssist) {
                     registerAssist(editor);
                 }
+                registerBodyBlocks(editor);
 
                 /*
                  * Dropping a thumbnail from the images card or the library into the body.
@@ -1214,6 +1223,8 @@
             config.language = editorLanguage;
         }
 
+        // Beside the block-format list, so it is on screen rather than in the ••• overflow.
+        config.toolbar = config.toolbar.replace('| blocks |', '| blocks bodyblocks |');
         if (aiAssist) {
             // First, not last: at the editor's real width TinyMCE folds the end of the toolbar
             // into its ••• overflow, where the button would be invisible until looked for.
@@ -1223,13 +1234,69 @@
         tinymce.init(config);
     }
 
+    function bodyBlocksCss() {
+        var link = document.querySelector('link[data-body-blocks]');
+        return link ? link.href : null;
+    }
+
+    /*
+     * The body's styled blocks (BodyBlocks in core, styled by the site's site.css) applied by hand:
+     * a toolbar menu toggling one TinyMCE format per block. Wrappers (callout, key facts, two
+     * columns, pull quote) go round the selected blocks; the lead is a class on the paragraph.
+     * Formats are registered at init, never through the `formats` option -- which would also be
+     * read as replacing defaults -- and no serialisation option changes for them.
+     */
+    function bodyBlockFormats() {
+        return [
+            {name: 'body_lead', text: t('editor.block.lead'), format: {selector: 'p', classes: 'body-lead'}},
+            {name: 'body_callout', text: t('editor.block.callout'), format: {block: 'div', classes: 'body-callout', wrapper: true, remove: 'all'}},
+            {name: 'body_pullquote', text: t('editor.block.pullquote'), format: {block: 'blockquote', classes: 'body-pullquote', wrapper: true, remove: 'all'}},
+            {name: 'body_facts', text: t('editor.block.facts'), format: {block: 'div', classes: 'body-facts', wrapper: true, remove: 'all'}},
+            {name: 'body_columns', text: t('editor.block.columns'), format: {block: 'div', classes: 'body-columns', wrapper: true, remove: 'all'}}
+        ];
+    }
+
+    function registerBodyBlocks(editor) {
+        var blocks = bodyBlockFormats();
+        editor.on('init', function () {
+            blocks.forEach(function (block) {
+                editor.formatter.register(block.name, block.format);
+            });
+        });
+        editor.ui.registry.addMenuButton('bodyblocks', {
+            text: t('editor.blocks'),
+            tooltip: t('editor.blocks.tooltip'),
+            fetch: function (callback) {
+                callback(blocks.map(function (block) {
+                    return {
+                        type: 'togglemenuitem',
+                        text: block.text,
+                        onAction: function () {
+                            editor.undoManager.transact(function () {
+                                editor.formatter.toggle(block.name);
+                            });
+                            editor.nodeChanged();
+                        },
+                        onSetup: function (api) {
+                            api.setActive(editor.formatter.match(block.name));
+                            return function () {};
+                        }
+                    };
+                }));
+            }
+        });
+    }
+
     /* ------------------------------------------------------ writing help (AI)
      *
-     * A toolbar button that sends the selection to POST /mgmt/ai/assist with what to do, shows the
-     * answer in the dialog -- markup the server has already cleaned to a small allow-list -- and
-     * replaces the selection only on Insert. Nothing is saved: the article is still the operator's
-     * to save, and the unsaved-changes guard sees the insert like any edit. A fetch, never a form,
-     * because the editor holds unsaved rich text.
+     * A toolbar button that opens a dialog. With a selection: the selection reworked one of six
+     * ways (POST /mgmt/ai/assist) or laid out in headings, lists and the body's styled blocks
+     * (/mgmt/ai/design-body, every word kept). With none: a passage written from a brief at the
+     * cursor (/mgmt/ai/write) or the whole text laid out. The answer -- markup the server has
+     * already cleaned to a small allow-list -- shows in the dialog and goes into the editor only on
+     * Insert. Nothing is saved: the article is still the operator's to save, and the
+     * unsaved-changes guard sees the insert like any edit. A fetch, never a form, because the
+     * editor holds unsaved rich text.
      */
     // Literal keys, each one: MgmtJsTextTest finds a key only where t('…') spells it out.
     function assistActions() {
@@ -1239,7 +1306,15 @@
             {value: 'expand', text: t('ai.assist.action.expand')},
             {value: 'fix', text: t('ai.assist.action.fix')},
             {value: 'formal', text: t('ai.assist.action.formal')},
-            {value: 'friendly', text: t('ai.assist.action.friendly')}
+            {value: 'friendly', text: t('ai.assist.action.friendly')},
+            {value: 'design', text: t('ai.assist.action.design')}
+        ];
+    }
+
+    function assistEmptyActions() {
+        return [
+            {value: 'write', text: t('ai.assist.action.write')},
+            {value: 'designAll', text: t('ai.assist.action.designAll')}
         ];
     }
 
@@ -1257,30 +1332,64 @@
         return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    function hasText(html) {
+        return !!html && !!html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+    }
+
+    /* Where an action is sent and with what: the endpoint under MGMT and the JSON body. */
+    function assistRequest(editor, action, passage, brief) {
+        if (action === 'design') {
+            return {path: '/ai/design-body', body: {html: passage}};
+        }
+        if (action === 'designAll') {
+            return {path: '/ai/design-body', body: {html: editor.getContent()}};
+        }
+        if (action === 'write') {
+            return {path: '/ai/write', body: {brief: brief, html: editor.getContent()}};
+        }
+        return {path: '/ai/assist', body: {action: action, html: passage}};
+    }
+
+    function assistResultNote(action) {
+        if (action === 'write') {
+            return t('ai.assist.result.cursor');
+        }
+        if (action === 'designAll') {
+            return t('ai.assist.result.all');
+        }
+        return t('ai.assist.result');
+    }
+
     function openAssist(editor) {
         var passage = editor.selection.getContent();
-        if (!passage || !passage.replace(/<[^>]*>/g, '').trim()) {
-            editor.notificationManager.open({text: t('ai.assist.select'), type: 'info', timeout: 4000});
-            return;
+        var selected = hasText(passage);
+        if (!selected) {
+            // Nothing with text is selected, but an image may be: a passage written for the
+            // cursor must go beside it, never in its place.
+            editor.selection.collapse(false);
         }
         var bookmark = editor.selection.getBookmark(2, true);
-        var state = {action: 'improve', result: null};
+        var state = {action: selected ? 'improve' : 'write', brief: '', result: null};
+
+        function items(previewHtml) {
+            var list = [{
+                type: 'selectbox', name: 'action', label: t('ai.assist.action'),
+                items: selected ? assistActions() : assistEmptyActions()
+            }];
+            if (!selected) {
+                list.push({type: 'textarea', name: 'brief', label: t('ai.assist.brief'),
+                    placeholder: t('ai.assist.brief.example')});
+            }
+            list.push({type: 'htmlpanel', html: previewHtml});
+            return list;
+        }
 
         function spec(previewHtml) {
             return {
                 title: t('ai.assist.title'),
                 size: 'medium',
-                body: {
-                    type: 'panel',
-                    items: [
-                        {
-                            type: 'selectbox', name: 'action', label: t('ai.assist.action'),
-                            items: assistActions()
-                        },
-                        {type: 'htmlpanel', html: previewHtml}
-                    ]
-                },
-                initialData: {action: state.action},
+                body: {type: 'panel', items: items(previewHtml)},
+                initialData: selected ? {action: state.action} : {action: state.action, brief: state.brief},
                 buttons: [
                     {type: 'custom', name: 'ask', text: t('ai.assist.ask'), primary: state.result === null},
                     // TinyMCE translates its own 'Cancel' through the editor's language pack.
@@ -1288,24 +1397,45 @@
                     {type: 'submit', name: 'insert', text: t('ai.assist.insert'), primary: state.result !== null,
                         enabled: state.result !== null}
                 ],
+                onChange: function (api, details) {
+                    // A changed choice or brief makes the answer shown stale: Insert waits for Ask.
+                    if (state.result !== null && (details.name === 'action' || details.name === 'brief')) {
+                        state.action = api.getData().action;
+                        state.brief = api.getData().brief || '';
+                        state.result = null;
+                        api.redial(spec('<p>' + escapeHtml(intro()) + '</p>'));
+                    }
+                },
                 onAction: function (api, details) {
                     if (details.name !== 'ask') {
                         return;
                     }
-                    state.action = api.getData().action;
+                    var data = api.getData();
+                    state.action = data.action;
+                    state.brief = data.brief || '';
+                    if (state.action === 'write' && !state.brief.trim()) {
+                        editor.notificationManager.open({text: t('ai.assist.brief.missing'), type: 'info', timeout: 4000});
+                        return;
+                    }
+                    if (state.action === 'designAll' && !hasText(editor.getContent())) {
+                        editor.notificationManager.open({text: t('ai.assist.empty'), type: 'info', timeout: 4000});
+                        return;
+                    }
+                    var request = assistRequest(editor, state.action, passage, state.brief);
                     api.block(t('ai.assist.working'));
                     var headers = window.mgmtCsrf();
                     headers['Content-Type'] = 'application/json';
                     headers['Accept'] = 'application/json';
-                    fetch(MGMT + '/ai/assist', {
+                    fetch(MGMT + request.path, {
                         method: 'POST', credentials: 'same-origin', headers: headers,
-                        body: JSON.stringify({action: state.action, html: passage})
+                        body: JSON.stringify(request.body)
                     })
                         .then(readJson)
-                        .then(function (data) {
-                            state.result = data.html || '';
-                            // Already cleaned by the server (HtmlSafety); shown as it will be inserted.
-                            api.redial(spec('<p>' + escapeHtml(t('ai.assist.result')) + '</p>'
+                        .then(function (answer) {
+                            state.result = answer.html || '';
+                            // Already cleaned by the server (HtmlSafety); shown as it will be
+                            // inserted, the body's blocks styled by body-blocks.css.
+                            api.redial(spec('<p>' + escapeHtml(assistResultNote(state.action)) + '</p>'
                                     + '<div class="ai-preview">' + state.result + '</div>'));
                         })
                         .catch(function (error) {
@@ -1315,16 +1445,204 @@
                 },
                 onSubmit: function (api) {
                     if (state.result !== null) {
-                        editor.selection.moveToBookmark(bookmark);
-                        editor.selection.setContent(state.result);
+                        var result = state.result;
+                        var action = state.action;
+                        editor.undoManager.transact(function () {
+                            if (action === 'designAll') {
+                                editor.setContent(result);
+                            } else {
+                                editor.selection.moveToBookmark(bookmark);
+                                if (action === 'write') {
+                                    editor.insertContent(result);
+                                } else {
+                                    editor.selection.setContent(result);
+                                }
+                            }
+                        });
+                        editor.setDirty(true);
+                        editor.nodeChanged();
                     }
                     api.close();
                 }
             };
         }
 
-        editor.windowManager.open(spec('<p>' + escapeHtml(t('ai.assist.intro')) + '</p>'));
+        function intro() {
+            return selected ? t('ai.assist.intro') : t('ai.assist.intro.empty');
+        }
+
+        editor.windowManager.open(spec('<p>' + escapeHtml(intro()) + '</p>'));
     }
+
+    /*
+     * "Suggest titles" under the title: POST /mgmt/ai/titles with the title and body as they
+     * stand in the editor, unsaved; the candidates as buttons, one click putting one in the field
+     * (and an input event, for the unsaved-changes guard). The buttons have no name and are
+     * type="button": they sit inside #article-form and must post nothing.
+     */
+    Array.prototype.forEach.call(document.querySelectorAll('[data-ai-titles]'), function (button) {
+        var field = document.getElementById('title');
+        var note = button.parentNode.querySelector('[data-ai-note]');
+        var list = button.parentNode.parentNode.querySelector('[data-ai-title-list]');
+        if (!field || !list || !window.fetch) {
+            return;
+        }
+        button.hidden = false;
+        button.addEventListener('click', function () {
+            var headers = window.mgmtCsrf();
+            headers['Content-Type'] = 'application/json';
+            headers['Accept'] = 'application/json';
+            var editor = window.tinymce && tinymce.activeEditor;
+            var body = editor && !editor.removed ? editor.getContent() : (document.getElementById('text') || {}).value;
+            button.disabled = true;
+            note.textContent = t('ai.suggest.working');
+            list.textContent = '';
+            list.hidden = true;
+            fetch(MGMT + '/ai/titles', {
+                method: 'POST', credentials: 'same-origin', headers: headers,
+                body: JSON.stringify({title: field.value, html: body || ''})
+            })
+                .then(readJson)
+                .then(function (data) {
+                    var titles = data.titles || [];
+                    if (!titles.length) {
+                        note.textContent = t('ai.titles.none');
+                        return;
+                    }
+                    note.textContent = t('ai.titles.pick');
+                    titles.forEach(function (title) {
+                        var choice = document.createElement('button');
+                        choice.type = 'button';
+                        choice.className = 'btn btn-sm btn-ghost ai-title-choice';
+                        choice.textContent = title;
+                        choice.addEventListener('click', function () {
+                            field.value = title;
+                            field.dispatchEvent(new Event('input', {bubbles: true}));
+                            note.textContent = t('ai.suggest.done');
+                            list.textContent = '';
+                            list.hidden = true;
+                        });
+                        list.appendChild(choice);
+                    });
+                    list.hidden = false;
+                })
+                .catch(function (error) {
+                    note.textContent = error.message;
+                })
+                .then(function () {
+                    button.disabled = false;
+                });
+        });
+    });
+
+    /*
+     * "Draft with AI": a card of its own, outside #article-form (nothing in it may be bound by
+     * save()), rendered hidden. POST /mgmt/ai/draft with the brief and a length; the answer fills
+     * the title, the description and the body -- after a confirm when any of them holds text --
+     * and an input event arms the unsaved-changes guard. Saving is the operator's.
+     */
+    Array.prototype.forEach.call(document.querySelectorAll('[data-ai-draft]'), function (card) {
+        var brief = card.querySelector('[data-ai-draft-brief]');
+        var length = card.querySelector('[data-ai-draft-length]');
+        var button = card.querySelector('[data-ai-draft-make]');
+        var note = card.querySelector('[data-ai-note]');
+        var title = document.getElementById('title');
+        var description = document.getElementById('description');
+        if (!brief || !length || !button || !title || !description || !window.fetch) {
+            return;
+        }
+        card.hidden = false;
+        button.addEventListener('click', function () {
+            if (!brief.value.trim()) {
+                note.textContent = t('ai.assist.brief.missing');
+                brief.focus();
+                return;
+            }
+            var editor = window.tinymce && tinymce.activeEditor;
+            var live = editor && !editor.removed;
+            var body = live ? editor.getContent() : (document.getElementById('text') || {}).value;
+            if ((title.value.trim() || description.value.trim() || hasText(body)) && !window.confirm(t('ai.draft.replace'))) {
+                return;
+            }
+            var headers = window.mgmtCsrf();
+            headers['Content-Type'] = 'application/json';
+            headers['Accept'] = 'application/json';
+            button.disabled = true;
+            note.textContent = t('ai.draft.working');
+            fetch(MGMT + '/ai/draft', {
+                method: 'POST', credentials: 'same-origin', headers: headers,
+                body: JSON.stringify({brief: brief.value, length: length.value})
+            })
+                .then(readJson)
+                .then(function (data) {
+                    title.value = data.title || '';
+                    description.value = data.description || '';
+                    if (live) {
+                        editor.undoManager.transact(function () {
+                            editor.setContent(data.html || '');
+                        });
+                        editor.setDirty(true);
+                    } else if (document.getElementById('text')) {
+                        document.getElementById('text').value = data.html || '';
+                    }
+                    title.dispatchEvent(new Event('input', {bubbles: true}));
+                    description.dispatchEvent(new Event('input', {bubbles: true}));
+                    note.textContent = t('ai.draft.done');
+                })
+                .catch(function (error) {
+                    note.textContent = error.message;
+                })
+                .then(function () {
+                    button.disabled = false;
+                });
+        });
+    });
+
+    /*
+     * Restoring a website or an organisation (site-restore.html, organisation-restore.html): the
+     * archive goes as the request body itself, application/zip, to the form's action with the
+     * form's other fields in the query string -- never multipart, whose 4 MB ceiling is every other
+     * upload's. The answer is JSON: where to go (the server filed the flash for that address), or
+     * why not. The file input has no name, so a submit that slipped past this posts no file.
+     */
+    Array.prototype.forEach.call(document.querySelectorAll('form[data-archive-restore]'), function (form) {
+        var input = form.querySelector('[data-archive-file]');
+        var note = form.querySelector('[data-archive-note]');
+        var button = form.querySelector('button[type="submit"]');
+        if (!input || !window.fetch) {
+            return;
+        }
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            var file = input.files && input.files[0];
+            if (!file) {
+                note.textContent = t('archive.choose');
+                return;
+            }
+            var query = [];
+            Array.prototype.forEach.call(form.elements, function (field) {
+                if (field.name && field !== input) {
+                    query.push(encodeURIComponent(field.name) + '=' + encodeURIComponent(field.value));
+                }
+            });
+            var headers = window.mgmtCsrf();
+            headers['Content-Type'] = 'application/zip';
+            headers['Accept'] = 'application/json';
+            button.disabled = true;
+            note.textContent = t('archive.working');
+            fetch(form.action + (query.length ? '?' + query.join('&') : ''), {
+                method: 'POST', credentials: 'same-origin', headers: headers, body: file
+            })
+                .then(readJson)
+                .then(function (data) {
+                    window.location.assign(data.location);
+                })
+                .catch(function (error) {
+                    note.textContent = error.message;
+                    button.disabled = false;
+                });
+        });
+    });
 
     /*
      * The suggest buttons under the description and the tags: a fetch to /mgmt/ai/describe or

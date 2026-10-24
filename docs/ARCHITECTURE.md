@@ -106,7 +106,11 @@ preview is counted or tracked, and drafts are read past every cache.
   Gotenberg, in a website's chosen format (standard, or a two-column scientific paper) and mode
   (code, or an abstract and keywords written by pacod-gw); a journal issue renders each article,
   has the site lay out its cover and contents with the page numbers the studio computed, and is
-  merged and numbered with PDFBox. Translation jobs call pacod-gw.
+  merged and numbered with PDFBox. Translation jobs call pacod-gw, and so does the design job,
+  which drafts a website's theme and every page layout from one description.
+- **Export and restore**: a website, or an organisation's websites, downloads as one ZIP (its
+  collections as raw BSON and its files, without analytics, members or hosts) and restores from one,
+  always as a new website created the way the portal creates one.
 - **Counters** (page views, readers, banner impressions, crawler visits) are buffered in the site per
   website and flushed into that website's database; the studio reads them for its dashboard,
   monitoring and crawler screens.

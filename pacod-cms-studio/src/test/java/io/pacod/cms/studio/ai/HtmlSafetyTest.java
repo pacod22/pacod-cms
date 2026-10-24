@@ -34,4 +34,38 @@ class HtmlSafetyTest {
     void text() {
         assertThat(HtmlSafety.text("<b>Tom</b> &amp; Jerry <script>x</script>")).isEqualTo("Tom & Jerry");
     }
+
+    @Test
+    @DisplayName("a body keeps the blocks on their own elements and loses every other class, style and handler")
+    void bodyBlocks() {
+        String cleaned = HtmlSafety.body("<p>x</p>", """
+                <p class="body-lead lead">Lead</p>
+                <div class="body-callout" style="color:red" onclick="x()"><p>Note</p></div>
+                <blockquote class="body-pullquote">Quote</blockquote>
+                <p class="body-callout">Wrong element</p>
+                <div class="body-facts"><h3>Facts</h3><ul><li>one</li></ul></div>
+                <div class="hero"><p>Unknown block</p></div>
+                <div><p>Bare</p></div>""");
+        assertThat(cleaned).contains("<p class=\"body-lead\">Lead</p>", "<div class=\"body-callout\"><p>Note</p></div>",
+                        "<blockquote class=\"body-pullquote\">Quote</blockquote>", "<p>Wrong element</p>",
+                        "<div class=\"body-facts\"><h3>Facts</h3>", "<p>Unknown block</p>", "<p>Bare</p>")
+                .doesNotContain("style", "onclick", "hero", "class=\"lead", "<div><p>", "<div>");
+    }
+
+    @Test
+    @DisplayName("a figure keeps its side and caption, and still only the source's images")
+    void bodyFigure() {
+        String source = "<p><img src=\"/assets/img/articles/a.jpg\"></p>";
+        String cleaned = HtmlSafety.body(source, "<figure class=\"body-figure body-figure-left\">"
+                + "<img src=\"/assets/img/articles/a.jpg\" alt=\"A\"><figcaption>Caption</figcaption></figure>"
+                + "<figure class=\"body-figure\"><img src=\"https://tracker.example/p.gif\"></figure>");
+        assertThat(cleaned).contains("<figure class=\"body-figure body-figure-left\"><img src=\"/assets/img/articles/a.jpg\"",
+                "<figcaption>Caption</figcaption>").doesNotContain("tracker");
+    }
+
+    @Test
+    @DisplayName("the plain allow-list still takes no blocks")
+    void cleanTakesNoBlocks() {
+        assertThat(HtmlSafety.clean("", "<div class=\"body-callout\"><p>x</p></div>")).isEqualTo("<p>x</p>");
+    }
 }

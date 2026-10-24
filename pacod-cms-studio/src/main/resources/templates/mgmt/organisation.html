@@ -94,6 +94,19 @@
                 </form>
             </div>
 
+            <!--/* Every website of the organisation as one archive (MgmtArchiveController), org.manage. */-->
+            <div class="card" th:if="${canManage}">
+                <h2><svg class="i"><use href="#i-save"></use></svg> <span th:text="#{portal.archive.export.title}">Export</span></h2>
+                <div class="card-body">
+                    <p class="muted" style="margin:0" th:text="#{portal.archive.export.org}">Every website of the organisation as one ZIP.</p>
+                </div>
+                <div class="card-foot">
+                    <a class="btn" th:href="${studioRoot} + '/mgmt/organisations/' + ${organisation.id} + '/export'" download>
+                        <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{portal.archive.export.download}">Download</span>
+                    </a>
+                </div>
+            </div>
+
             <div class="card danger" th:if="${canManage}">
                 <h2><svg class="i"><use href="#i-trash"></use></svg> <span th:text="#{portal.org.delete.heading}">Delete the organisation</span></h2>
                 <div class="card-body">

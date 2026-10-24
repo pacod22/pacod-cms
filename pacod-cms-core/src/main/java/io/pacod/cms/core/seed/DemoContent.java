@@ -48,9 +48,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * The demo content, "Demo Journal" ({@value #SEED}): sections, authors, about twenty published
- * articles with pictures and some translations, tags, a "Sections" menu group and a link page --
- * written into a website <b>only when someone asks for it</b>, never on its own.
+ * The demo content: one of the installation's {@link Demo}s -- "Demo Journal" ({@value #SEED}) or
+ * "Space travels" ({@code demo/demo-space.json}) -- sections, authors, about twenty published
+ * articles with pictures and some translations, tags, a "Sections" menu group and a link page, and
+ * where the seed has them the website's taglines and a theme -- written into a website <b>only when
+ * someone asks for it</b>, never on its own. The methods without a {@link Demo} mean the journal.
  *
  * <h2>Not a {@link SiteSeedStep}</h2>
  * The seed steps run on every re-provisioning ({@code SiteProvisioner.reconcile()}); a step that
@@ -81,6 +83,42 @@ import java.util.stream.Collectors;
 public class DemoContent {
 
     public static final String SEED = "demo/demo-journal.json";
+
+    /** The demos there are: an id the forms and commands name, and the seed it reads. */
+    public enum Demo {
+        JOURNAL("journal", SEED),
+        SPACE("space", "demo/demo-space.json");
+
+        private final String id;
+        private final String resource;
+
+        Demo(String id, String resource) {
+            this.id = id;
+            this.resource = resource;
+        }
+
+        public String id() {
+            return id;
+        }
+
+        public String resource() {
+            return resource;
+        }
+
+        /** The demo named {@code id}, case ignored; blank, {@code true} or {@code 1} mean the journal. */
+        public static java.util.Optional<Demo> of(String id) {
+            String v = id == null ? "" : id.strip().toLowerCase(java.util.Locale.ROOT);
+            if (v.isEmpty() || v.equals("true") || v.equals("1")) {
+                return java.util.Optional.of(JOURNAL);
+            }
+            for (Demo demo : values()) {
+                if (demo.id.equals(v)) {
+                    return java.util.Optional.of(demo);
+                }
+            }
+            return java.util.Optional.empty();
+        }
+    }
 
     /** In a promotion's text, the website's name. */
     public static final String NAME = "{name}";
@@ -116,6 +154,20 @@ public class DemoContent {
                          boolean menuGroup, boolean socialPage) {
     }
 
+    private io.pacod.cms.core.repository.SiteSettingsRepository siteSettings;
+    private io.pacod.cms.core.repository.ThemeRepository themes;
+
+    /**
+     * Where a seed's taglines and theme go; optional, so the hand-built instances of the tests and
+     * of a seed that has neither need none.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void useSiteAndTheme(io.pacod.cms.core.repository.SiteSettingsRepository siteSettings,
+                                io.pacod.cms.core.repository.ThemeRepository themes) {
+        this.siteSettings = siteSettings;
+        this.themes = themes;
+    }
+
     private final ArticleRepository articles;
     private final CategoryRepository categories;
     private final AuthorRepository authors;
@@ -126,7 +178,7 @@ public class DemoContent {
     private final ImageService imageService;
     private final ObjectMapper objectMapper;
 
-    private volatile Seed seed;
+    private final Map<Demo, Seed> seeds = new java.util.concurrent.ConcurrentHashMap<>();
 
     public DemoContent(ArticleRepository articles, CategoryRepository categories, AuthorRepository authors,
                        ImageMediaRepository images, TagRepository tags, MenuRepository menus,
@@ -142,29 +194,39 @@ public class DemoContent {
         this.objectMapper = objectMapper;
     }
 
-    /** The seed, read once. */
+    /** The journal's seed, read once. */
     public Seed seed() {
-        Seed read = seed;
-        if (read == null) {
-            try (InputStream in = new ClassPathResource(SEED).getInputStream()) {
-                read = objectMapper.readValue(in, Seed.class);
+        return seed(Demo.JOURNAL);
+    }
+
+    /** A demo's seed, read once. */
+    public Seed seed(Demo demo) {
+        return seeds.computeIfAbsent(demo, d -> {
+            try (InputStream in = new ClassPathResource(d.resource()).getInputStream()) {
+                return objectMapper.readValue(in, Seed.class);
             } catch (IOException | RuntimeException e) {
                 // Jackson 3's parse failures are unchecked: catching IOException alone would let a
                 // malformed seed escape as something nobody reads as "the seed is broken".
-                throw new IllegalStateException("Could not read " + SEED + ": " + e.getMessage(), e);
+                throw new IllegalStateException("Could not read " + d.resource() + ": " + e.getMessage(), e);
             }
-            seed = read;
-        }
-        return read;
+        });
     }
 
     /** The content languages demo content can be written in: those the seed has every text in. */
     public Set<String> languages() {
-        return completeLanguages(seed());
+        return languages(Demo.JOURNAL);
+    }
+
+    public Set<String> languages(Demo demo) {
+        return completeLanguages(seed(demo));
     }
 
     public boolean supports(String language) {
-        return language != null && languages().contains(LanguageChain.normalise(language));
+        return supports(Demo.JOURNAL, language);
+    }
+
+    public boolean supports(Demo demo, String language) {
+        return language != null && languages(demo).contains(LanguageChain.normalise(language));
     }
 
     /**
@@ -176,11 +238,16 @@ public class DemoContent {
      *                               running it again finishes the job
      */
     public Result install(SiteSeedStep.Website website) {
+        return install(Demo.JOURNAL, website);
+    }
+
+    /** {@link #install(SiteSeedStep.Website)}, of the demo named. */
+    public Result install(Demo demo, SiteSeedStep.Website website) {
         String bound = TenantContext.current().siteId();
         if (!bound.equals(website.id())) {
             throw new IllegalStateException("Demo content for " + website.id() + " while " + bound + " is bound");
         }
-        Seed seed = seed();
+        Seed seed = seed(demo);
         String lang = website.defaultLanguage() == null || website.defaultLanguage().isBlank()
                 ? LanguageChain.original() : LanguageChain.normalise(website.defaultLanguage());
         if (!completeLanguages(seed).contains(lang)) {
@@ -238,6 +305,8 @@ public class DemoContent {
 
         boolean menuGroup = addSectionsGroup(seed);
         boolean socialPage = addSocialPage(seed, website, lang);
+        addSiteTexts(seed);
+        addTheme(seed);
 
         Map<Integer, Category> categoryById = byId(categories.findAllById(
                 seed.getCategories().stream().map(CategorySeed::getId).toList()), Category::getId);
@@ -251,7 +320,7 @@ public class DemoContent {
         articles.saveAll(written);
 
         Result result = new Result(written.size(), newImages, newCategories, newAuthors, newTags, menuGroup, socialPage);
-        log.info("Demo content in website {}: {}", website.id(), result);
+        log.info("Demo content ({}) in website {}: {}", demo.id(), website.id(), result);
         return result;
     }
 
@@ -344,6 +413,46 @@ public class DemoContent {
             }
         }
         return false;
+    }
+
+    /** The seed's taglines and descriptions, each list only while the website's is empty. */
+    private void addSiteTexts(Seed seed) {
+        if (seed.getSite() == null || siteSettings == null) {
+            return;
+        }
+        io.pacod.cms.core.data.SiteSettings site = siteSettings.findById(io.pacod.cms.core.data.SiteSettings.ID)
+                .orElseGet(io.pacod.cms.core.data.SiteSettings::new);
+        boolean changed = false;
+        if ((site.getTaglines() == null || site.getTaglines().isEmpty()) && !seed.getSite().getTaglines().isEmpty()) {
+            site.setTaglines(texts(seed.getSite().getTaglines()));
+            changed = true;
+        }
+        if ((site.getDescriptions() == null || site.getDescriptions().isEmpty()) && !seed.getSite().getDescriptions().isEmpty()) {
+            site.setDescriptions(texts(seed.getSite().getDescriptions()));
+            changed = true;
+        }
+        if (changed) {
+            siteSettings.save(site);
+        }
+    }
+
+    /**
+     * The seed's theme, drafted and published, only while the website has no theme of its own;
+     * every value checked as the theme editor checks it.
+     */
+    private void addTheme(Seed seed) {
+        if (seed.getTheme() == null || seed.getTheme().isEmpty() || themes == null
+                || themes.existsById(io.pacod.cms.core.design.Theme.ID)) {
+            return;
+        }
+        Map<String, String> values = io.pacod.cms.core.design.ThemeCss.clean(seed.getTheme());
+        io.pacod.cms.core.design.Theme theme = new io.pacod.cms.core.design.Theme();
+        theme.setDraft(new LinkedHashMap<>(values));
+        theme.setPublished(new LinkedHashMap<>(values));
+        java.time.Instant now = java.time.Instant.now();
+        theme.setUpdatedOn(now);
+        theme.setPublishedOn(now);
+        themes.save(theme);
     }
 
     /** The link page, published, when the website has none: named after the website. */
@@ -452,6 +561,16 @@ public class DemoContent {
         private MenuSeed menu = new MenuSeed();
         private SocialSeed social = new SocialSeed();
         private Promotions promotions;
+        /** The website's taglines and descriptions, where it has none; optional. */
+        private SiteSeed site;
+        /** Theme token values ({@code ThemeToken} ids), drafted and published where there is no theme; optional. */
+        private Map<String, String> theme;
+    }
+
+    @Data
+    public static class SiteSeed {
+        private Map<String, String> taglines = new LinkedHashMap<>();
+        private Map<String, String> descriptions = new LinkedHashMap<>();
     }
 
     @Data

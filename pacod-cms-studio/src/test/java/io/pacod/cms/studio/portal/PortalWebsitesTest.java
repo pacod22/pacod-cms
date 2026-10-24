@@ -100,9 +100,9 @@ class PortalWebsitesTest {
     void demoLanguageIsCheckedFirst() {
         when(access.allowedAt(eq("website.create"), any())).thenReturn(true);
         io.pacod.cms.studio.demo.StudioDemo demo = org.mockito.Mockito.mock(io.pacod.cms.studio.demo.StudioDemo.class);
-        when(demo.supports("en")).thenReturn(true);
-        when(demo.supports("de")).thenReturn(false);
-        when(demo.languageNames(any())).thenReturn("English");
+        when(demo.supports(any(), eq("en"))).thenReturn(true);
+        when(demo.supports(any(), eq("de"))).thenReturn(false);
+        when(demo.languageNames(any(), any())).thenReturn("English");
         portal.useDemo(demo);
 
         assertThatThrownBy(() -> portal.create(new PortalWebsites.NewSite("org_a", "acme", "Acme", "de", "UTC", List.of(), true)))

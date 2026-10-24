@@ -141,6 +141,13 @@ if [ "$ENV_NAME" = stage ]; then
       *localhost*|,*|*,) bad "DEMO_HOSTS/DEMO_MINIMAL_HOSTS are '$demo': the demo websites are created once, on the first start, at these hosts" ;;
       *) ok "demo websites at $demo" ;;
     esac
+    # Newer than the other two: an older .env lacks it, and the space demo then takes its default.
+    space="$(get DEMO_SPACE_HOSTS)"
+    case "$space" in
+      '') warn "DEMO_SPACE_HOSTS is not set: on an empty platform the space demo website answers at space.localhost; set it to space.$sites" ;;
+      *localhost*) bad "DEMO_SPACE_HOSTS is '$space': the space demo website is created once, on the first start, at these hosts" ;;
+      *) ok "space demo website at $space" ;;
+    esac
   fi
   [ -z "$smtp" ] || [ "$smtp" = pacod-mailpit ] || warn "PID_SMTP_HOST=$smtp: stage sends real mail"
 fi

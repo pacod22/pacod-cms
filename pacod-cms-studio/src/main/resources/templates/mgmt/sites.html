@@ -21,6 +21,9 @@
                 <a class="btn btn-primary" th:if="${canCreateSite}" th:href="${studioRoot} + '/mgmt/sites/new'">
                     <svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{portal.site.new.title}">New website</span>
                 </a>
+                <a class="btn" th:if="${canCreateSite}" th:href="${studioRoot} + '/mgmt/sites/restore'">
+                    <svg class="i"><use href="#i-upload"></use></svg> <span th:text="#{portal.archive.site.title}">Restore a website</span>
+                </a>
                 <a class="btn" th:if="${!canCreateSite and canCreateOrganisation}" th:href="${studioRoot} + '/mgmt/organisations'">
                     <svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{portal.orgs.new.heading}">New organisation</span>
                 </a>

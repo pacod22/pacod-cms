@@ -132,14 +132,14 @@ status: ## The environment, its containers and its addresses
 
 ##@ Content
 .PHONY: site-create seed reseed-pages reseed-pages-restore restore mongo
-site-create: ## Create a website: SLUG=acme NAME="Acme News" HOSTS=acme.localhost [LANGUAGE= ORG=org_… TEMPLATE=minimal DEMO=1]
-	@test -n "$(SLUG)" -a -n "$(HOSTS)" || { echo 'usage: make site-create SLUG=acme NAME="Acme News" HOSTS=acme.example.net[,www.acme.example.net] [LANGUAGE=en] [ORG=org_…] [TEMPLATE=minimal] [DEMO=1]'; exit 2; }
+site-create: ## Create a website: SLUG=acme NAME="Acme News" HOSTS=acme.localhost [LANGUAGE= ORG=org_… TEMPLATE=minimal DEMO=1|space]
+	@test -n "$(SLUG)" -a -n "$(HOSTS)" || { echo 'usage: make site-create SLUG=acme NAME="Acme News" HOSTS=acme.example.net[,www.acme.example.net] [LANGUAGE=en] [ORG=org_…] [TEMPLATE=minimal] [DEMO=1|space]'; exit 2; }
 	$(STUDIO_CLI) --create-site --site-id="$(SLUG)" --site-name="$(or $(NAME),$(SLUG))" --hosts="$(HOSTS)" \
-		--language="$(or $(LANGUAGE),en)" $(if $(ORG),--org-id="$(ORG)") $(if $(TEMPLATE),--template-set="$(TEMPLATE)") $(if $(DEMO),--demo)
+		--language="$(or $(LANGUAGE),en)" $(if $(ORG),--org-id="$(ORG)") $(if $(TEMPLATE),--template-set="$(TEMPLATE)") $(if $(DEMO),--demo="$(DEMO)")
 
-seed: ## Give a website the demo content (SITE=<id>; dev/stage: demo) -- only one without articles
+seed: ## Give a website the demo content (SITE=<id>; dev/stage: demo) [DEMO=space] -- only one without articles
 	$(call need,SITE,make seed SITE=<website id>)
-	$(STUDIO_CLI) --seed-demo --site-id="$(SITE)"
+	$(STUDIO_CLI) --seed-demo --site-id="$(SITE)" $(if $(DEMO),--demo="$(DEMO)")
 
 reseed-pages: ## Rebuild a website's standing pages from the seed (SITE=<id>); reports unless APPLY=1
 	$(call need,SITE,make reseed-pages SITE=<website id>)

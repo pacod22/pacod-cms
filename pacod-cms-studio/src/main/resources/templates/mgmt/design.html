@@ -26,6 +26,41 @@
                 </a>
             </div>
 
+            <!--/* The whole website from one description: the theme and every layout drafted by a job
+                   (DesignSiteHandler). Only drafts change; each screen offers its own undo. While one
+                   is unfinished, it is shown with a way to stop it instead of the form. */-->
+            <div class="card" th:if="${aiAvailable and can != null and can.site('design.write')}">
+                <h2><svg class="i"><use href="#i-sun"></use></svg> <span th:text="#{design.assist.site.title}">The whole website from one description</span></h2>
+                <th:block th:if="${designJob != null}">
+                    <div class="card-body">
+                        <p style="margin:0" th:text="#{design.assist.site.running}">A design job is running.</p>
+                    </div>
+                    <div class="card-foot">
+                        <a class="btn" th:href="@{/mgmt/jobs/{id}(id=${designJob.id})}" th:text="#{design.assist.site.follow}">Follow it</a>
+                        <form method="post" class="inline-form" th:action="@{/mgmt/design/assist/{id}/cancel(id=${designJob.id})}">
+                            <button class="btn btn-ghost" type="submit" th:text="#{design.assist.site.cancel}">Stop it</button>
+                        </form>
+                    </div>
+                </th:block>
+                <form method="post" th:if="${designJob == null}" th:action="@{/mgmt/design/assist}">
+                    <div class="card-body">
+                        <span class="hint" th:text="#{design.assist.site.intro}">Describe the website you want.</span>
+                        <textarea name="brief" rows="3" maxlength="900" th:placeholder="#{design.assist.site.example}"></textarea>
+                        <div class="checkline">
+                            <input type="radio" id="site-assist-refine" name="mode" value="refine" checked>
+                            <label for="site-assist-refine" th:text="#{design.assist.mode.refine}">Change the current drafts</label>
+                        </div>
+                        <div class="checkline">
+                            <input type="radio" id="site-assist-replace" name="mode" value="replace">
+                            <label for="site-assist-replace" th:text="#{design.assist.mode.replace}">Start over</label>
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn" type="submit"><svg class="i"><use href="#i-play"></use></svg> <span th:text="#{design.assist.site.make}">Draft everything</span></button>
+                    </div>
+                </form>
+            </div>
+
             <div class="card">
                 <h2><svg class="i"><use href="#i-layout"></use></svg> <span th:text="#{design.template.current}">Template</span></h2>
                 <div class="card-body">

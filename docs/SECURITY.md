@@ -87,12 +87,26 @@ Every answer from the gateway is treated as hostile input:
   attributes and values in order, only `alt`, `title`, `aria-label` and `placeholder` changed — or it
   is refused. What is stored is the parser's serialisation of the checked answer, never the raw
   string, so a model cannot add anything executable the body did not already have.
-- **Writing help** is held to a small allow-list of tags and of link schemes (http, https, mailto,
-  relative); images survive only where the selection already had them.
+- **Writing help** — rewrites, drafted articles, passages, laid-out bodies — is held to a small
+  allow-list of tags and of link schemes (http, https, mailto, relative); a `class` survives only
+  where it names one of the body's styled blocks on its own element, never a `style`; images survive
+  only where the author's own text already had them. A laid-out body must keep every word of the
+  author's in order, and a body holding a frame or script is not sent to be laid out at all. Nothing
+  is saved until the author saves.
 - **Design assist** answers are validated exactly as if an operator had typed them, and only reach
-  a draft.
+  a draft, which one click restores to what it was.
 - Attribution to the gateway uses opaque ids only: a website's id, a feature, a job, a person's
   pacod-id subject. No names or e-mail addresses.
+
+## Archives
+
+- **An uploaded archive is untrusted.** Every entry is read and checked before anything is created:
+  paths stay inside the website's own trees, files are of the types a website stores, collections
+  are the website's own, and no document may reference another database (`$db`), carry an operator
+  field name or hold code. A restore always creates a new website, through the same checks as
+  creating one, and writes only into its database and folder; it never overwrites an existing one.
+- **Exports leave out members and roles** (pacod-id's), the hosts, and the traffic statistics.
+- Only the two restore paths accept a large request body; every other upload stays at 4 MiB.
 
 ## Public pages
 

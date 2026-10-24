@@ -84,6 +84,13 @@
                                 <span class="help" th:text="#{portal.site.new.demo.help(${demoLanguages})}">Sample articles, pictures and a link page.</span>
                             </div>
                         </div>
+                        <div class="field">
+                            <label for="demoKind" th:text="#{portal.site.new.demoKind}">Which demo</label>
+                            <select id="demoKind" th:field="*{demoKind}">
+                                <option th:each="d : ${demoKinds}" th:value="${d.id()}"
+                                        th:text="${mgmtText.msg('portal.site.new.demoKind.' + d.id())}">Demo Journal</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 

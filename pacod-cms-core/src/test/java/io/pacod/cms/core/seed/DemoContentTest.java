@@ -300,6 +300,51 @@ class DemoContentTest {
         assertThat(savedArticles()).allSatisfy(article -> assertThat(article.getImages()).doesNotContainNull());
     }
 
+    @Test
+    @DisplayName("the space travels: its own articles and pictures, and its taglines and theme only where the website has none")
+    void spaceTravels() {
+        var settingsRepository = mock(io.pacod.cms.core.repository.SiteSettingsRepository.class);
+        var themeRepository = mock(io.pacod.cms.core.repository.ThemeRepository.class);
+        io.pacod.cms.core.data.SiteSettings site = new io.pacod.cms.core.data.SiteSettings();
+        site.setDescriptions(new ArrayList<>(List.of(new TextItem("The operator's own description", "en"))));
+        when(settingsRepository.findById(io.pacod.cms.core.data.SiteSettings.ID)).thenReturn(Optional.of(site));
+        demo.useSiteAndTheme(settingsRepository, themeRepository);
+
+        DemoContent.Result result = demo.install(DemoContent.Demo.SPACE, TEST);
+
+        assertThat(result.articles()).isEqualTo(20);
+        assertThat(savedArticles()).extracting(Article::getTitle).contains("Why the stars do not twinkle in space");
+        assertThat(storedImages).containsKey("demo-launch-climb.jpg");
+        ArgumentCaptor<io.pacod.cms.core.data.SiteSettings> settings = ArgumentCaptor.forClass(io.pacod.cms.core.data.SiteSettings.class);
+        verify(settingsRepository).save(settings.capture());
+        assertThat(settings.getValue().getTaglines()).extracting(TextItem::getText).contains("Travel writing from across the Reach");
+        // The operator's description stays.
+        assertThat(settings.getValue().getDescriptions()).extracting(TextItem::getText).containsExactly("The operator's own description");
+        ArgumentCaptor<io.pacod.cms.core.design.Theme> theme = ArgumentCaptor.forClass(io.pacod.cms.core.design.Theme.class);
+        verify(themeRepository).save(theme.capture());
+        assertThat(theme.getValue().getPublished()).isEqualTo(theme.getValue().getDraft()).containsEntry("panel", "#0b1020");
+    }
+
+    @Test
+    @DisplayName("a website with a theme of its own keeps it")
+    void spaceKeepsAnOwnTheme() {
+        var themeRepository = mock(io.pacod.cms.core.repository.ThemeRepository.class);
+        when(themeRepository.existsById(io.pacod.cms.core.design.Theme.ID)).thenReturn(true);
+        demo.useSiteAndTheme(mock(io.pacod.cms.core.repository.SiteSettingsRepository.class), themeRepository);
+        demo.install(DemoContent.Demo.SPACE, TEST);
+        verify(themeRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("a demo is named by its id; blank, true or 1 mean the journal; anything else is none")
+    void demoNames() {
+        assertThat(DemoContent.Demo.of("space")).contains(DemoContent.Demo.SPACE);
+        assertThat(DemoContent.Demo.of(" SPACE ")).contains(DemoContent.Demo.SPACE);
+        assertThat(DemoContent.Demo.of(null)).contains(DemoContent.Demo.JOURNAL);
+        assertThat(DemoContent.Demo.of("1")).contains(DemoContent.Demo.JOURNAL);
+        assertThat(DemoContent.Demo.of("moon")).isEmpty();
+    }
+
     private void nothingWritten() {
         verify(articles, never()).saveAll(anyIterable());
         verify(categories, never()).save(any());

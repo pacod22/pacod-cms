@@ -1094,6 +1094,67 @@ a.kicker:hover { background: var(--greenDark); color: var(--onPanel); }
     color: var(--ink);
 }
 
+/* --- the body's styled blocks (BodyBlocks in core): a closed vocabulary the studio's editor and
+       its AI may write. Theme tokens only, so night mode and every theme follow. The studio's
+       mgmt-assets/body-blocks.css draws the same blocks in the editor; a test keeps the class
+       lists of the two in step. --- */
+.article-body .body-lead {
+    font: 500 21px/1.55 var(--font-display);
+    color: var(--ink);
+}
+
+.article-body .body-callout {
+    margin: 30px 0;
+    padding: 20px 24px 2px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--highlight);
+    font-size: 16px;
+}
+
+.article-body .body-pullquote {
+    margin: 36px 0;
+    padding: 18px 0;
+    background: none;
+    border: 0;
+    border-top: 2px solid var(--ink);
+    border-bottom: 2px solid var(--ink);
+    font: 600 26px/1.3 var(--font-display);
+    text-align: center;
+}
+
+.article-body .body-facts {
+    margin: 30px 0;
+    padding: 18px 24px 2px;
+    background: var(--tint);
+    border-left: 3px solid var(--greenText);
+    font: 400 16px/1.6 var(--font-text);
+}
+.article-body .body-facts h3 { margin-top: 0; font: 600 14px/1.3 var(--font-label); text-transform: uppercase; letter-spacing: .06em; }
+
+.article-body .body-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 32px;
+    margin: 0 0 22px;
+}
+
+.article-body .body-figure { margin: 30px 0; }
+.article-body .body-figure img { display: block; width: 100%; height: auto; }
+.article-body .body-figure figcaption { margin-top: 8px; font: 400 var(--mono-sm)/1.5 var(--font-label); color: var(--muted); }
+.article-body .body-figure-left,
+.article-body .body-figure-right { width: 44%; margin-top: 6px; margin-bottom: 18px; }
+.article-body .body-figure-left { float: left; margin-right: 26px; }
+.article-body .body-figure-right { float: right; margin-left: 26px; }
+.article-body::after { content: ""; display: table; clear: both; }
+
+@media (max-width: 700px) {
+    .article-body .body-columns { grid-template-columns: 1fr; }
+    .article-body .body-figure-left,
+    .article-body .body-figure-right { float: none; width: auto; margin: 30px 0; }
+    .article-body .body-pullquote { font-size: 22px; }
+}
+
 /* --- guards for older markup. Do not remove: article bodies and standing pages may hold
        hand-written or imported HTML with inline widths, <font>, <style> blocks, Word markup
        and tables. --- */

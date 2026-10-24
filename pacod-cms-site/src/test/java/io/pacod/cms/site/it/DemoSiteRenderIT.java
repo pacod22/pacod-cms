@@ -45,6 +45,7 @@ class DemoSiteRenderIT extends TwoWebsitesIT {
 
     private static final String EDITORIAL = "omicron.test";
     private static final String MINIMAL = "sigma.test";
+    private static final String SPACE = "tau.test";
 
     @Autowired
     CategoryRepository categories;
@@ -62,15 +63,22 @@ class DemoSiteRenderIT extends TwoWebsitesIT {
     LanguageRepository languages;
     @Autowired
     ImageService imageService;
+    @Autowired
+    io.pacod.cms.core.repository.ThemeRepository themes;
 
     /** Ids of their own: the context, and so every website in it, is shared by every IT class. */
     @BeforeAll
     void demoWebsites() {
         demoWebsite("omicron", "Omicron Journal", EDITORIAL, null);
         demoWebsite("sigma", "Sigma Notes", MINIMAL, "minimal");
+        demoWebsite("tau", "Tau Travels", SPACE, null, DemoContent.Demo.SPACE);
     }
 
     private void demoWebsite(String id, String name, String host, String templateSet) {
+        demoWebsite(id, name, host, templateSet, DemoContent.Demo.JOURNAL);
+    }
+
+    private void demoWebsite(String id, String name, String host, String templateSet, DemoContent.Demo kind) {
         if (directory.bySite(id).isPresent()) {
             return;
         }
@@ -85,13 +93,14 @@ class DemoSiteRenderIT extends TwoWebsitesIT {
         SiteSeedStep.Website about = new SiteSeedStep.Website(id, name, "en");
         DemoContent demo = new DemoContent(articles, categories, authors, images, tags, menus, socialPages,
                 imageService, mapper);
+        demo.useSiteAndTheme(settings, themes);
         TenantContext.runAs(tenant, () -> {
             // What the studio's provisioning writes before anyone can ask for demo content.
             new LanguageBootstrap(languages, mapper).seed(about);
             new PageBootstrap(pages, mapper).seed(about);
             new SiteBootstrap(settings, menus, mapper).seed(about);
-            DemoContent.Result result = demo.install(about);
-            assertThat(result.articles()).isEqualTo(demo.seed().getArticles().size());
+            DemoContent.Result result = demo.install(kind, about);
+            assertThat(result.articles()).isEqualTo(demo.seed(kind).getArticles().size());
             assertThat(result.menuGroup()).isTrue();
         });
     }
@@ -160,5 +169,32 @@ class DemoSiteRenderIT extends TwoWebsitesIT {
         assertThat(page(EDITORIAL, "/social")).contains("Omicron Journal", "/social/go/", "About this journal");
         assertThat(get(EDITORIAL, "/sitemap.xml", "application/xml").body())
                 .contains("<loc>http://" + EDITORIAL + "/article/20</loc>", "<loc>http://" + EDITORIAL + "/list/6</loc>");
+    }
+
+    @Test
+    @DisplayName("the space travels: a complete website -- its articles in their styled blocks, translations, pictures, theme and taglines")
+    void spaceTravels() {
+        assertThat(page(SPACE, "/")).as("home")
+                .contains("Why the stars do not twinkle in space", "Forty-eight hours on Halcyon Station",
+                        "/assets/img/articles/demo-clear-stars.jpg", "Destinations", "/theme.css?v=");
+        assertThat(page(SPACE, "/article/2")).as("an article with its blocks")
+                .contains("Veyra: walking among the ice geysers", "class=\"body-lead\"", "class=\"body-pullquote\"",
+                        "class=\"body-facts\"", "Good to know", "Liora");
+        assertThat(page(SPACE, "/de/article/19")).contains("Achtundvierzig Stunden auf der Halcyon-Station");
+        assertThat(page(SPACE, "/es/article/20")).contains("Por qué las estrellas no titilan en el espacio");
+        assertThat(page(SPACE, "/list/3")).contains("Ships &amp; Gear", "How a pressure suit is fitted");
+        assertThat(get(SPACE, "/assets/img/articles/demo-launch-climb.jpg", "image/*").statusCode()).isEqualTo(200);
+        assertThat(page(SPACE, "/social")).contains("Tau Travels", "About this magazine");
+
+        Tenant tau = directory.bySite("tau").orElseThrow();
+        TenantContext.runAs(tau, () -> {
+            assertThat(settings.findById(io.pacod.cms.core.data.SiteSettings.ID).orElseThrow().getTaglines())
+                    .extracting(io.pacod.cms.core.data.TextItem::getText).contains("Travel writing from across the Reach");
+            assertThat(themes.findById(io.pacod.cms.core.design.Theme.ID).orElseThrow().getPublished())
+                    .containsEntry("accent", "#1b2d5c").containsEntry("font-display", "plex-sans");
+        });
+        // The journal's websites got no theme: theirs is the template's own.
+        TenantContext.runAs(directory.bySite("omicron").orElseThrow(),
+                () -> assertThat(themes.existsById(io.pacod.cms.core.design.Theme.ID)).isFalse());
     }
 }

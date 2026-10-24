@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  Restoring a website from an archive its export wrote (SiteArchives), always as a NEW website:
+  into an organisation the person may create websites in (offered here, checked again by
+  PortalWebsites.restore), under the id and name typed -- blank takes the archive's, or the next
+  free id. mgmt.js posts the file itself as the request body ([data-archive-restore]): the 4 MB
+  multipart ceiling of every other upload does not apply to these two paths, which Caddy lets
+  carry more. With scripting off the form cannot send the file, and says so.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{portal.archive.site.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('sites')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{portal.archive.site.title})}"></header>
+
+        <main class="content">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="card" th:if="${organisations.isEmpty()}">
+                <div class="card-body">
+                    <p class="muted" style="margin:0" th:text="#{portal.site.new.noOrganisation}">You cannot create a website in any organisation.</p>
+                </div>
+            </div>
+
+            <form class="form-page" method="post" th:if="${!organisations.isEmpty()}" data-archive-restore
+                  th:action="${studioRoot} + '/mgmt/sites/restore'">
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-upload"></use></svg> <span th:text="#{portal.archive.site.title}">Restore a website</span></h2>
+                    <div class="card-body">
+                        <p class="muted" style="margin-top:0" th:text="#{portal.archive.site.intro}">A website exported from a studio becomes a new website here.</p>
+                        <div class="field">
+                            <label for="archive-file" th:text="#{portal.archive.field.file}">Archive</label>
+                            <input type="file" id="archive-file" accept=".zip,application/zip" required data-archive-file>
+                            <span class="hint" th:text="#{portal.archive.field.file.hint(${maxMegabytes})}">A .zip from Export, at most 2048 MB.</span>
+                        </div>
+                        <div class="field">
+                            <label for="org" th:text="#{portal.site.field.organisation}">Organisation</label>
+                            <select id="org" name="org">
+                                <option th:each="o : ${organisations}" th:value="${o.id}" th:text="${o.name}">Acme</option>
+                            </select>
+                        </div>
+                        <div class="grid-2">
+                            <div class="field">
+                                <label for="id" th:text="#{portal.site.field.id}">Id</label>
+                                <input type="text" id="id" name="id" minlength="2" maxlength="40"
+                                       pattern="[a-z][a-z0-9\-]{1,39}" autocapitalize="off" spellcheck="false">
+                                <span class="hint" th:text="#{portal.archive.field.id.hint(${siteDomain})}">Blank: the archive's, or the next free one.</span>
+                            </div>
+                            <div class="field">
+                                <label for="name" th:text="#{portal.site.field.name}">Name</label>
+                                <input type="text" id="name" name="name" maxlength="100">
+                                <span class="hint" th:text="#{portal.archive.field.name.hint}">Blank: the archive's.</span>
+                            </div>
+                        </div>
+                        <noscript><p class="field-error" th:text="#{portal.archive.noscript}">Restoring needs JavaScript.</p></noscript>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-upload"></use></svg> <span th:text="#{portal.archive.submit}">Restore</span>
+                        </button>
+                        <span class="library-note" data-archive-note></span>
+                    </div>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

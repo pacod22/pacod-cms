@@ -1,0 +1,65 @@
+/*
+   The article body's styled blocks (BodyBlocks in core) as the studio shows them: inside the
+   editor -- TinyMCE loads this file into its iframe as content_css, whose <body> carries
+   .mce-content-body -- and in the AI dialog's preview (.ai-preview), which is in the studio's own
+   document, where the head fragment links this file too. Scoped to those two, so nothing else in
+   the studio is touched.
+
+   An approximation of the site's rules (site.css, "the body's styled blocks"), on colours that
+   read on both the light and the dark editor: the website's theme is not the studio's. The class
+   list must match site.css's; BodyBlocksCssTest checks both files name every block.
+*/
+
+.mce-content-body .body-lead,
+.ai-preview .body-lead { font-size: 1.18em; font-weight: 500; }
+
+.mce-content-body .body-callout,
+.ai-preview .body-callout {
+    margin: 1.4em 0;
+    padding: .9em 1.1em .1em;
+    border: 1px solid rgba(128, 128, 128, .45);
+    border-top: 3px solid #b26a3f;
+    background: rgba(128, 128, 128, .08);
+}
+
+.mce-content-body .body-pullquote,
+.ai-preview .body-pullquote {
+    margin: 1.6em 0;
+    padding: .7em 0;
+    border: 0;
+    border-top: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    font-size: 1.4em;
+    font-weight: 600;
+    text-align: center;
+}
+
+.mce-content-body .body-facts,
+.ai-preview .body-facts {
+    margin: 1.4em 0;
+    padding: .8em 1.1em .1em;
+    border-left: 3px solid #3f7a4b;
+    background: rgba(63, 122, 75, .12);
+}
+.mce-content-body .body-facts h3,
+.ai-preview .body-facts h3 { margin-top: 0; font-size: .85em; text-transform: uppercase; letter-spacing: .06em; }
+
+.mce-content-body .body-columns,
+.ai-preview .body-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 1.6em;
+    outline: 1px dashed rgba(128, 128, 128, .45);
+    outline-offset: 4px;
+}
+
+.mce-content-body .body-figure,
+.ai-preview .body-figure { margin: 1.4em 0; }
+.mce-content-body .body-figure img,
+.ai-preview .body-figure img { display: block; max-width: 100%; height: auto; }
+.mce-content-body .body-figure figcaption,
+.ai-preview .body-figure figcaption { margin-top: .4em; font-size: .85em; opacity: .75; }
+.mce-content-body .body-figure-left,
+.ai-preview .body-figure-left { float: left; width: 44%; margin: .3em 1.4em 1em 0; }
+.mce-content-body .body-figure-right,
+.ai-preview .body-figure-right { float: right; width: 44%; margin: .3em 0 1em 1.4em; }

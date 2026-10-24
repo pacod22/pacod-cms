@@ -1,8 +1,16 @@
 package io.pacod.cms.studio.controller;
 
+import io.pacod.cms.core.control.data.Job;
+import io.pacod.cms.core.control.data.JobStatus;
+import io.pacod.cms.core.control.data.JobType;
 import io.pacod.cms.core.data.MenuLinkKind;
 import io.pacod.cms.core.design.PageType;
 import io.pacod.cms.core.design.ThemeToken;
+import io.pacod.cms.core.jobs.JobQueue;
+import io.pacod.cms.core.tenant.Tenant;
+import io.pacod.cms.core.tenant.TenantContext;
+import io.pacod.cms.studio.access.StudioPrincipals;
+import io.pacod.cms.studio.ai.DesignSiteHandler;
 import io.pacod.cms.studio.MgmtCategoryService;
 import io.pacod.cms.studio.MgmtLanguageService;
 import io.pacod.cms.studio.MgmtNotFoundException;
@@ -16,7 +24,9 @@ import io.pacod.cms.studio.design.DesignText;
 import io.pacod.cms.studio.design.DesignTheme;
 import io.pacod.cms.studio.i18n.MgmtText;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,6 +57,8 @@ import java.util.Map;
 @RequestMapping("/mgmt/design")
 public class MgmtDesignController {
 
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(MgmtDesignController.class);
+
     private final DesignLayouts layouts;
     private final DesignTheme theme;
     private final DesignTemplates templates;
@@ -55,11 +67,13 @@ public class MgmtDesignController {
     private final MgmtLanguageService languages;
     private final MgmtText text;
     private final DesignPreview preview;
+    private final JobQueue jobs;
 
     public MgmtDesignController(DesignLayouts layouts, DesignTheme theme, DesignTemplates templates, DesignMenus menus,
                                 MgmtCategoryService categories, MgmtLanguageService languages, MgmtText text,
-                                DesignPreview preview) {
+                                DesignPreview preview, JobQueue jobs) {
         this.preview = preview;
+        this.jobs = jobs;
         this.layouts = layouts;
         this.theme = theme;
         this.templates = templates;
@@ -111,7 +125,80 @@ public class MgmtDesignController {
         common(model);
         model.addAttribute("pageTypes", layouts.overview());
         model.addAttribute("theme", theme.load());
+        model.addAttribute("designJob", designJob().orElse(null));
         return "mgmt/design";
+    }
+
+    /**
+     * The website's design job still to finish, queued or running, if any. An unreadable control
+     * plane is none, logged: the design screens must not fail over a card.
+     */
+    private java.util.Optional<Job> designJob() {
+        String siteId = TenantContext.current().siteId();
+        try {
+            for (JobStatus status : List.of(JobStatus.RUNNING, JobStatus.QUEUED)) {
+                java.util.Optional<Job> job = jobs.forSite(siteId, status, PageRequest.of(0, 50)).stream()
+                        .filter(j -> j.getType() == JobType.DESIGN_SITE).findFirst();
+                if (job.isPresent()) {
+                    return job;
+                }
+            }
+        } catch (RuntimeException e) {
+            LOG.error("The design jobs of {} could not be read", siteId, e);
+        }
+        return java.util.Optional.empty();
+    }
+
+    /**
+     * The theme and every page type's layout drafted from one brief, as a job
+     * ({@link DesignSiteHandler}): one at a time while another is unfinished. {@code design.write}
+     * and AI available here; the job carries the person's account id, as nobody is signed in
+     * where it runs.
+     */
+    @PostMapping("/assist")
+    public String assistSite(@RequestParam(defaultValue = "") String brief, @RequestParam(required = false) String mode,
+                             Authentication authentication, RedirectAttributes redirect) {
+        java.util.Optional<io.pacod.cms.studio.ai.AiRefusal> refusal = ai == null
+                ? java.util.Optional.of(io.pacod.cms.studio.ai.AiRefusal.NOT_SET_UP) : ai.refusalHere();
+        if (refusal.isPresent()) {
+            redirect.addFlashAttribute("error", text.label(refusal.get()));
+            return "redirect:/mgmt/design";
+        }
+        if (brief.isBlank()) {
+            redirect.addFlashAttribute("error", text.msg("design.assist.site.brief"));
+            return "redirect:/mgmt/design";
+        }
+        if (designJob().isPresent()) {
+            redirect.addFlashAttribute("error", text.msg("design.assist.site.running"));
+            return "redirect:/mgmt/design";
+        }
+        String b = brief.strip();
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("brief", b.length() > DesignSiteHandler.MAX_BRIEF ? b.substring(0, DesignSiteHandler.MAX_BRIEF) : b);
+        params.put("mode", io.pacod.cms.studio.ai.DesignAssist.Mode.of(mode).name().toLowerCase(Locale.ROOT));
+        params.put("by", StudioPrincipals.currentSubject());
+        Tenant tenant = TenantContext.current();
+        Job job = jobs.enqueue(tenant.siteId(), tenant.organisationId(), JobType.DESIGN_SITE, params,
+                StudioPrincipals.displayName(authentication), false);
+        redirect.addFlashAttribute("message", text.msg("design.assist.site.queued"));
+        return "redirect:/mgmt/jobs/" + job.getId();
+    }
+
+    /**
+     * Stops the website's design job: here, under {@code design.write}, because the jobs screen's
+     * own cancel needs {@code content.write}, which a designer does not hold. A design job only.
+     */
+    @PostMapping("/assist/{jobId}/cancel")
+    public String cancelSiteAssist(@PathVariable String jobId, RedirectAttributes redirect) {
+        String siteId = TenantContext.current().siteId();
+        boolean ours = jobId.matches("[0-9a-f]{24}")
+                && jobs.find(siteId, jobId).filter(j -> j.getType() == JobType.DESIGN_SITE).isPresent();
+        if (ours && jobs.cancel(siteId, jobId)) {
+            redirect.addFlashAttribute("message", text.msg("design.assist.site.cancelled"));
+        } else {
+            redirect.addFlashAttribute("error", text.msg("design.assist.site.notNow"));
+        }
+        return "redirect:/mgmt/design";
     }
 
     // ---------------------------------------------------------------------------------- preview
@@ -153,12 +240,29 @@ public class MgmtDesignController {
         return "redirect:/mgmt/design/layouts/" + type.name().toLowerCase(Locale.ROOT);
     }
 
-    /** A layout draft for the page type from a description of the page (design assist). */
+    /**
+     * A layout draft for the page type from a description of the page (design assist): the
+     * current draft refined, or ({@code mode=replace}) a new one.
+     */
     @PostMapping("/layouts/{pageType}/assist")
     public String assistLayout(@PathVariable String pageType, @RequestParam(defaultValue = "") String brief,
-                               RedirectAttributes redirect) {
+                               @RequestParam(required = false) String mode, RedirectAttributes redirect) {
         PageType type = pageType(pageType);
-        assist(redirect, () -> assist.layout(type, brief), "design.assist.layout.applied");
+        assist(redirect, () -> assist.layout(type, brief, io.pacod.cms.studio.ai.DesignAssist.Mode.of(mode),
+                io.pacod.cms.studio.ai.DesignAssist.Actor.signedIn()), "design.assist.layout.applied");
+        return back(type);
+    }
+
+    /** Design assist's last change to the draft undone -- or, undone already, redone. */
+    @PostMapping("/layouts/{pageType}/assist/undo")
+    public String undoLayoutAssist(@PathVariable String pageType, RedirectAttributes redirect) {
+        PageType type = pageType(pageType);
+        try {
+            layouts.undoAssist(type);
+            redirect.addFlashAttribute("message", text.msg("design.assist.undone"));
+        } catch (MgmtOperationException e) {
+            redirect.addFlashAttribute("error", text.of(e));
+        }
         return back(type);
     }
 
@@ -323,10 +427,27 @@ public class MgmtDesignController {
         return "redirect:/mgmt/design/theme";
     }
 
-    /** A theme draft from a description of the look (design assist). */
+    /**
+     * A theme draft from a description of the look (design assist): the current draft refined,
+     * or ({@code mode=replace}) a new one.
+     */
     @PostMapping("/theme/assist")
-    public String assistTheme(@RequestParam(defaultValue = "") String brief, RedirectAttributes redirect) {
-        assist(redirect, () -> assist.theme(brief), "design.assist.theme.applied");
+    public String assistTheme(@RequestParam(defaultValue = "") String brief, @RequestParam(required = false) String mode,
+                              RedirectAttributes redirect) {
+        assist(redirect, () -> assist.theme(brief, io.pacod.cms.studio.ai.DesignAssist.Mode.of(mode),
+                io.pacod.cms.studio.ai.DesignAssist.Actor.signedIn()), "design.assist.theme.applied");
+        return "redirect:/mgmt/design/theme";
+    }
+
+    /** Design assist's last change to the theme draft undone -- or, undone already, redone. */
+    @PostMapping("/theme/assist/undo")
+    public String undoThemeAssist(RedirectAttributes redirect) {
+        try {
+            theme.undoAssist();
+            redirect.addFlashAttribute("message", text.msg("design.assist.undone"));
+        } catch (MgmtOperationException e) {
+            redirect.addFlashAttribute("error", text.of(e));
+        }
         return "redirect:/mgmt/design/theme";
     }
 

@@ -175,6 +175,7 @@ END
 # The demo websites, created once on the first start: point these at the server too.
 DEMO_HOSTS=demo.$SITE_DOMAIN_ARG
 DEMO_MINIMAL_HOSTS=minimal.$SITE_DOMAIN_ARG
+DEMO_SPACE_HOSTS=space.$SITE_DOMAIN_ARG
 END
     fi
     if [ -n "$EMAIL_ARG" ]; then

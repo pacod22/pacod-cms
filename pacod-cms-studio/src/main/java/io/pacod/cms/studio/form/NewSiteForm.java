@@ -22,6 +22,8 @@ public class NewSiteForm {
     private String hosts;
     /** Start with the demo content. */
     private boolean demo;
+    /** Which demo, {@code DemoContent.Demo}'s id: the journal unless chosen. */
+    private String demoKind = "journal";
     /** The template set; the default one unless chosen. */
     private String templateSet = io.pacod.cms.core.tenant.Tenant.DEFAULT_TEMPLATE_SET;
 

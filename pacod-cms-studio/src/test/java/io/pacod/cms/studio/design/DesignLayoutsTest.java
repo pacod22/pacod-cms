@@ -71,12 +71,12 @@ class DesignLayoutsTest {
 
     @Test
     @DisplayName("replacing the whole draft keeps the page's own content, its id and its place")
-    void replaceDraftKeepsPrimary() throws Exception {
+    void assistDraftKeepsPrimary() throws Exception {
         String primaryId = on("editorial", () -> layouts.editor(PageType.ARTICLE)).regions().stream()
                 .flatMap(r -> r.sections().stream()).filter(DesignLayouts.SectionView::primary)
                 .findFirst().orElseThrow().section().getId();
-        run("editorial", () -> layouts.replaceDraft(PageType.ARTICLE, Map.of("aside",
-                List.of(Section.of(io.pacod.cms.core.design.SectionType.RICH_TEXT, Map.of("html", "<p>x</p>"))))));
+        run("editorial", () -> layouts.assistDraft(PageType.ARTICLE, Map.of("aside",
+                List.of(Section.of(io.pacod.cms.core.design.SectionType.RICH_TEXT, Map.of("html", "<p>x</p>")))), "usr_a", null));
         Layout doc = store.get("ARTICLE");
         assertThat(doc.getDraft().get("main")).extracting(Section::getId).containsExactly(primaryId);
         assertThat(doc.getDraft().get("aside")).extracting(Section::getType).containsExactly("rich-text");
@@ -164,5 +164,68 @@ class DesignLayoutsTest {
         assertThat(ids("main")).hasSize(2);
         run("editorial", () -> layouts.discard(PageType.HOME));
         assertThat(store.get("HOME").getDraft()).isNull();
+    }
+
+    private static Map<String, List<Section>> richText(String html) {
+        return Map.of("aside", List.of(Section.of(io.pacod.cms.core.design.SectionType.RICH_TEXT, Map.of("html", html))));
+    }
+
+    private List<String> asideTypes() {
+        return store.get("HOME").getDraft().getOrDefault("aside", List.of()).stream().map(Section::getType).toList();
+    }
+
+    @Test
+    @DisplayName("an AI draft can be undone, and undoing again redoes it; who made it is recorded")
+    void assistUndo() throws Exception {
+        List<String> before = on("editorial", () -> layouts.draftOf(PageType.HOME)).get("aside").stream().map(Section::getType).toList();
+        run("editorial", () -> layouts.assistDraft(PageType.HOME, richText("<p>ai</p>"), "usr_ai", null));
+        assertThat(asideTypes()).containsExactly("rich-text");
+        assertThat(store.get("HOME").getUpdatedBy()).isEqualTo("usr_ai");
+        assertThat(on("editorial", () -> layouts.editor(PageType.HOME)).assistUndoable()).isTrue();
+
+        run("editorial", () -> layouts.undoAssist(PageType.HOME));
+        assertThat(asideTypes()).isEqualTo(before);
+        run("editorial", () -> layouts.undoAssist(PageType.HOME));
+        assertThat(asideTypes()).containsExactly("rich-text");
+    }
+
+    @Test
+    @DisplayName("two AI drafts in a row undo one step; any other change, publishing or discarding forgets the undo")
+    void assistUndoIsOneStep() throws Exception {
+        run("editorial", () -> layouts.assistDraft(PageType.HOME, richText("<p>first</p>"), "usr_a", null));
+        run("editorial", () -> layouts.assistDraft(PageType.HOME, richText("<p>second</p>"), "usr_a", null));
+        run("editorial", () -> layouts.undoAssist(PageType.HOME));
+        assertThat(store.get("HOME").getDraft().get("aside").getFirst().getSettings().get("html")).isEqualTo("<p>first</p>");
+
+        run("editorial", () -> layouts.add(PageType.HOME, "aside", "rich-text"));
+        assertThat(store.get("HOME").assistUndoable()).isFalse();
+        assertThatThrownBy(() -> run("editorial", () -> layouts.undoAssist(PageType.HOME))).isInstanceOf(MgmtOperationException.class);
+
+        run("editorial", () -> layouts.assistDraft(PageType.HOME, richText("<p>third</p>"), "usr_a", null));
+        run("editorial", () -> layouts.publish(PageType.HOME));
+        assertThat(store.get("HOME").assistUndoable()).isFalse();
+        run("editorial", () -> layouts.assistDraft(PageType.HOME, richText("<p>fourth</p>"), "usr_a", null));
+        run("editorial", () -> layouts.discard(PageType.HOME));
+        assertThat(store.get("HOME").assistUndoable()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a job run again from the start keeps the undo it filled on its first attempt")
+    void assistUndoSurvivesAJobRerun() throws Exception {
+        run("editorial", () -> layouts.assistDraft(PageType.HOME, richText("<p>person</p>"), "usr_a", null));
+        run("editorial", () -> layouts.assistDraft(PageType.HOME, richText("<p>job, try 1</p>"), "usr_a", "job1"));
+        run("editorial", () -> layouts.assistDraft(PageType.HOME, richText("<p>job, try 2</p>"), "usr_a", "job1"));
+        run("editorial", () -> layouts.undoAssist(PageType.HOME));
+        assertThat(store.get("HOME").getDraft().get("aside").getFirst().getSettings().get("html")).isEqualTo("<p>person</p>");
+    }
+
+    @Test
+    @DisplayName("an AI draft keeps the sections the current set cannot render, for a switch back")
+    void assistDraftKeepsUnrenderedSections() throws Exception {
+        // editorial renders a search box; minimal does not, so on minimal it is kept, unshown to the model,
+        // after what the model drafted.
+        run("editorial", () -> layouts.add(PageType.HOME, "aside", "search-box"));
+        run("minimal", () -> layouts.assistDraft(PageType.HOME, richText("<p>ai</p>"), "usr_a", null));
+        assertThat(asideTypes()).startsWith("rich-text").endsWith("search-box");
     }
 }

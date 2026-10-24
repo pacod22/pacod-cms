@@ -40,9 +40,10 @@ Then open the studio at **http://studio.localhost:8000/** and sign in on pacod-i
 as `admin@pacod-cms.test` (`ID_ADMIN_EMAIL`) with the password `ID_ADMIN_PASSWORD` from
 `.env` — the bootstrap platform admin. **Create an account** on the sign-in page makes a new
 account that holds no role, so it sees no website; the confirmation mail lands in the mail catcher.
-On its first start the studio creates **two demo websites** in one demo organisation, one per
-template set: **"Demo Journal"** (editorial) at **http://demo.localhost:8000/** and
-**http://localhost:8000/**, and **"Demo Notes"** (minimal) at **http://minimal.localhost:8000/**.
+On its first start the studio creates **three demo websites** in one demo organisation:
+**"Demo Journal"** (editorial) at **http://demo.localhost:8000/** and **http://localhost:8000/**,
+**"Demo Notes"** (minimal) at **http://minimal.localhost:8000/**, and **"Starward"**, a space-travel
+magazine for an invented star system, at **http://space.localhost:8000/**.
 Each has its languages, standing pages, settings, menus and the **demo content**: six sections,
 twenty published articles with generated pictures (some translated into German and Spanish), a
 link page and two bookings of its own. `*.localhost` resolves to your own machine on macOS and in current
@@ -53,7 +54,7 @@ browsers, so no hosts file is needed.
 | Studio | http://studio.localhost:8000/ — the website list; a website's screens are under `/sites/<id>/mgmt/` |
 | Sign-in (pacod-id) | http://id.localhost:8000/ |
 | Mail catcher (every mail pacod-id sends) | http://localhost:8125/ |
-| Demo websites | http://demo.localhost:8000/ and http://localhost:8000/ (editorial); http://minimal.localhost:8000/ (minimal) |
+| Demo websites | http://demo.localhost:8000/ and http://localhost:8000/ (editorial); http://minimal.localhost:8000/ (minimal); http://space.localhost:8000/ (space travels) |
 | Over HTTPS (Caddy's local CA) | https://demo.localhost:8443/ — the studio's sign-in always returns to `STUDIO_ORIGIN`, locally http://studio.localhost:8000 |
 | Site, bypassing Caddy | http://localhost:8080/ (picks the website by host, like Caddy) |
 | Studio, bypassing Caddy | http://localhost:7070/mgmt-health — health only; signing in works only at the studio's configured address |
@@ -349,7 +350,7 @@ every setting a `.env` may hold. The secrets have no published default; `make ch
 | Studio session | `MGMT_SESSION_TIMEOUT` — idle time; afterwards pacod-id's own session signs the person back in |
 | AI | `PACOD_GW_URL` (default `http://pacod-gw:8080`) `PACOD_GW_API_KEY` `PACOD_AI_MODEL` (default `@fast`) |
 | Portal | `PACOD_ID_PROVISIONER_TOKEN` (written by `make id-provisioner`; without it only platform admins create organisations) · `PACOD_SITE_DOMAIN` (new websites answer at `<id>.<domain>`) · `PACOD_ORG_CREATION` (`self-service` or `platform-admins`) · `PACOD_MAX_ORGS_PER_USER` `PACOD_MAX_SITES_PER_ORG` `PACOD_AI_FOR_NEW_ORGS` (starting values of the installation screen) |
-| Hosts | `STUDIO_HOST` `ID_HOST` (Caddy) · `DEMO_HOSTS`, `DEMO_MINIMAL_HOSTS` (the demo websites', on an empty platform) · `SITE_PUBLIC_SCHEME` `SITE_PUBLIC_PORT` (how the studio spells a website's address) |
+| Hosts | `STUDIO_HOST` `ID_HOST` (Caddy) · `DEMO_HOSTS`, `DEMO_MINIMAL_HOSTS`, `DEMO_SPACE_HOSTS` (the demo websites', on an empty platform) · `SITE_PUBLIC_SCHEME` `SITE_PUBLIC_PORT` (how the studio spells a website's address) |
 | Article image rules | `IMAGE_REQUIRED_WIDTH` `IMAGE_REQUIRED_HEIGHT` `IMAGE_MAX_BYTES` `IMAGE_DIMENSION_CHECK` `IMAGE_FILE_SIZE_CHECK` |
 | Statistics | `METRICS_VISITOR_SALT` `CRAWLER_TRACKING` `CRAWLER_VERIFY` |
 | CORS | `CORS_ALLOWED_ORIGINS` |

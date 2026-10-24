@@ -51,6 +51,12 @@
                 <div class="card-body" th:unless="${allowance.allowed()}">
                     <p class="muted" style="margin:0" th:text="${mgmtText.msg(allowance.refusal(), allowance.args())}">Only platform admins can create organisations.</p>
                 </div>
+                <!--/* Restoring one is creating one: the same allowance. */-->
+                <div class="card-foot" th:if="${allowance.allowed()}">
+                    <a class="btn" th:href="${studioRoot} + '/mgmt/organisations/restore'">
+                        <svg class="i"><use href="#i-upload"></use></svg> <span th:text="#{portal.archive.org.title}">Restore an organisation</span>
+                    </a>
+                </div>
                 <form method="post" th:if="${allowance.allowed()}" th:action="${studioRoot} + '/mgmt/organisations'">
                     <div class="card-body">
                         <div class="field">

@@ -104,10 +104,11 @@ make up           # make check first; builds pacod-id's image if missing; starts
   the user's password.
 - **The studio prepares the platform on every start.** It creates the control plane's indexes,
   brings every website whose database predates the release up to date (indexes and missing seed
-  content), and — **only while there are no websites at all** — creates two demo websites with
+  content), and — **only while there are no websites at all** — creates three demo websites with
   the demo content, in one organisation of their own: `demo` (editorial) at `DEMO_HOSTS` (default
-  `demo.localhost,localhost`) and `minimal` (the minimal template set) at `DEMO_MINIMAL_HOSTS`
-  (default `minimal.localhost`), so a fresh install has something to open. Deleting them later does
+  `demo.localhost,localhost`), `minimal` (the minimal template set) at `DEMO_MINIMAL_HOSTS`
+  (default `minimal.localhost`) and `space` (the space-travels demo) at `DEMO_SPACE_HOSTS` (default
+  `space.localhost`), so a fresh install has something to open. Deleting them later does
   not bring them back. Production's preset creates none (`DEMO_WEBSITES=false`). Each step logs
   its own failure at ERROR and is retried on the next start: **check `make logs-cms-studio` for index
   failures after every deploy** — a logged failure means that index does not exist. In the
@@ -426,7 +427,7 @@ Set per service, not globally:
 | `PACOD_MAX_ORGS_PER_USER`, `PACOD_MAX_SITES_PER_ORG`, `PACOD_AI_FOR_NEW_ORGS` | `cms-studio` | starting values (3, 5, false); the installation screen owns them once saved |
 | `IMAGE_REQUIRED_WIDTH`, `IMAGE_REQUIRED_HEIGHT`, `IMAGE_MAX_BYTES`, `IMAGE_DIMENSION_CHECK`, `IMAGE_FILE_SIZE_CHECK` | `cms-studio` | what an uploaded article image must be; read at startup |
 | `SITE_PUBLIC_SCHEME`, `SITE_PUBLIC_PORT` | `cms-studio` | how the studio spells a website's address |
-| `DEMO_HOSTS` (as `PACOD_BOOTSTRAP_DEMO_HOSTS`), `DEMO_MINIMAL_HOSTS` (as `PACOD_BOOTSTRAP_DEMO_MINIMAL_HOSTS`) | `cms-studio` | the two demo websites' hosts, used only on an empty platform |
+| `DEMO_HOSTS` (as `PACOD_BOOTSTRAP_DEMO_HOSTS`), `DEMO_MINIMAL_HOSTS` (as `PACOD_BOOTSTRAP_DEMO_MINIMAL_HOSTS`), `DEMO_SPACE_HOSTS` (as `PACOD_BOOTSTRAP_DEMO_SPACE_HOSTS`) | `cms-studio` | the three demo websites' hosts, used only on an empty platform |
 | `PACOD_PDF_GOTENBERG_URL` | `cms-studio` | Gotenberg, for PDF export (compose: `http://cms-gotenberg:3000`); blank switches it off |
 | `PACOD_JOBS_WORKERS`, `PACOD_JOBS_PER_ORGANISATION` | `cms-studio` | jobs run at once (2), and of one organisation (1) |
 | `PACOD_GW_URL`, `PACOD_GW_API_KEY` | `cms-studio` | the AI gateway (pacod-gw, default `http://pacod-gw:8080`) and the studio's key for it; without a key AI is not set up |

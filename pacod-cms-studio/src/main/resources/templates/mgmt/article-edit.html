@@ -51,6 +51,16 @@
                                     <label for="title" th:text="#{articles.c.title}">Title</label>
                                     <textarea id="title" th:field="*{title}" rows="2" maxlength="256"></textarea>
                                     <span class="field-error" th:if="${#fields.hasErrors('title')}" th:errors="*{title}"></span>
+                                    <!--/* Like "Suggest a summary" below: no name, rendered hidden, shown by
+                                           mgmt.js. The candidates are buttons it builds in the list, which
+                                           put one in the field; saving is the operator's. */-->
+                                    <div class="field-actions" th:if="${aiAvailable}">
+                                        <button type="button" class="btn btn-sm btn-ghost" hidden data-ai-titles>
+                                            <svg class="i"><use href="#i-insert"></use></svg> <th:block th:text="#{ai.suggest.titles}">Suggest titles</th:block>
+                                        </button>
+                                        <span class="library-note" data-ai-note></span>
+                                    </div>
+                                    <div class="field-actions" th:if="${aiAvailable}" hidden data-ai-title-list></div>
                                 </div>
 
                                 <div class="field">
@@ -429,6 +439,39 @@
                   images directly under the text instead of below the whole rail.
                 */-->
                 <div class="editor-tail">
+                    <!--/*
+                      A whole article drafted from a brief (POST /mgmt/ai/draft): title, description
+                      and body, put into the form above by mgmt.js -- after a confirm where any of
+                      them holds text -- for the operator to check and save. Outside #article-form,
+                      and nothing in it has a name: save() binds what that form carries. Rendered
+                      hidden, since with scripting off it would be a dead control.
+                    */-->
+                    <div class="card" th:if="${aiAvailable}" hidden data-ai-draft>
+                        <h2><svg class="i"><use href="#i-file-text"></use></svg> <th:block th:text="#{ai.draft.title}">Draft with AI</th:block></h2>
+                        <div class="card-body">
+                            <p class="muted" style="margin-top:0" th:text="#{ai.draft.intro}">Describe the article.</p>
+                            <div class="field">
+                                <label for="ai-draft-brief" th:text="#{ai.draft.brief}">Brief</label>
+                                <textarea id="ai-draft-brief" rows="4" maxlength="2000" data-ai-draft-brief
+                                          th:placeholder="#{ai.draft.example}"></textarea>
+                            </div>
+                            <div class="field">
+                                <label for="ai-draft-length" th:text="#{ai.draft.length}">Length</label>
+                                <select id="ai-draft-length" data-ai-draft-length>
+                                    <option value="short" th:text="#{ai.draft.length.short}">Short</option>
+                                    <option value="medium" selected th:text="#{ai.draft.length.medium}">Medium</option>
+                                    <option value="long" th:text="#{ai.draft.length.long}">Long</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="card-foot">
+                            <button class="btn" type="button" data-ai-draft-make>
+                                <svg class="i"><use href="#i-play"></use></svg> <th:block th:text="#{ai.draft.make}">Draft it</th:block>
+                            </button>
+                            <span class="library-note" data-ai-note></span>
+                        </div>
+                    </div>
+
                     <!--/*
                       The selected authors, in the order the byline prints them.
 

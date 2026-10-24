@@ -38,6 +38,7 @@ class DesignAssistTest {
     void setUp() {
         assist = new DesignAssist(gateway, theme, layouts, "@fast");
         when(layouts.currentSet()).thenReturn(new TemplateSetCatalog().find("minimal").orElseThrow());
+        when(layouts.draftOf(any())).thenReturn(Map.of());
         Theme current = new Theme();
         current.setDraftCss(".x{}");
         when(theme.load()).thenReturn(current);
@@ -58,10 +59,10 @@ class DesignAssistTest {
         body.put("bg", null);
         answer(body);
 
-        DesignAssist.Outcome outcome = assist.theme("calm and bright");
+        DesignAssist.Outcome outcome = assist.theme("calm and bright", DesignAssist.Mode.REPLACE, new DesignAssist.Actor("usr_a", null));
         assertThat(outcome.applied()).isEqualTo(2);
         assertThat(outcome.refused()).containsExactlyInAnyOrder("ink", "shell");
-        verify(theme).saveDraft(eq(Map.of("accent", "#1d4e6f", "font-display", "georgia")), eq(".x{}"));
+        verify(theme).assistDraft(eq(Map.of("accent", "#1d4e6f", "font-display", "georgia")), eq("usr_a"), eq(null));
 
         ArgumentCaptor<AiGateway.Call> call = ArgumentCaptor.forClass(AiGateway.Call.class);
         verify(gateway).complete(call.capture());
@@ -74,7 +75,7 @@ class DesignAssistTest {
     void themeNothingUsable() {
         answer(Map.of("accent", "not a colour"));
         assertThatThrownBy(() -> assist.theme("x")).isInstanceOf(AiGateway.AiException.class);
-        verify(theme, never()).saveDraft(any(), any());
+        verify(theme, never()).assistDraft(any(), any(), any());
     }
 
     @Test
@@ -88,11 +89,12 @@ class DesignAssistTest {
                 Map.of("region", "main", "type", "article-list", "settings", Map.of("source", "nowhere")),
                 Map.of("region", "main", "type", "rich-text", "settings", Map.of("html", "<p onclick=\"x()\">Hello</p><script>y()</script>")))));
 
-        DesignAssist.Outcome outcome = assist.layout(PageType.HOME, "a lead and a list");
+        DesignAssist.Outcome outcome = assist.layout(PageType.HOME, "a lead and a list", DesignAssist.Mode.REPLACE,
+                new DesignAssist.Actor("usr_a", null));
         assertThat(outcome.applied()).isEqualTo(2);
         assertThat(outcome.refused()).hasSize(3);
         ArgumentCaptor<Map<String, List<Section>>> draft = ArgumentCaptor.forClass(Map.class);
-        verify(layouts).replaceDraft(eq(PageType.HOME), draft.capture());
+        verify(layouts).assistDraft(eq(PageType.HOME), draft.capture(), eq("usr_a"), eq(null));
         assertThat(draft.getValue().get("main")).extracting(Section::getType).containsExactly("article-list", "rich-text");
         assertThat(draft.getValue().get("main").get(1).getSettings().get("html")).isEqualTo("<p>Hello</p>");
 
@@ -107,7 +109,7 @@ class DesignAssistTest {
     void layoutEmpty() {
         answer(Map.of("sections", List.of()));
         assertThatThrownBy(() -> assist.layout(PageType.HOME, "x")).isInstanceOf(AiGateway.AiException.class);
-        verify(layouts, never()).replaceDraft(any(), any());
+        verify(layouts, never()).assistDraft(any(), any(), any(), any());
     }
 
     @Test
@@ -115,5 +117,50 @@ class DesignAssistTest {
     void noBrief() {
         assertThatThrownBy(() -> assist.theme(" ")).isInstanceOf(AiGateway.AiException.class);
         verify(gateway, never()).complete(any());
+    }
+
+    @Test
+    @DisplayName("refining a theme shows the current values, and a null keeps one")
+    void themeRefine() {
+        Theme current = new Theme();
+        current.setDraft(new java.util.LinkedHashMap<>(Map.of("accent", "#111111", "bg", "#ffffff")));
+        when(theme.load()).thenReturn(current);
+        Map<String, Object> body = new HashMap<>();
+        body.put("accent", "#222222");
+        body.put("bg", null);
+        answer(body);
+
+        assist.theme("darker links", DesignAssist.Mode.REFINE, new DesignAssist.Actor("usr_a", "job1"));
+        verify(theme).assistDraft(eq(Map.of("accent", "#222222", "bg", "#ffffff")), eq("usr_a"), eq("job1"));
+        ArgumentCaptor<AiGateway.Call> call = ArgumentCaptor.forClass(AiGateway.Call.class);
+        verify(gateway).complete(call.capture());
+        assertThat(call.getValue().user()).contains("Brief: darker links", "#111111");
+        assertThat(call.getValue().system()).contains("keep its current value");
+        assertThat(call.getValue().userId()).isEqualTo("usr_a");
+        assertThat(call.getValue().trace()).isEqualTo("job1");
+    }
+
+    @Test
+    @DisplayName("refining a layout shows the current sections the set renders")
+    void layoutRefine() {
+        when(layouts.draftOf(PageType.HOME)).thenReturn(Map.of("main", List.of(
+                Section.of(io.pacod.cms.core.design.SectionType.ARTICLE_LIST, Map.of("source", "latest", "count", 7)),
+                Section.of(io.pacod.cms.core.design.SectionType.SEARCH_BOX, Map.of()))));
+        answer(Map.of("sections", List.of(
+                Map.of("region", "main", "type", "article-list", "settings", Map.of("source", "latest", "count", 3)))));
+
+        assist.layout(PageType.HOME, "fewer stories", DesignAssist.Mode.REFINE, new DesignAssist.Actor("usr_a", null));
+        ArgumentCaptor<AiGateway.Call> call = ArgumentCaptor.forClass(AiGateway.Call.class);
+        verify(gateway).complete(call.capture());
+        assertThat(call.getValue().user()).contains("Brief: fewer stories", "article-list", "\"count\":7").doesNotContain("search-box");
+        assertThat(call.getValue().system()).contains("keeping every section");
+    }
+
+    @Test
+    @DisplayName("an absent or unknown mode refines; only replace starts over")
+    void modes() {
+        assertThat(DesignAssist.Mode.of(null)).isEqualTo(DesignAssist.Mode.REFINE);
+        assertThat(DesignAssist.Mode.of("whatever")).isEqualTo(DesignAssist.Mode.REFINE);
+        assertThat(DesignAssist.Mode.of("replace")).isEqualTo(DesignAssist.Mode.REPLACE);
     }
 }

@@ -68,11 +68,15 @@ make up          # check, build, start, wait; prints the addresses
 ```
 
 Then open **http://studio.localhost:8000/** and sign in as `admin@pacod-cms.test` with the password
-`ID_ADMIN_PASSWORD` from `.env`. This is the bootstrap platform admin. The first start creates two
+`ID_ADMIN_PASSWORD` from `.env`. This is the bootstrap platform admin. The first start creates three
 demo websites with the demo content:
 
 - **"Demo Journal"** (editorial template set) at http://demo.localhost:8000/ and http://localhost:8000/
 - **"Demo Notes"** (minimal template set) at http://minimal.localhost:8000/
+- **"Starward"**, the space-travels demo, at http://space.localhost:8000/
+
+A platform created before the space demo existed gets it with `make site-create SLUG=space
+NAME=Starward HOSTS=space.localhost DEMO=space`.
 
 pacod-id's sign-in pages are at http://id.localhost:8000/, and every mail it sends lands in pacod-mailpit,
 http://localhost:8125/. **Create an account** on the sign-in page makes an account with no role,
@@ -253,6 +257,14 @@ tar -czf /data/backup/storage-$(date +%F).tgz -C /data storage
 `make restore DUMP=<folder under MONGO_BACKUP_DIR>` puts a MongoDB dump back. It only reports what
 it would do until you add `APPLY=1`, and `CONFIRM=prod` too in production.
 
+**One website, or one organisation, is exported and restored in the studio** rather than here: a
+website's *Settings* screen and an organisation's screen offer *Export* (a ZIP of its content and
+files, without traffic statistics, members or hosts), and *Websites → Restore a website* and
+*Organisations → Restore an organisation* bring one back -- always as a **new** website or
+organisation, on this installation or another. Uploads up to 2 GiB pass Caddy on those two paths
+only (`CMS_ARCHIVE_MAX_SIZE`; the studio's `pacod.archive.max-bytes`). It is the way to move one
+website between installations; the dumps above remain the way to back up the whole platform.
+
 ## What the first start does
 
 `make up` runs these steps in order, each safe to repeat:
@@ -294,11 +306,13 @@ make site-create SLUG=acme NAME="Acme News" HOSTS=acme.example-sites.net,www.acm
 - Its hosts must resolve to the server, except on dev.
 
 **The demo content** is *Demo Journal*: six sections, four authors, twenty published articles with
-generated pictures (five also in German and Spanish), a link page and two bookings. To add it to an
-existing website:
+generated pictures (five also in German and Spanish), a link page and two bookings -- or, with
+`DEMO=space`, *Space travels*: the same for a travel magazine of an invented star system, with its
+own theme and taglines. To add it to an existing website:
 
 ```bash
-make seed SITE=acme
+make seed SITE=acme              # Demo Journal
+make seed SITE=acme DEMO=space   # Space travels
 ```
 
 It is written only into a website **without articles**, whose content language is English, and it

@@ -40,9 +40,9 @@ class PlatformBootstrapTest {
         provisioner = mock(SiteProvisioner.class);
         websites = mock(WebsiteRepository.class);
         demo = mock(StudioDemo.class);
-        when(demo.supports("en")).thenReturn(true);
-        when(demo.languages()).thenReturn(Set.of("en"));
-        when(demo.install(any())).thenReturn(new StudioDemo.Outcome(
+        when(demo.supports(any(), org.mockito.ArgumentMatchers.eq("en"))).thenReturn(true);
+        when(demo.languages(any())).thenReturn(Set.of("en"));
+        when(demo.install(any(), any())).thenReturn(new StudioDemo.Outcome(
                 new DemoContent.Result(20, 24, 6, 4, 12, true, true), 2, null));
         created = new Website("demo", "org_x", "Demo Journal");
         second = new Website("minimal", "org_x", "Demo Notes");
@@ -79,8 +79,32 @@ class PlatformBootstrapTest {
         assertThat(minimal.organisationId()).isEqualTo("org_x");
         assertThat(minimal.templateSet()).isEqualTo("minimal");
         assertThat(minimal.hosts()).containsExactly("minimal.localhost");
-        verify(demo).install(created);
-        verify(demo).install(second);
+        verify(demo).install(io.pacod.cms.core.seed.DemoContent.Demo.JOURNAL, created);
+        verify(demo).install(io.pacod.cms.core.seed.DemoContent.Demo.JOURNAL, second);
+    }
+
+    @Test
+    @DisplayName("with the space demo switched on, a third website gets the space travels, in the same organisation")
+    void spaceDemoWebsite() {
+        when(websites.count()).thenReturn(0L);
+        Website space = new Website("space", "org_x", "Starward");
+        org.mockito.Mockito.doAnswer(call -> switch (call.<SiteProvisioner.NewWebsite>getArgument(0).siteId()) {
+            case "demo" -> created;
+            case "space" -> space;
+            default -> second;
+        }).when(provisioner).create(any());
+        PlatformBootstrap bootstrap = bootstrap(true, "en", true);
+        bootstrap.useSpace(true, "space", "Starward", "space.localhost");
+
+        bootstrap.start();
+
+        ArgumentCaptor<SiteProvisioner.NewWebsite> request = ArgumentCaptor.forClass(SiteProvisioner.NewWebsite.class);
+        verify(provisioner, org.mockito.Mockito.times(3)).create(request.capture());
+        SiteProvisioner.NewWebsite third = request.getAllValues().get(2);
+        assertThat(third.siteId()).isEqualTo("space");
+        assertThat(third.organisationId()).isEqualTo("org_x");
+        assertThat(third.hosts()).containsExactly("space.localhost");
+        verify(demo).install(io.pacod.cms.core.seed.DemoContent.Demo.SPACE, space);
     }
 
     @Test
@@ -96,8 +120,8 @@ class PlatformBootstrapTest {
 
         bootstrap(true, "en", true).start();
 
-        verify(demo).install(created);
-        verify(demo, never()).install(second);
+        verify(demo).install(io.pacod.cms.core.seed.DemoContent.Demo.JOURNAL, created);
+        verify(demo, never()).install(any(), org.mockito.ArgumentMatchers.eq(second));
     }
 
     @Test
@@ -112,7 +136,7 @@ class PlatformBootstrapTest {
         assertThat(request.getValue().siteId()).isEqualTo("demo");
         assertThat(request.getValue().hosts()).containsExactly("demo.localhost", "localhost");
         assertThat(request.getValue().organisationId()).isNull();
-        verify(demo).install(created);
+        verify(demo).install(io.pacod.cms.core.seed.DemoContent.Demo.JOURNAL, created);
     }
 
     @Test
@@ -124,7 +148,7 @@ class PlatformBootstrapTest {
         bootstrap(true, "de").start();
 
         verify(provisioner, org.mockito.Mockito.times(2)).create(any());
-        verify(demo, never()).install(any());
+        verify(demo, never()).install(any(), any());
     }
 
     @Test
@@ -135,19 +159,19 @@ class PlatformBootstrapTest {
         bootstrap(true, "en").start();
 
         verify(provisioner, never()).create(any());
-        verify(demo, never()).install(any());
+        verify(demo, never()).install(any(), any());
     }
 
     @Test
     @DisplayName("demo content that fails leaves the demo website standing and the start going")
     void failingContentIsContained() {
         when(websites.count()).thenReturn(0L);
-        when(demo.install(any())).thenThrow(new IllegalStateException("disk full"));
+        when(demo.install(any(), any())).thenThrow(new IllegalStateException("disk full"));
 
         // start() returning at all is half the point: the studio's start must not fail on it.
         bootstrap(true, "en").start();
 
         verify(provisioner).create(any());
-        verify(demo).install(created);
+        verify(demo).install(io.pacod.cms.core.seed.DemoContent.Demo.JOURNAL, created);
     }
 }

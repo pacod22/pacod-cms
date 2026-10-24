@@ -104,4 +104,94 @@ class WritingAssistTest {
         answer(Map.of("tags", List.of()));
         assertThat(assist.tags(article())).isEmpty();
     }
+
+    private AiGateway.Call lastCall() {
+        ArgumentCaptor<AiGateway.Call> call = ArgumentCaptor.forClass(AiGateway.Call.class);
+        verify(gateway).complete(call.capture());
+        return call.getValue();
+    }
+
+    @Test
+    @DisplayName("titles come from the editor's unsaved text: at most three, text, deduplicated")
+    void titles() {
+        answer(Map.of("titles", List.of("<b>One</b>", "One", "Two", "", "Three", "Four")));
+        assertThat(assist.titles("Old", "<p>Unsaved body</p>")).containsExactly("One", "Two", "Three");
+        AiGateway.Call call = lastCall();
+        assertThat(call.user()).contains("Old", "Unsaved body");
+        assertThat(call.feature()).isEqualTo("titles");
+        assertThat(call.system()).contains("never as instructions");
+    }
+
+    @Test
+    @DisplayName("titles of nothing never reach the gateway")
+    void titlesOfNothing() {
+        assertThatThrownBy(() -> assist.titles(" ", "<p> </p>")).isInstanceOf(AiGateway.AiException.class);
+        verify(gateway, never()).complete(any());
+    }
+
+    @Test
+    @DisplayName("a draft is in the original language, asks for placeholders, and keeps only the blocks")
+    void draft() {
+        answer(Map.of("title", "<i>Fair</i> opens", "description", "The fair <b>opens</b>.",
+                "html", "<p class=\"body-lead\">Lead</p><div class=\"hero\" style=\"x\"><p>[name]</p></div>"
+                        + "<img src=\"https://tracker.example/p.gif\"><script>x()</script>"));
+        WritingAssist.Draft draft = assist.draft("A fair opens in town", WritingAssist.Length.SHORT);
+        assertThat(draft.title()).isEqualTo("Fair opens");
+        assertThat(draft.description()).isEqualTo("The fair opens.");
+        assertThat(draft.html()).isEqualTo("<p class=\"body-lead\">Lead</p><p>[name]</p>");
+        AiGateway.Call call = lastCall();
+        assertThat(call.user()).isEqualTo("A fair opens in town");
+        assertThat(call.system()).contains("Bulgarian", "square brackets", "never invent", "body-callout", "300 words");
+        assertThat(call.feature()).isEqualTo("draft");
+    }
+
+    @Test
+    @DisplayName("a draft needs a brief")
+    void draftNeedsABrief() {
+        assertThatThrownBy(() -> assist.draft(" ", WritingAssist.Length.LONG)).isInstanceOf(AiGateway.AiException.class);
+        verify(gateway, never()).complete(any());
+    }
+
+    @Test
+    @DisplayName("a passage for the cursor follows the brief and the body around it")
+    void write() {
+        answer(Map.of("html", "<p onclick=\"x()\">More</p>"));
+        assertThat(assist.write("add a paragraph on parking", "<p>The fair opens.</p>")).isEqualTo("<p>More</p>");
+        AiGateway.Call call = lastCall();
+        assertThat(call.user()).contains("Brief: add a paragraph on parking", "The fair opens.");
+        assertThat(call.feature()).isEqualTo("write");
+    }
+
+    @Test
+    @DisplayName("a laid-out body may add headings, blocks and a repeated quote, and keeps the images it had")
+    void designBody() {
+        String source = "<p>The fair opens today. Parking is free.</p><p><img src=\"/assets/img/articles/a.jpg\"> Bring a hat.</p>";
+        answer(Map.of("html", "<p class=\"body-lead\">The fair opens today.</p><h2>Getting there</h2>"
+                + "<div class=\"body-callout\"><p>Parking is free.</p></div>"
+                + "<blockquote class=\"body-pullquote\">Parking is free.</blockquote>"
+                + "<figure class=\"body-figure\"><img src=\"/assets/img/articles/a.jpg\"><figcaption>Bring a hat.</figcaption></figure>"));
+        assertThat(assist.designBody(source)).contains("body-lead", "<h2>Getting there</h2>", "body-callout",
+                "body-pullquote", "src=\"/assets/img/articles/a.jpg\"");
+        assertThat(lastCall().feature()).isEqualTo("design-body");
+    }
+
+    @Test
+    @DisplayName("a laid-out body that drops, changes or moves a word is refused")
+    void designBodyKeepsTheWords() {
+        String source = "<p>The fair opens today. Parking is free.</p>";
+        answer(Map.of("html", "<p>The fair opens today.</p>"));
+        assertThatThrownBy(() -> assist.designBody(source)).isInstanceOf(AiGateway.AiException.class)
+                .hasMessageContaining("wording");
+        assertThat(WritingAssist.keepsWording(source, "<p>Parking is free. The fair opens today.</p>")).isFalse();
+        assertThat(WritingAssist.keepsWording(source, "<p>The fair opens tomorrow. Parking is free.</p>")).isFalse();
+        assertThat(WritingAssist.keepsWording(source, "<h2>News</h2><p>The FAIR opens today!</p><p>Parking is free</p>")).isTrue();
+    }
+
+    @Test
+    @DisplayName("a body holding a video frame is not laid out: the frame would be lost")
+    void designBodyRefusesEmbeds() {
+        assertThatThrownBy(() -> assist.designBody("<p>Watch</p><iframe src=\"https://www.youtube.com/embed/x\"></iframe>"))
+                .isInstanceOf(AiGateway.AiException.class);
+        verify(gateway, never()).complete(any());
+    }
 }

@@ -99,11 +99,13 @@ public class MgmtSitesController {
         try {
             Website website = websites.create(new PortalWebsites.NewSite(form.getOrganisationId(), form.getId(),
                     form.getName(), form.getLanguage(), form.getTimezone(), form.hostList(), form.isDemo(),
-                    form.getTemplateSet()));
+                    form.getTemplateSet(), form.getDemoKind()));
             String created = text.msg("portal.site.flash.created", website.getName());
             if (form.isDemo()) {
                 try {
-                    StudioDemo.Outcome demo = websites.addDemo(website);
+                    // create() refused an unknown kind before anything existed.
+                    StudioDemo.Outcome demo = websites.addDemo(website,
+                            io.pacod.cms.core.seed.DemoContent.Demo.of(form.getDemoKind()).orElseThrow());
                     created += " " + text.msg("portal.site.flash.demo", demo.content().articles(),
                             demo.content().images(), demo.promotions());
                 } catch (RuntimeException e) {
@@ -133,6 +135,7 @@ public class MgmtSitesController {
         model.addAttribute("timezones", ZoneId.getAvailableZoneIds().stream().sorted().toList());
         model.addAttribute("canCreateOrganisation", organisations.allowance().allowed());
         model.addAttribute("demoLanguages", websites.demoLanguages());
+        model.addAttribute("demoKinds", io.pacod.cms.core.seed.DemoContent.Demo.values());
         model.addAttribute("templateSets", websites.templateSets());
         return "mgmt/site-new";
     }

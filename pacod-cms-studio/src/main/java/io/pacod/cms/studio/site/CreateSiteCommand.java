@@ -2,6 +2,7 @@ package io.pacod.cms.studio.site;
 
 import io.pacod.cms.core.control.data.Website;
 import io.pacod.cms.core.design.TemplateSetCatalog;
+import io.pacod.cms.core.seed.DemoContent;
 import io.pacod.cms.core.tenant.SiteProvisioner;
 import io.pacod.cms.studio.demo.StudioDemo;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +21,7 @@ import java.util.List;
  * <pre>
  *   java -jar pacod-cms-studio.jar --spring.main.web-application-type=none \
  *       --create-site --site-id=acme --site-name="Acme News" --hosts=acme.localhost [--language=de] \
- *       [--org-id=org_... | --org-name="Acme Ltd"] [--template-set=minimal] [--demo]
+ *       [--org-id=org_... | --org-name="Acme Ltd"] [--template-set=minimal] [--demo[=space]]
  * </pre>
  * {@code --org-id} adds the website to an organisation that exists; without it a new organisation
  * is created, named {@code --org-name} (else the website's name), with a generated id.
@@ -28,10 +29,11 @@ import java.util.List;
  * {@code --template-set} must name a set this installation has (else it is refused before anything
  * is created); without it the website renders with the default set.
  *
- * {@code --demo} starts it with the demo content ({@link StudioDemo}); a content language the demo
- * is not written in is refused before the website is created.
+ * {@code --demo} starts it with the demo content ({@link StudioDemo}): the journal, or with
+ * {@code --demo=space} the space travels; a content language the demo is not written in, or a demo
+ * that does not exist, is refused before the website is created.
  *
- * {@code make site-create SLUG=… NAME=… HOSTS=… [TEMPLATE=minimal] [DEMO=1]} runs it in a one-off studio container. It goes
+ * {@code make site-create SLUG=… NAME=… HOSTS=… [TEMPLATE=minimal] [DEMO=1|space]} runs it in a one-off studio container. It goes
  * through {@link SiteProvisioner#create} -- the same path the portal takes -- so the website
  * gets its indexes and its seed content and is active when the command returns.
  *
@@ -71,14 +73,17 @@ public class CreateSiteCommand implements ApplicationRunner {
                         + catalog.all().stream().map(m -> m.id()).toList());
             }
             boolean withDemo = args.containsOption(DEMO);
-            if (withDemo && !demo.supports(request.defaultLanguage())) {
-                throw new IllegalArgumentException("Demo content is written in " + demo.languages()
+            DemoContent.Demo which = withDemo ? SeedDemoCommand.demo(args).orElseThrow(() -> new IllegalArgumentException(
+                    "--demo names no demo; there are " + Arrays.stream(DemoContent.Demo.values()).map(DemoContent.Demo::id).toList()))
+                    : null;
+            if (withDemo && !demo.supports(which, request.defaultLanguage())) {
+                throw new IllegalArgumentException("Demo content is written in " + demo.languages(which)
                         + ", not in " + request.defaultLanguage());
             }
             Website created = provisioner.create(request);
             log.info("Created website {} ('{}'), database {}", created.getId(), created.getName(), created.getDbName());
             if (withDemo) {
-                status = SeedDemoCommand.install(demo, created);
+                status = SeedDemoCommand.install(demo, which, created);
             }
         } catch (RuntimeException e) {
             log.error("Could not create the website: {}", e.getMessage());

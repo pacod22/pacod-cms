@@ -11,7 +11,8 @@
 #     REPLACES a value a client wrote rather than appending to it.
 #   - X-Pacod-Print is removed: only the PDF renderer, on pacod-net, may send one;
 #   - request bodies stop at 4 MiB, in step with the studio's multipart limits (Spring's 4MB is
-#     4 MiB; Caddy's MB is decimal, so the unit is MiB);
+#     4 MiB; Caddy's MB is decimal, so the unit is MiB) -- but for the studio's two restore paths,
+#     which take an archive as the body, up to CMS_ARCHIVE_MAX_SIZE (2 GiB);
 #   - / on the studio's host answers 302 to /mgmt/sites;
 #   - /_internal/ answers 404: those questions are asked on pacod-net only;
 #   - each request is logged to stdout with sign-in codes and state, tokens, keys, Referer and the
@@ -78,10 +79,17 @@
 	}
 }
 
-# The studio.
+# The studio. The two restore paths take a whole website's archive as the request body (never
+# multipart, which stays at 4 MiB with every other upload); the studio caps it again itself
+# (pacod.archive.max-bytes), so keep CMS_ARCHIVE_MAX_SIZE in step with that.
 {$CMS_STUDIO_SITE:http://studio.localhost, https://studio.localhost} {
 	import cms-front
-	request_body {
+	@cms-archive path /mgmt/sites/restore /mgmt/organisations/restore
+	@cms-upload not path /mgmt/sites/restore /mgmt/organisations/restore
+	request_body @cms-archive {
+		max_size {$CMS_ARCHIVE_MAX_SIZE:2GiB}
+	}
+	request_body @cms-upload {
 		max_size 4MiB
 	}
 	# Relative: the browser keeps the host and port it asked with.

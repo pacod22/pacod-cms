@@ -2,6 +2,7 @@ package io.pacod.cms.studio.site;
 
 import io.pacod.cms.core.control.data.Website;
 import io.pacod.cms.core.control.repository.WebsiteRepository;
+import io.pacod.cms.core.seed.DemoContent;
 import io.pacod.cms.core.tenant.SiteIndexes;
 import io.pacod.cms.core.tenant.SiteProvisioner;
 import io.pacod.cms.core.tenant.SiteRetirement;
@@ -31,7 +32,8 @@ import java.util.List;
  * <p>The demo websites are created only while the {@code website} collection is empty, so deleting
  * them later does not bring them back: {@code demo} on the default template set and, in the same
  * organisation, {@code minimal} on the {@code minimal} set ({@code pacod.bootstrap.demo.minimal.*};
- * {@code enabled=false} leaves it out), so a fresh install shows both. Each starts with the demo
+ * {@code enabled=false} leaves it out), so a fresh install shows both -- and a third, {@code space}, with
+ * the space-travels demo ({@code pacod.bootstrap.demo.space.*}). Each starts with the demo
  * content ({@link StudioDemo}) unless {@code pacod.bootstrap.demo.content=false}, and each is created
  * on its own: one failing does not keep the other away. {@code pacod.bootstrap.enabled=false} turns all of this off, as
  * the test profile does.
@@ -89,6 +91,27 @@ public class PlatformBootstrap {
         this.minimalHosts = hosts(minimalHosts);
     }
 
+    private boolean spaceEnabled;
+    private String spaceId;
+    private String spaceName;
+    private List<String> spaceHosts = List.of();
+
+    /**
+     * The third demo website, {@code space} with the space-travels demo
+     * ({@code pacod.bootstrap.demo.space.*}; {@code enabled=false} leaves it out), in the first one's
+     * organisation. A setter, so the hand-built instances of the tests have none.
+     */
+    @org.springframework.beans.factory.annotation.Autowired
+    void useSpace(@Value("${pacod.bootstrap.demo.space.enabled:true}") boolean enabled,
+                  @Value("${pacod.bootstrap.demo.space.id:space}") String id,
+                  @Value("${pacod.bootstrap.demo.space.name:Starward}") String name,
+                  @Value("${pacod.bootstrap.demo.space.hosts:space.localhost}") String hosts) {
+        this.spaceEnabled = enabled;
+        this.spaceId = id;
+        this.spaceName = name;
+        this.spaceHosts = hosts(hosts);
+    }
+
     private static List<String> hosts(String list) {
         return Arrays.stream(list.split(",")).map(String::strip).filter(h -> !h.isEmpty()).toList();
     }
@@ -137,15 +160,19 @@ public class PlatformBootstrap {
             log.error("Could not count the websites; no demo website: {}", e.getMessage());
             return;
         }
-        Website first = createDemo(null, demoId, demoName, demoHosts, null);
+        Website first = createDemo(null, demoId, demoName, demoHosts, null, DemoContent.Demo.JOURNAL);
         if (minimalEnabled && first != null) {
-            // In the first one's organisation: one demo organisation holding both.
-            createDemo(first.getOrganisationId(), minimalId, minimalName, minimalHosts, MINIMAL_SET);
+            // In the first one's organisation: one demo organisation holding them all.
+            createDemo(first.getOrganisationId(), minimalId, minimalName, minimalHosts, MINIMAL_SET, DemoContent.Demo.JOURNAL);
+        }
+        if (spaceEnabled && first != null) {
+            createDemo(first.getOrganisationId(), spaceId, spaceName, spaceHosts, null, DemoContent.Demo.SPACE);
         }
     }
 
     /** One demo website, with its content; null when it could not be created. */
-    private Website createDemo(String organisationId, String id, String name, List<String> hosts, String templateSet) {
+    private Website createDemo(String organisationId, String id, String name, List<String> hosts, String templateSet,
+                               DemoContent.Demo kind) {
         Website website;
         try {
             website = provisioner.create(new SiteProvisioner.NewWebsite(organisationId, "Demo organisation", id,
@@ -156,11 +183,11 @@ public class PlatformBootstrap {
             return null;
         }
         if (demoContent) {
-            if (demo.supports(demoLanguage)) {
-                SeedDemoCommand.install(demo, website);
+            if (demo.supports(kind, demoLanguage)) {
+                SeedDemoCommand.install(demo, kind, website);
             } else {
                 log.warn("The demo website {} is in {}; demo content is written in {}, so it starts empty",
-                        id, demoLanguage, demo.languages());
+                        id, demoLanguage, demo.languages(kind));
             }
         }
         return website;

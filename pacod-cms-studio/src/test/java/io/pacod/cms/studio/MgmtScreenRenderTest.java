@@ -2397,6 +2397,32 @@ class MgmtScreenRenderTest {
         mockMvc.perform(post("/mgmt/ai/tags").with(csrf()).contentType("application/json").content("{\"articleId\":42}"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("\"wine\"")));
+
+        when(writingAssist.titles(eq("Old"), eq("<p>x</p>"))).thenReturn(List.of("New title"));
+        mockMvc.perform(post("/mgmt/ai/titles").with(csrf()).contentType("application/json")
+                        .content("{\"title\":\"Old\",\"html\":\"<p>x</p>\"}"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("\"New title\"")));
+        when(writingAssist.draft(eq("A fair"), eq(io.pacod.cms.studio.ai.WritingAssist.Length.SHORT)))
+                .thenReturn(new io.pacod.cms.studio.ai.WritingAssist.Draft("T", "D", "<p class=\"body-lead\">B</p>"));
+        mockMvc.perform(post("/mgmt/ai/draft").with(csrf()).contentType("application/json")
+                        .content("{\"brief\":\"A fair\",\"length\":\"short\"}"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("\"title\":\"T\"")))
+                .andExpect(content().string(containsString("body-lead")));
+        mockMvc.perform(post("/mgmt/ai/draft").with(csrf()).contentType("application/json")
+                        .content("{\"brief\":\"A fair\",\"length\":\"endless\"}"))
+                .andExpect(status().isBadRequest());
+        when(writingAssist.write(eq("more"), eq("<p>x</p>"))).thenReturn("<p>more</p>");
+        mockMvc.perform(post("/mgmt/ai/write").with(csrf()).contentType("application/json")
+                        .content("{\"brief\":\"more\",\"html\":\"<p>x</p>\"}"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<p>more</p>")));
+        when(writingAssist.designBody(eq("<p>x</p>"))).thenThrow(new io.pacod.cms.studio.ai.AiGateway.AiException("The answer changed the wording"));
+        mockMvc.perform(post("/mgmt/ai/design-body").with(csrf()).contentType("application/json")
+                        .content("{\"html\":\"<p>x</p>\"}"))
+                .andExpect(status().isBadGateway())
+                .andExpect(content().string(containsString("changed the wording")));
     }
 
     @Test
@@ -2405,8 +2431,24 @@ class MgmtScreenRenderTest {
         org.assertj.core.api.Assertions.assertThat(mockMvc.perform(get("/mgmt/articles/42")).andReturn().getResponse().getContentAsString())
                 .contains("data-ai-assist=\"false\"").doesNotContain("data-ai-describe", "data-ai-tags");
         when(aiAccess.availableHere()).thenReturn(true);
+        String html = mockMvc.perform(get("/mgmt/articles/42")).andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(html)
+                .contains("data-ai-assist=\"true\"", "data-ai-describe", "data-ai-tags", "data-ai-titles", "data-ai-draft");
+        // The draft card is outside #article-form (its first </form> is its end: it nests none), and
+        // neither it nor the titles control carries a name save() would bind.
+        int formEnd = html.indexOf("</form>", html.indexOf("id=\"article-form\""));
+        org.assertj.core.api.Assertions.assertThat(html.indexOf("data-ai-draft")).isGreaterThan(formEnd);
+        org.assertj.core.api.Assertions.assertThat(html.substring(html.indexOf("data-ai-draft"), html.indexOf("data-ai-draft-make")))
+                .doesNotContain("name=");
+        org.assertj.core.api.Assertions.assertThat(html.substring(html.indexOf("data-ai-titles"), html.indexOf("data-ai-title-list")))
+                .doesNotContain("name=");
+    }
+
+    @Test
+    @DisplayName("the body's styled blocks are linked for the editor and the AI preview")
+    void bodyBlocksStylesheet() throws Exception {
         org.assertj.core.api.Assertions.assertThat(mockMvc.perform(get("/mgmt/articles/42")).andReturn().getResponse().getContentAsString())
-                .contains("data-ai-assist=\"true\"", "data-ai-describe", "data-ai-tags");
+                .contains("data-body-blocks", "/mgmt-assets/body-blocks.css");
     }
 
     @Test

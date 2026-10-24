@@ -61,7 +61,50 @@ public class DesignTheme {
         Theme theme = load();
         theme.setDraft(new LinkedHashMap<>(clean));
         theme.setDraftCss(css == null || css.isBlank() ? null : css);
-        stamp(theme);
+        forgetAssist(theme);
+        stamp(theme, StudioPrincipals.currentSubject());
+        themes.save(theme);
+    }
+
+    /**
+     * Design assist's draft: exactly these values (already checked, {@link ThemeCss#clean}), the
+     * draft's own CSS kept, and what the draft was kept for {@link #undoAssist}. A person's assist
+     * always refills that slot; a job ({@code jobId}) refills it unless it is its own, so a job
+     * run again from the start still undoes to the draft from before its first attempt.
+     *
+     * @param updatedBy who the change is recorded as: the person, or the one who queued the job
+     */
+    public void assistDraft(Map<String, String> values, String updatedBy, String jobId) {
+        Theme theme = load();
+        if (jobId == null || !jobId.equals(theme.getBeforeAssistJob())) {
+            theme.setBeforeAssist(new LinkedHashMap<>(theme.getDraft() == null ? Map.of() : theme.getDraft()));
+            theme.setBeforeAssistCss(theme.getDraftCss());
+            theme.setBeforeAssistJob(jobId);
+        }
+        theme.setDraft(new LinkedHashMap<>(ThemeCss.clean(values)));
+        stamp(theme, updatedBy);
+        themes.save(theme);
+    }
+
+    /**
+     * The draft and what it was before design assist swap places: an undo, and undoing again
+     * redoes.
+     *
+     * @throws MgmtOperationException {@code design.assist.undo.none} when there is nothing to undo
+     */
+    public void undoAssist() {
+        Theme theme = load();
+        if (!theme.assistUndoable()) {
+            throw new MgmtOperationException("design.assist.undo.none");
+        }
+        Map<String, String> draft = theme.getDraft();
+        String css = theme.getDraftCss();
+        theme.setDraft(new LinkedHashMap<>(theme.getBeforeAssist()));
+        theme.setDraftCss(theme.getBeforeAssistCss());
+        theme.setBeforeAssist(new LinkedHashMap<>(draft == null ? Map.of() : draft));
+        theme.setBeforeAssistCss(css);
+        theme.setBeforeAssistJob(null);
+        stamp(theme, StudioPrincipals.currentSubject());
         themes.save(theme);
     }
 
@@ -74,7 +117,8 @@ public class DesignTheme {
         Theme theme = load();
         theme.setDraft(new LinkedHashMap<>(preset.tokens()));
         theme.setPreset(presetId);
-        stamp(theme);
+        forgetAssist(theme);
+        stamp(theme, StudioPrincipals.currentSubject());
         themes.save(theme);
     }
 
@@ -84,7 +128,8 @@ public class DesignTheme {
         theme.setPublishedCss(theme.getDraftCss());
         theme.setPublishedOn(Instant.now());
         theme.setPublishedBy(StudioPrincipals.currentSubject());
-        stamp(theme);
+        forgetAssist(theme);
+        stamp(theme, StudioPrincipals.currentSubject());
         themes.save(theme);
     }
 
@@ -93,12 +138,20 @@ public class DesignTheme {
         Theme theme = load();
         theme.setDraft(new LinkedHashMap<>(theme.getPublished() == null ? Map.of() : theme.getPublished()));
         theme.setDraftCss(theme.getPublishedCss());
-        stamp(theme);
+        forgetAssist(theme);
+        stamp(theme, StudioPrincipals.currentSubject());
         themes.save(theme);
     }
 
-    private static void stamp(Theme theme) {
+    private static void stamp(Theme theme, String updatedBy) {
         theme.setUpdatedOn(Instant.now());
-        theme.setUpdatedBy(StudioPrincipals.currentSubject());
+        theme.setUpdatedBy(updatedBy);
+    }
+
+    /** Any change but design assist's own: the undo would bring back a stale draft. */
+    private static void forgetAssist(Theme theme) {
+        theme.setBeforeAssist(null);
+        theme.setBeforeAssistCss(null);
+        theme.setBeforeAssistJob(null);
     }
 }

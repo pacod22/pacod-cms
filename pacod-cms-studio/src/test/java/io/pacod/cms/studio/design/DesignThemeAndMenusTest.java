@@ -109,4 +109,24 @@ class DesignThemeAndMenusTest {
         menus.remove("main", "1.0");
         assertThat(menuStore.get("main").getItems().get(1).getChildren()).isEmpty();
     }
+
+    @Test
+    @DisplayName("an AI theme draft keeps the CSS, can be undone and redone, and a manual save forgets the undo")
+    void themeAssistUndo() {
+        on("editorial", () -> theme.saveDraft(Map.of("accent", "#111111"), ".mine {}"));
+        on("editorial", () -> theme.assistDraft(Map.of("accent", "#222222", "bg", "#ffffff"), "usr_ai", null));
+        assertThat(stored.getDraft()).containsEntry("accent", "#222222").containsEntry("bg", "#ffffff");
+        assertThat(stored.getDraftCss()).isEqualTo(".mine {}");
+        assertThat(stored.getUpdatedBy()).isEqualTo("usr_ai");
+        assertThat(stored.assistUndoable()).isTrue();
+
+        on("editorial", theme::undoAssist);
+        assertThat(stored.getDraft()).isEqualTo(Map.of("accent", "#111111"));
+        on("editorial", theme::undoAssist);
+        assertThat(stored.getDraft()).containsEntry("accent", "#222222");
+
+        on("editorial", () -> theme.saveDraft(Map.of("accent", "#333333"), ".mine {}"));
+        assertThat(stored.assistUndoable()).isFalse();
+        on("editorial", () -> assertThatThrownBy(theme::undoAssist).isInstanceOf(MgmtOperationException.class));
+    }
 }

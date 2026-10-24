@@ -1,0 +1,1372 @@
+{
+  "categories": [
+    {
+      "id": 1,
+      "names": {
+        "en": "Destinations",
+        "de": "Reiseziele",
+        "es": "Destinos"
+      }
+    },
+    {
+      "id": 2,
+      "names": {
+        "en": "Spaceports & Stations",
+        "de": "Raumhäfen & Stationen",
+        "es": "Puertos y estaciones"
+      }
+    },
+    {
+      "id": 3,
+      "names": {
+        "en": "Ships & Gear",
+        "de": "Schiffe & Ausrüstung",
+        "es": "Naves y equipo"
+      }
+    },
+    {
+      "id": 4,
+      "names": {
+        "en": "Travel Guides",
+        "de": "Reiseführer",
+        "es": "Guías de viaje"
+      }
+    },
+    {
+      "id": 5,
+      "names": {
+        "en": "Science",
+        "de": "Wissenschaft",
+        "es": "Ciencia"
+      }
+    },
+    {
+      "id": 6,
+      "names": {
+        "en": "Traveller Stories",
+        "de": "Reiseberichte",
+        "es": "Relatos de viaje"
+      }
+    }
+  ],
+  "authors": [
+    {
+      "id": 1,
+      "firstname": "Liora",
+      "lastname": "Venn",
+      "title": "Destinations editor",
+      "descriptions": {
+        "en": "Has crossed the Reach eleven times and still books the window seat. Writes about places, and the people who keep them running.",
+        "de": "Hat die Weite elfmal durchquert und bucht noch immer den Fensterplatz. Schreibt über Orte und die Menschen, die sie am Laufen halten.",
+        "es": "Ha cruzado el Alcance once veces y sigue reservando la ventanilla. Escribe sobre lugares y sobre quienes los mantienen en marcha."
+      }
+    },
+    {
+      "id": 2,
+      "firstname": "Tomas",
+      "lastname": "Arkwright",
+      "title": "Ships and engineering",
+      "descriptions": {
+        "en": "Spent nine years inspecting hulls at the Halcyon yards before he started writing about what he found inside them.",
+        "de": "Prüfte neun Jahre lang Schiffsrümpfe auf den Halcyon-Werften, bevor er über das zu schreiben begann, was er darin fand.",
+        "es": "Pasó nueve años inspeccionando cascos en los astilleros de Halcyon antes de escribir sobre lo que encontraba dentro."
+      }
+    },
+    {
+      "id": 3,
+      "firstname": "Ilse",
+      "lastname": "Marrow",
+      "title": "Science correspondent",
+      "descriptions": {
+        "en": "Trained as a planetary geologist. Explains why things in space behave the way they do, preferably with a diagram.",
+        "de": "Ausgebildete Planetengeologin. Erklärt, warum sich Dinge im All so verhalten, wie sie es tun, am liebsten mit einer Skizze.",
+        "es": "Geóloga planetaria de formación. Explica por qué las cosas se comportan así en el espacio, a ser posible con un esquema."
+      }
+    },
+    {
+      "id": 4,
+      "firstname": "Dev",
+      "lastname": "Castellan",
+      "title": "Practical travel",
+      "descriptions": {
+        "en": "Once ran a hostel next to the Port Kestrel launch pads. Writes the guides he wishes his guests had read.",
+        "de": "Führte einst ein Hostel neben den Startrampen von Port Kestrel. Schreibt die Reiseführer, die seine Gäste hätten lesen sollen.",
+        "es": "Regentó un albergue junto a las plataformas de Port Kestrel. Escribe las guías que le habría gustado que leyeran sus huéspedes."
+      }
+    }
+  ],
+  "tags": {
+    "veyra": {
+      "de": "Veyra",
+      "es": "Veyra"
+    },
+    "tessaly": {
+      "de": "Tessaly",
+      "es": "Tessaly"
+    },
+    "orrin": {
+      "de": "Orrin",
+      "es": "Orrin"
+    },
+    "halcyon-station": {
+      "de": "Halcyon-Station",
+      "es": "Estación Halcyon"
+    },
+    "port-kestrel": {
+      "de": "Port Kestrel",
+      "es": "Port Kestrel"
+    },
+    "lantern-belt": {
+      "de": "Laternengürtel",
+      "es": "Cinturón Linterna"
+    },
+    "zero-g": {
+      "de": "Schwerelosigkeit",
+      "es": "Gravedad cero"
+    },
+    "budget": {
+      "de": "Sparsam reisen",
+      "es": "Viajar barato"
+    },
+    "family": {
+      "de": "Familie",
+      "es": "Familia"
+    },
+    "first-flight": {
+      "de": "Erster Flug",
+      "es": "Primer vuelo"
+    },
+    "packing": {
+      "de": "Packen",
+      "es": "Equipaje"
+    },
+    "health": {
+      "de": "Gesundheit",
+      "es": "Salud"
+    },
+    "cruise": {
+      "de": "Kreuzfahrt",
+      "es": "Crucero"
+    },
+    "photography": {
+      "de": "Fotografie",
+      "es": "Fotografía"
+    },
+    "explainer": {
+      "de": "Erklärt",
+      "es": "Explicado"
+    },
+    "how-to": {
+      "de": "Anleitung",
+      "es": "Cómo hacerlo"
+    },
+    "interview": {
+      "de": "Interview",
+      "es": "Entrevista"
+    }
+  },
+  "images": [
+    {
+      "key": "launch-climb",
+      "motif": "rocket",
+      "colours": [
+        "#070b1a",
+        "#1d2b53",
+        "#ff7b00"
+      ],
+      "captions": {
+        "en": "A rocket climbing on a bright trail."
+      },
+      "alts": {
+        "en": "Illustration: a white rocket climbing diagonally on an orange exhaust trail through a starry sky.",
+        "de": "Illustration: Eine weiße Rakete steigt auf einer orangefarbenen Abgasspur durch einen Sternenhimmel.",
+        "es": "Ilustración: un cohete blanco asciende en diagonal sobre una estela naranja en un cielo estrellado."
+      }
+    },
+    {
+      "key": "veyra-geysers",
+      "motif": "moonscape",
+      "colours": [
+        "#05070f",
+        "#3d4a5c",
+        "#9ad1f5"
+      ],
+      "captions": {
+        "en": "An icy horizon under a pale blue world."
+      },
+      "alts": {
+        "en": "Illustration: a grey cratered horizon with a large pale blue world rising behind it.",
+        "de": "Illustration: Ein grauer, verkraterter Horizont, hinter dem eine große hellblaue Welt aufgeht.",
+        "es": "Ilustración: un horizonte gris lleno de cráteres con un gran mundo azul pálido saliendo tras él."
+      }
+    },
+    {
+      "key": "halcyon-ring",
+      "motif": "station",
+      "colours": [
+        "#030712",
+        "#111c34",
+        "#4cc9f0"
+      ],
+      "captions": {
+        "en": "A station with wide blue solar wings."
+      },
+      "alts": {
+        "en": "Illustration: a space station of white modules on a truss between two pairs of blue solar wings.",
+        "de": "Illustration: Eine Raumstation aus weißen Modulen an einem Träger zwischen zwei Paar blauer Solarflügel.",
+        "es": "Ilustración: una estación espacial de módulos blancos sobre una viga entre dos pares de alas solares azules."
+      }
+    },
+    {
+      "key": "halcyon-dock",
+      "motif": "station",
+      "colours": [
+        "#0a0f1f",
+        "#1f2a44",
+        "#f4a261"
+      ],
+      "captions": {
+        "en": "The station's docking side, wings in amber."
+      },
+      "alts": {
+        "en": "Illustration: a space station with amber solar wings against a dark starfield.",
+        "de": "Illustration: Eine Raumstation mit bernsteinfarbenen Solarflügeln vor einem dunklen Sternenfeld.",
+        "es": "Ilustración: una estación espacial con alas solares ámbar sobre un campo de estrellas oscuro."
+      }
+    },
+    {
+      "key": "tessaly-transfer",
+      "motif": "planet",
+      "colours": [
+        "#04060d",
+        "#141a33",
+        "#e09f3e"
+      ],
+      "captions": {
+        "en": "A ringed amber planet, half in shadow."
+      },
+      "alts": {
+        "en": "Illustration: a banded amber planet with a thin white ring, its right half in shadow, a small moon above.",
+        "de": "Illustration: Ein gestreifter bernsteinfarbener Planet mit dünnem weißem Ring, rechts im Schatten, darüber ein kleiner Mond.",
+        "es": "Ilustración: un planeta ámbar con bandas y un fino anillo blanco, la mitad derecha en sombra y una luna pequeña encima."
+      }
+    },
+    {
+      "key": "packing-cubes",
+      "motif": "grid",
+      "colours": [
+        "#0d1326",
+        "#1d2b53",
+        "#f2c14e"
+      ],
+      "captions": {
+        "en": "Rows of dark tiles, a few lit in gold."
+      },
+      "alts": {
+        "en": "Illustration: a grid of dark blue tiles, a few of them lit in gold, like packed storage cubes.",
+        "de": "Illustration: Ein Raster dunkelblauer Kacheln, einige golden erleuchtet, wie gepackte Staufächer.",
+        "es": "Ilustración: una cuadrícula de baldosas azul oscuro, algunas iluminadas en dorado, como cajas de equipaje."
+      }
+    },
+    {
+      "key": "belt-pilots",
+      "motif": "asteroids",
+      "colours": [
+        "#06070d",
+        "#2b2d42",
+        "#ffb703"
+      ],
+      "captions": {
+        "en": "Rocks tumbling across the dark."
+      },
+      "alts": {
+        "en": "Illustration: irregular grey and amber rocks scattered across a starfield.",
+        "de": "Illustration: Unregelmäßige graue und bernsteinfarbene Felsbrocken verstreut vor einem Sternenfeld.",
+        "es": "Ilustración: rocas irregulares grises y ámbar dispersas sobre un campo de estrellas."
+      }
+    },
+    {
+      "key": "belt-rocks",
+      "motif": "asteroids",
+      "colours": [
+        "#0b0d18",
+        "#3a3d55",
+        "#8ecae6"
+      ],
+      "captions": {
+        "en": "A field of rocks in cold light."
+      },
+      "alts": {
+        "en": "Illustration: a field of grey rocks lit in pale blue, stars behind them.",
+        "de": "Illustration: Ein Feld grauer Felsen in blassblauem Licht, dahinter Sterne.",
+        "es": "Ilustración: un campo de rocas grises con luz azul pálida y estrellas detrás."
+      }
+    },
+    {
+      "key": "morning-lark",
+      "motif": "starfield",
+      "colours": [
+        "#05070f",
+        "#1b2140",
+        "#8ecae6"
+      ],
+      "captions": {
+        "en": "A bright band of stars across the sky."
+      },
+      "alts": {
+        "en": "Illustration: a soft pale band of stars running diagonally across a deep blue sky.",
+        "de": "Illustration: Ein weiches, helles Sternenband zieht sich diagonal über einen tiefblauen Himmel.",
+        "es": "Ilustración: una suave franja clara de estrellas cruza en diagonal un cielo azul profundo."
+      }
+    },
+    {
+      "key": "inner-ear",
+      "motif": "circles",
+      "colours": [
+        "#1b1035",
+        "#3c1f6e",
+        "#f7b2d9"
+      ],
+      "captions": {
+        "en": "Overlapping circles in violet and pink."
+      },
+      "alts": {
+        "en": "Illustration: overlapping translucent circles in violet with a few in pink.",
+        "de": "Illustration: Sich überlagernde durchscheinende Kreise in Violett, einige in Rosa.",
+        "es": "Ilustración: círculos translúcidos superpuestos en violeta, algunos en rosa."
+      }
+    },
+    {
+      "key": "orrin-canyons",
+      "motif": "peaks",
+      "colours": [
+        "#5c2a1c",
+        "#a1522f",
+        "#ffd6a5"
+      ],
+      "captions": {
+        "en": "Layered red ridges under a pale sun."
+      },
+      "alts": {
+        "en": "Illustration: layered red-brown ridges like canyon walls, a pale sun above them.",
+        "de": "Illustration: Geschichtete rotbraune Grate wie Canyonwände, darüber eine blasse Sonne.",
+        "es": "Ilustración: crestas rojizas en capas como paredes de un cañón, con un sol pálido encima."
+      }
+    },
+    {
+      "key": "orrin-dusk",
+      "motif": "peaks",
+      "colours": [
+        "#2b1b33",
+        "#7a3b45",
+        "#f4a261"
+      ],
+      "captions": {
+        "en": "Ridges at dusk, the sun low and orange."
+      },
+      "alts": {
+        "en": "Illustration: dark ridges at dusk under a low orange sun.",
+        "de": "Illustration: Dunkle Grate in der Abenddämmerung unter einer tief stehenden orangefarbenen Sonne.",
+        "es": "Ilustración: crestas oscuras al atardecer bajo un sol naranja y bajo."
+      }
+    },
+    {
+      "key": "kestrel-port",
+      "motif": "grid",
+      "colours": [
+        "#0a0f1f",
+        "#16213e",
+        "#4cc9f0"
+      ],
+      "captions": {
+        "en": "A night grid of lit windows."
+      },
+      "alts": {
+        "en": "Illustration: a grid of dark tiles with some lit in cyan, like a terminal at night.",
+        "de": "Illustration: Ein Raster dunkler Kacheln, einige cyan erleuchtet, wie ein Terminal bei Nacht.",
+        "es": "Ilustración: una cuadrícula de baldosas oscuras, algunas iluminadas en cian, como una terminal de noche."
+      }
+    },
+    {
+      "key": "tessaly-rings",
+      "motif": "planet",
+      "colours": [
+        "#05050c",
+        "#1c1530",
+        "#c9a227"
+      ],
+      "captions": {
+        "en": "A golden planet inside its ring."
+      },
+      "alts": {
+        "en": "Illustration: a golden ringed planet with a dark night side and a small moon nearby.",
+        "de": "Illustration: Ein goldener Ringplanet mit dunkler Nachtseite und einem kleinen Mond in der Nähe.",
+        "es": "Ilustración: un planeta dorado con anillo, su lado nocturno oscuro y una luna pequeña cerca."
+      }
+    },
+    {
+      "key": "suit-fitting",
+      "motif": "stripes",
+      "colours": [
+        "#101828",
+        "#24324f",
+        "#ff9f1c"
+      ],
+      "captions": {
+        "en": "Diagonal bands, one of them orange."
+      },
+      "alts": {
+        "en": "Illustration: diagonal bands in dark blue with a few in bright orange.",
+        "de": "Illustration: Diagonale Bänder in Dunkelblau, einige in leuchtendem Orange.",
+        "es": "Ilustración: franjas diagonales en azul oscuro con algunas en naranja intenso."
+      }
+    },
+    {
+      "key": "family-window",
+      "motif": "orbit",
+      "colours": [
+        "#03071e",
+        "#1b263b",
+        "#90e0ef"
+      ],
+      "captions": {
+        "en": "A small planet inside its orbits."
+      },
+      "alts": {
+        "en": "Illustration: a light blue planet at the centre of faint elliptical orbits, stars around.",
+        "de": "Illustration: Ein hellblauer Planet in der Mitte schwacher elliptischer Bahnen, ringsum Sterne.",
+        "es": "Ilustración: un planeta azul claro en el centro de tenues órbitas elípticas, rodeado de estrellas."
+      }
+    },
+    {
+      "key": "belt-meteors",
+      "motif": "nebula",
+      "colours": [
+        "#0b0420",
+        "#2c0f4a",
+        "#f72585"
+      ],
+      "captions": {
+        "en": "Clouds of violet and pink light."
+      },
+      "alts": {
+        "en": "Illustration: soft clouds of violet and pink light scattered with stars.",
+        "de": "Illustration: Weiche Wolken aus violettem und rosa Licht, übersät mit Sternen.",
+        "es": "Ilustración: nubes suaves de luz violeta y rosa salpicadas de estrellas."
+      }
+    },
+    {
+      "key": "galley",
+      "motif": "circles",
+      "colours": [
+        "#3d1f12",
+        "#7a3e1d",
+        "#ffd166"
+      ],
+      "captions": {
+        "en": "Warm discs in amber and cream."
+      },
+      "alts": {
+        "en": "Illustration: overlapping discs in warm amber and cream tones.",
+        "de": "Illustration: Sich überlagernde Scheiben in warmen Bernstein- und Cremetönen.",
+        "es": "Ilustración: discos superpuestos en tonos cálidos ámbar y crema."
+      }
+    },
+    {
+      "key": "cabin-window",
+      "motif": "starfield",
+      "colours": [
+        "#060814",
+        "#20264a",
+        "#ffd6a5"
+      ],
+      "captions": {
+        "en": "A starry band seen from a cabin."
+      },
+      "alts": {
+        "en": "Illustration: a band of stars with a warm glow, as seen through a window.",
+        "de": "Illustration: Ein Sternenband mit warmem Schimmer, wie durch ein Fenster gesehen.",
+        "es": "Ilustración: una franja de estrellas con un brillo cálido, vista como desde una ventana."
+      }
+    },
+    {
+      "key": "veyra-dawn",
+      "motif": "moonscape",
+      "colours": [
+        "#06080f",
+        "#4a5568",
+        "#ffd6a5"
+      ],
+      "captions": {
+        "en": "A pale sun rising over an icy plain."
+      },
+      "alts": {
+        "en": "Illustration: a cratered grey plain with a pale yellow sun rising over it.",
+        "de": "Illustration: Eine verkraterte graue Ebene, über der eine blassgelbe Sonne aufgeht.",
+        "es": "Ilustración: una llanura gris con cráteres sobre la que sale un sol amarillo pálido."
+      }
+    },
+    {
+      "key": "veyra-ice",
+      "motif": "nebula",
+      "colours": [
+        "#041322",
+        "#0b3c5d",
+        "#9ad1f5"
+      ],
+      "captions": {
+        "en": "Cold blue light, like ice in mist."
+      },
+      "alts": {
+        "en": "Illustration: soft clouds of cold blue light, like ice seen through mist.",
+        "de": "Illustration: Weiche Wolken kalten blauen Lichts, wie Eis im Nebel.",
+        "es": "Ilustración: nubes suaves de luz azul fría, como hielo visto entre la niebla."
+      }
+    },
+    {
+      "key": "transfer-timetable",
+      "motif": "orbit",
+      "colours": [
+        "#0d0a1f",
+        "#241b45",
+        "#f4a261"
+      ],
+      "captions": {
+        "en": "Orbits around an orange world."
+      },
+      "alts": {
+        "en": "Illustration: an orange planet at the centre of several elliptical orbits.",
+        "de": "Illustration: Ein orangefarbener Planet in der Mitte mehrerer elliptischer Bahnen.",
+        "es": "Ilustración: un planeta naranja en el centro de varias órbitas elípticas."
+      }
+    },
+    {
+      "key": "halcyon-promenade",
+      "motif": "station",
+      "colours": [
+        "#020611",
+        "#0f2230",
+        "#2ec4b6"
+      ],
+      "captions": {
+        "en": "A station with teal solar wings."
+      },
+      "alts": {
+        "en": "Illustration: a space station with teal solar wings and a row of white modules.",
+        "de": "Illustration: Eine Raumstation mit türkisfarbenen Solarflügeln und einer Reihe weißer Module.",
+        "es": "Ilustración: una estación espacial con alas solares turquesa y una fila de módulos blancos."
+      }
+    },
+    {
+      "key": "clear-stars",
+      "motif": "starfield",
+      "colours": [
+        "#02030a",
+        "#0f1630",
+        "#ffffff"
+      ],
+      "captions": {
+        "en": "Steady stars on a black sky."
+      },
+      "alts": {
+        "en": "Illustration: a dense field of steady white stars and a faint pale band across a black sky.",
+        "de": "Illustration: Ein dichtes Feld ruhiger weißer Sterne und ein schwaches helles Band über schwarzem Himmel.",
+        "es": "Ilustración: un campo denso de estrellas blancas fijas y una franja tenue sobre un cielo negro."
+      }
+    }
+  ],
+  "articles": [
+    {
+      "id": 1,
+      "daysAgo": 22,
+      "hour": 8,
+      "counter": 312,
+      "categories": [
+        4
+      ],
+      "authors": [
+        4
+      ],
+      "images": [
+        "launch-climb"
+      ],
+      "tags": [
+        "first-flight",
+        "how-to",
+        "health"
+      ],
+      "titles": {
+        "en": "Ten things to know before your first orbital flight"
+      },
+      "descriptions": {
+        "en": "What the brochure leaves out: the seat, the waiting, the first minute without weight, and the one thing to eat beforehand."
+      },
+      "bodies": {
+        "en": "<p class=\"body-lead\">Your first orbital flight is mostly waiting, then eight very loud minutes, then the strangest quiet of your life. A little preparation makes all three easier.</p>\n<h2>Before the day</h2>\n<ol>\n<li><strong>Sleep normally.</strong> Staying up to watch launch footage does not help.</li>\n<li><strong>Eat light.</strong> Plain bread two hours before boarding; nothing fizzy.</li>\n<li><strong>Dress in layers.</strong> Cabins are cool at the pad and warm in orbit.</li>\n</ol>\n<h2>On board</h2>\n<p>Strap in early, even if the crew says there is time. The seat is shaped for your back under load, not for sitting upright.</p>\n<div class=\"body-callout\"><p>When the engines stop, keep your head still for a full minute. Most space sickness starts with someone turning to look out of the window.</p></div>\n<p>After that, look all you like. The view is the reason you came.</p>"
+      }
+    },
+    {
+      "id": 2,
+      "daysAgo": 20,
+      "hour": 11,
+      "counter": 198,
+      "categories": [
+        1
+      ],
+      "authors": [
+        1
+      ],
+      "images": [
+        "veyra-geysers"
+      ],
+      "tags": [
+        "veyra",
+        "photography"
+      ],
+      "titles": {
+        "en": "Veyra: walking among the ice geysers"
+      },
+      "descriptions": {
+        "en": "On Veyra's southern plains the ground breathes every forty minutes. A guided walk to the geyser fields, and how not to miss an eruption."
+      },
+      "bodies": {
+        "en": "<p class=\"body-lead\">Veyra is a small, cold moon, and for most of the day it looks it. Then, every forty minutes or so, the plain in front of you exhales a column of ice a kilometre high.</p>\n<p>The geyser walks leave from the Southpole Hab twice a day. Guides carry a pressure map of the field and will stop the group well before a vent opens.</p>\n<blockquote class=\"body-pullquote\">The plain in front of you exhales a column of ice a kilometre high.</blockquote>\n<div class=\"body-facts\"><h3>Good to know</h3><ul><li>Walks last three hours, suits included.</li><li>Eruptions are quiet: watch the frost, not your ears.</li><li>Bring a spare battery; cold drains them fast.</li></ul></div>\n<p>Photographers should set exposure for the bright column, not the dark ground. The ice falls back slowly in the low gravity, and the best pictures come in the minute after the eruption, not during it.</p>"
+      }
+    },
+    {
+      "id": 3,
+      "daysAgo": 19,
+      "hour": 15,
+      "counter": 167,
+      "categories": [
+        2
+      ],
+      "authors": [
+        2
+      ],
+      "images": [
+        "halcyon-ring",
+        "halcyon-dock"
+      ],
+      "tags": [
+        "halcyon-station"
+      ],
+      "titles": {
+        "en": "Inside Halcyon Station's new arrivals ring"
+      },
+      "descriptions": {
+        "en": "The busiest station in the Reach has rebuilt the place where every journey starts. We walked the new ring before it opened."
+      },
+      "bodies": {
+        "en": "<p class=\"body-lead\">Halcyon Station handles more passengers than any port in the Reach, and until this year most of them met it in a corridor designed for cargo.</p>\n<p>The new arrivals ring replaces that corridor with a wide, slowly spinning hall. Its gentle spin gives about a third of normal weight, enough for luggage to stay where you put it.</p>\n<h2>What changes for travellers</h2>\n<ul>\n<li>Docking to the hall takes twelve minutes instead of forty.</li>\n<li>Connections are announced on the floor itself, in light.</li>\n<li>There are, at last, enough seats.</li>\n</ul>\n<div class=\"body-callout\"><p>The old cargo corridor stays open for crew. If a ticket says Gate C, it still means the old way round.</p></div>\n<p>The engineers' favourite detail is less visible: the ring can be balanced while it turns, so it never has to stop for maintenance.</p>"
+      }
+    },
+    {
+      "id": 4,
+      "daysAgo": 17,
+      "hour": 9,
+      "counter": 241,
+      "categories": [
+        5
+      ],
+      "authors": [
+        3
+      ],
+      "images": [
+        "tessaly-transfer"
+      ],
+      "tags": [
+        "tessaly",
+        "explainer"
+      ],
+      "titles": {
+        "en": "Why the trip to Tessaly takes nine days, not three"
+      },
+      "descriptions": {
+        "en": "A faster engine exists. So why does every liner still take the long way? A short lesson in orbits, fuel and patience."
+      },
+      "bodies": {
+        "en": "<p class=\"body-lead\">Tessaly is close enough that a determined ship could reach it in three days. Every scheduled liner takes nine. The reason is not comfort; it is fuel.</p>\n<h2>Falling, mostly</h2>\n<p>Ships in the Reach do not drive in straight lines. They burn their engines briefly, then coast along a curved path, falling around the sun until the target world catches up with them.</p>\n<blockquote class=\"body-pullquote\">A ship does not drive to Tessaly. It falls there, carefully.</blockquote>\n<p>The nine-day path needs two short burns. A three-day path needs the engines running for most of the trip, and about six times the fuel.</p>\n<div class=\"body-facts\"><h3>In numbers</h3><ul><li>Nine-day transfer: two burns, under an hour in total.</li><li>Three-day transfer: thirty hours of burning.</li><li>Ticket price: roughly the same ratio.</li></ul></div>\n<p>So the long way is the cheap way, and on a liner with a good window it is also the better one.</p>"
+      }
+    },
+    {
+      "id": 5,
+      "daysAgo": 16,
+      "hour": 13,
+      "counter": 184,
+      "categories": [
+        4
+      ],
+      "authors": [
+        4
+      ],
+      "images": [
+        "packing-cubes"
+      ],
+      "tags": [
+        "packing",
+        "zero-g",
+        "how-to"
+      ],
+      "titles": {
+        "en": "Packing for zero gravity: what floats, what fails"
+      },
+      "descriptions": {
+        "en": "Loose things wander, liquids misbehave and zips become your best friend. A practical list for a week without weight."
+      },
+      "bodies": {
+        "en": "<p>In zero gravity everything you own wants to leave. Packing well means giving each thing a place it cannot drift out of.</p>\n<h2>Bring</h2>\n<ul>\n<li><strong>Bags that zip shut.</strong> Open pockets empty themselves within a day.</li>\n<li><strong>Clothes rolled, not folded.</strong> They stay together when they float.</li>\n<li><strong>A small mesh net.</strong> For the things you use every hour.</li>\n</ul>\n<h2>Leave behind</h2>\n<ul>\n<li>Powder of any kind. It ends up in the air filters, and in your eyes.</li>\n<li>Glass bottles. Use the soft pouches the ship provides.</li>\n</ul>\n<div class=\"body-callout\"><p>Put your sleep mask and earplugs in the same pocket every time. You will want them in the dark, and in zero gravity there is no bedside table to find them on.</p></div>"
+      }
+    },
+    {
+      "id": 6,
+      "daysAgo": 15,
+      "hour": 18,
+      "counter": 133,
+      "categories": [
+        6
+      ],
+      "authors": [
+        1
+      ],
+      "images": [
+        "belt-pilots",
+        "belt-rocks"
+      ],
+      "tags": [
+        "lantern-belt",
+        "interview"
+      ],
+      "titles": {
+        "en": "The quiet art of the Lantern Belt pilots"
+      },
+      "descriptions": {
+        "en": "They steer tourist skiffs through a field of drifting rock and rarely raise their voices. Three pilots on patience, rocks and passengers."
+      },
+      "bodies": {
+        "en": "<p class=\"body-lead\">The Lantern Belt is a slow river of stone, and the pilots who take visitors into it talk about it the way old sailors talk about tides.</p>\n<p>Nobody steers by sight. The skiffs follow lanes worked out the night before, and a pilot's real work is watching for the rock that has wandered out of its lane.</p>\n<blockquote class=\"body-pullquote\">You do not dodge a rock. You arrive somewhere it has already left.</blockquote>\n<p>Asked about their worst day, all three pilots we met described the same thing: not a near miss, but a passenger who would not stay strapped in.</p>\n<div class=\"body-facts\"><h3>Taking a skiff tour</h3><ul><li>Tours leave from the Belt Lantern platform, four hours each.</li><li>Children over eight are welcome.</li><li>The best views are on the night side of the belt.</li></ul></div>"
+      }
+    },
+    {
+      "id": 7,
+      "daysAgo": 14,
+      "hour": 10,
+      "counter": 156,
+      "categories": [
+        3
+      ],
+      "authors": [
+        2
+      ],
+      "images": [
+        "morning-lark"
+      ],
+      "tags": [
+        "cruise"
+      ],
+      "titles": {
+        "en": "Morning Lark: a week aboard the slowest liner in the Reach"
+      },
+      "descriptions": {
+        "en": "The Aster Line's oldest ship takes eleven days where others take nine. Its passengers would not have it any other way."
+      },
+      "bodies": {
+        "en": "<p class=\"body-lead\">The Morning Lark is old, slow and almost always full. It takes eleven days to reach Tessaly, two more than any other liner, and its regulars book a year ahead.</p>\n<p>The reason is the observation deck: a single curved window the length of the ship, built at a time when nobody had yet decided windows were a weakness.</p>\n<h2>Life on board</h2>\n<p>The Lark spins slowly for a little weight, enough to eat at tables and sleep in beds. Evenings belong to the deck, where the crew dims every light at the same hour and the stars do the rest.</p>\n<div class=\"body-callout\"><p>Cabins on the Lark have no windows of their own. If you want a view, you go and share it, which is rather the point.</p></div>\n<p>The ship retires in three years. Its replacement will be faster, and the regulars are already complaining.</p>"
+      }
+    },
+    {
+      "id": 8,
+      "daysAgo": 13,
+      "hour": 16,
+      "counter": 219,
+      "categories": [
+        5
+      ],
+      "authors": [
+        3
+      ],
+      "images": [
+        "inner-ear"
+      ],
+      "tags": [
+        "health",
+        "explainer"
+      ],
+      "titles": {
+        "en": "Space sickness, explained, and what actually helps"
+      },
+      "descriptions": {
+        "en": "Your inner ear expects gravity and does not find it. Why that makes half of all travellers queasy, and the habits that shorten it."
+      },
+      "bodies": {
+        "en": "<p>About half of all first-time travellers feel sick in their first day without weight. It is not weakness and it is not the food. It is a disagreement inside your head.</p>\n<h2>What is going on</h2>\n<p>Your inner ear tells your brain which way is down. In orbit it has nothing to report, while your eyes still see a floor and a ceiling. The brain, receiving two stories, responds the way it would to poison.</p>\n<blockquote class=\"body-pullquote\">The brain, receiving two stories, responds the way it would to poison.</blockquote>\n<h2>What helps</h2>\n<ul>\n<li>Keep your head still and move your body around it.</li>\n<li>Choose one surface to call the floor, and keep your feet towards it.</li>\n<li>Sip water; skip the coffee for the first day.</li>\n</ul>\n<p>For most people it fades within two days, as the brain learns to ignore the ear.</p>"
+      }
+    },
+    {
+      "id": 9,
+      "daysAgo": 12,
+      "hour": 7,
+      "counter": 176,
+      "categories": [
+        1
+      ],
+      "authors": [
+        1
+      ],
+      "images": [
+        "orrin-canyons",
+        "orrin-dusk"
+      ],
+      "tags": [
+        "orrin",
+        "how-to"
+      ],
+      "titles": {
+        "en": "Orrin's canyon rim trail, step by step"
+      },
+      "descriptions": {
+        "en": "Forty kilometres of red rock, low gravity and very long shadows. How to walk Orrin's most famous trail in three days."
+      },
+      "bodies": {
+        "en": "<p class=\"body-lead\">Orrin is a desert world with a third of normal gravity, which makes its great canyon both easier and stranger to walk than any on the home worlds.</p>\n<h2>Day one: Redgate to the Shelf</h2>\n<p>The trail starts gently along the northern rim. Low gravity tempts walkers to bound; resist it, because landing on loose stone is where most injuries happen.</p>\n<h2>Day two: the Long Shadow</h2>\n<p>The middle section runs along a ledge that sits in shade for most of the day. It is the coolest part of the walk and the one with the best views down.</p>\n<h2>Day three: down to the river bed</h2>\n<p>A switchback descent to the dry river, where the shuttle waits.</p>\n<div class=\"body-facts\"><h3>Plan ahead</h3><ul><li>Permits are needed; book at the Redgate office.</li><li>Carry four litres of water a day.</li><li>Huts at the Shelf and the Long Shadow sleep twelve each.</li></ul></div>"
+      }
+    },
+    {
+      "id": 10,
+      "daysAgo": 11,
+      "hour": 12,
+      "counter": 202,
+      "categories": [
+        2
+      ],
+      "authors": [
+        4
+      ],
+      "images": [
+        "kestrel-port"
+      ],
+      "tags": [
+        "port-kestrel",
+        "budget"
+      ],
+      "titles": {
+        "en": "Port Kestrel on a budget"
+      },
+      "descriptions": {
+        "en": "The Reach's busiest surface port is expensive if you let it be. Where to sleep, eat and wait for a launch without paying orbit prices."
+      },
+      "bodies": {
+        "en": "<p>Port Kestrel exists to send people upwards, and almost everything near the launch pads is priced for people with a ticket to orbit. With a little planning you can spend a day there for a fraction of that.</p>\n<h2>Sleep</h2>\n<p>Skip the pad-side hotels. The old town, two stops away on the tram, has guest houses at a third of the price and a quieter night.</p>\n<h2>Eat</h2>\n<p>The crew canteen on Level 2 is open to the public after the morning shift. The food is plain, hot and cheap.</p>\n<div class=\"body-callout\"><p>Launch viewing from the public terrace is free. Arrive an hour early; the terrace fills quickly on clear days.</p></div>\n<h2>Wait</h2>\n<p>If your launch slips, ask for a lounge pass at the desk. Many travellers never do, and the airline would rather you were comfortable than queuing.</p>"
+      }
+    },
+    {
+      "id": 11,
+      "daysAgo": 10,
+      "hour": 19,
+      "counter": 288,
+      "categories": [
+        1
+      ],
+      "authors": [
+        3
+      ],
+      "images": [
+        "tessaly-rings"
+      ],
+      "tags": [
+        "tessaly",
+        "photography"
+      ],
+      "titles": {
+        "en": "Seeing the rings of Tessaly from the inside",
+        "de": "Die Ringe von Tessaly von innen sehen",
+        "es": "Ver los anillos de Tessaly desde dentro"
+      },
+      "descriptions": {
+        "en": "From a distance they look solid. Up close the rings of Tessaly are a slow snowfall of ice, and a new tour lets visitors drift through them.",
+        "de": "Aus der Ferne wirken sie fest. Aus der Nähe sind die Ringe von Tessaly ein langsamer Schneefall aus Eis, und eine neue Tour lässt Besucher hindurchgleiten.",
+        "es": "De lejos parecen sólidos. De cerca, los anillos de Tessaly son una lenta nevada de hielo, y una nueva excursión permite atravesarlos."
+      },
+      "bodies": {
+        "en": "<p class=\"body-lead\">From the window of an arriving liner the rings of Tessaly look like a solid road of gold. Up close they are nothing of the kind.</p>\n<p>The rings are made of ice, in pieces from grains of sand to rooms. A new tour from the Tessaly Ring Platform takes small groups into the thinnest part, where the pieces drift past a few metres apart.</p>\n<blockquote class=\"body-pullquote\">It is like standing still in a snowfall that never lands.</blockquote>\n<p>The shuttle matches the ring's speed exactly, so the ice barely moves against it. Guests watch from a domed cabin; nobody leaves the shuttle.</p>\n<div class=\"body-facts\"><h3>The tour</h3><ul><li>Two hours, four departures a day.</li><li>Best light: the hour after Tessaly's shadow passes.</li><li>Cameras welcome, flash not.</li></ul></div>",
+        "de": "<p class=\"body-lead\">Vom Fenster eines ankommenden Linienschiffs aus sehen die Ringe von Tessaly aus wie eine feste Straße aus Gold. Aus der Nähe sind sie nichts dergleichen.</p>\n<p>Die Ringe bestehen aus Eis, in Stücken von der Größe eines Sandkorns bis zu der eines Zimmers. Eine neue Tour von der Tessaly-Ringplattform bringt kleine Gruppen in den dünnsten Teil, wo die Stücke wenige Meter voneinander entfernt vorbeitreiben.</p>\n<blockquote class=\"body-pullquote\">Es ist, als stünde man still in einem Schneefall, der nie landet.</blockquote>\n<p>Das Shuttle passt sich der Geschwindigkeit des Rings genau an, sodass sich das Eis kaum dagegen bewegt. Die Gäste schauen aus einer Kuppelkabine zu; niemand verlässt das Shuttle.</p>\n<div class=\"body-facts\"><h3>Die Tour</h3><ul><li>Zwei Stunden, vier Abfahrten am Tag.</li><li>Bestes Licht: die Stunde, nachdem Tessalys Schatten vorüber ist.</li><li>Kameras willkommen, Blitz nicht.</li></ul></div>",
+        "es": "<p class=\"body-lead\">Desde la ventana de un crucero que llega, los anillos de Tessaly parecen un camino sólido de oro. De cerca no son nada parecido.</p>\n<p>Los anillos son de hielo, en trozos que van del tamaño de un grano de arena al de una habitación. Una nueva excursión desde la Plataforma del Anillo de Tessaly lleva a grupos pequeños a la parte más fina, donde los trozos pasan a pocos metros unos de otros.</p>\n<blockquote class=\"body-pullquote\">Es como estar quieto en una nevada que nunca llega al suelo.</blockquote>\n<p>La lanzadera iguala exactamente la velocidad del anillo, así que el hielo apenas se mueve respecto a ella. Los visitantes miran desde una cabina con cúpula; nadie sale de la lanzadera.</p>\n<div class=\"body-facts\"><h3>La excursión</h3><ul><li>Dos horas, cuatro salidas al día.</li><li>La mejor luz: la hora después de que pase la sombra de Tessaly.</li><li>Cámaras bienvenidas, flash no.</li></ul></div>"
+      }
+    },
+    {
+      "id": 12,
+      "daysAgo": 9,
+      "hour": 14,
+      "counter": 121,
+      "categories": [
+        3
+      ],
+      "authors": [
+        2
+      ],
+      "images": [
+        "suit-fitting"
+      ],
+      "tags": [
+        "how-to"
+      ],
+      "titles": {
+        "en": "How a pressure suit is fitted"
+      },
+      "descriptions": {
+        "en": "A suit that is two centimetres too long will hurt within an hour. What happens at a fitting, and the questions worth asking."
+      },
+      "bodies": {
+        "en": "<p>Every surface excursion in the Reach starts in a fitting room. The suit you wear on Veyra or Orrin will be adjusted to you, and the half hour it takes is the most important part of the trip.</p>\n<h2>What gets measured</h2>\n<ul>\n<li><strong>Torso length.</strong> The single measurement that matters most.</li>\n<li><strong>Arm reach.</strong> Gloves that sit too far from your fingers make every task slow.</li>\n<li><strong>Boot size, with thick socks.</strong> Feet swell in low gravity.</li>\n</ul>\n<div class=\"body-callout\"><p>Say so if anything pinches. A pressure point that is mild on the bench becomes painful after an hour at full pressure.</p></div>\n<p>At the end of the fitting the suit is pressurised with you in it. Walk, kneel and reach for the floor before you sign anything.</p>"
+      }
+    },
+    {
+      "id": 13,
+      "daysAgo": 8,
+      "hour": 9,
+      "counter": 147,
+      "categories": [
+        4
+      ],
+      "authors": [
+        4
+      ],
+      "images": [
+        "family-window"
+      ],
+      "tags": [
+        "family",
+        "first-flight"
+      ],
+      "titles": {
+        "en": "Travelling the Reach with children"
+      },
+      "descriptions": {
+        "en": "Children adapt to weightlessness faster than adults and get bored much sooner. How to plan a family trip that everyone enjoys."
+      },
+      "bodies": {
+        "en": "<p class=\"body-lead\">Children are, as a rule, better at space travel than their parents. They adapt to weightlessness faster and complain about it less. What they do not do is sit still for nine days.</p>\n<h2>Choose the ship</h2>\n<p>Liners with a spinning section are easier with small children: meals at a table, a bed that stays put, and somewhere to run.</p>\n<h2>Plan the days</h2>\n<ul>\n<li>Book the window sessions in advance; children ask for them hourly.</li>\n<li>Bring games without small pieces. Small pieces float into air vents.</li>\n<li>Keep the usual bedtime, ship time.</li>\n</ul>\n<div class=\"body-callout\"><p>Most liners run a junior crew programme. It is free, it is popular, and it gives parents two quiet hours a day.</p></div>"
+      }
+    },
+    {
+      "id": 14,
+      "daysAgo": 7,
+      "hour": 21,
+      "counter": 263,
+      "categories": [
+        5
+      ],
+      "authors": [
+        3
+      ],
+      "images": [
+        "belt-meteors"
+      ],
+      "tags": [
+        "lantern-belt",
+        "photography"
+      ],
+      "titles": {
+        "en": "The night the Lantern Belt lit up"
+      },
+      "descriptions": {
+        "en": "A rare alignment sent a shower of dust from the Lantern Belt into Orrin's thin air. What caused the display, and when it may happen again."
+      },
+      "bodies": {
+        "en": "<p>For two hours last week the night sky over Orrin's western desert was full of falling light. Thousands of streaks, most of them violet, crossed the sky every minute.</p>\n<h2>Where the light came from</h2>\n<p>The Lantern Belt sheds fine dust as its rocks collide. Usually that dust drifts harmlessly between the worlds. Once every few decades Orrin passes through a dense stream of it.</p>\n<blockquote class=\"body-pullquote\">Each streak was a grain smaller than a sesame seed, burning in Orrin's thin air.</blockquote>\n<h2>Why violet</h2>\n<p>The belt's dust is rich in a mineral that glows violet when heated. Observers on the home worlds see the same streaks as white, because their thicker air burns the grains faster.</p>\n<p>The next pass through the stream is due in about nineteen years. Orrin's hotels have already started taking bookings.</p>"
+      }
+    },
+    {
+      "id": 15,
+      "daysAgo": 6,
+      "hour": 12,
+      "counter": 139,
+      "categories": [
+        6
+      ],
+      "authors": [
+        1
+      ],
+      "images": [
+        "galley"
+      ],
+      "tags": [
+        "zero-g",
+        "interview"
+      ],
+      "titles": {
+        "en": "A cook in orbit: three dishes that work without gravity"
+      },
+      "descriptions": {
+        "en": "Crumbs drift, sauces climb out of bowls and steam has nowhere to go. A station chef on the dishes that survive weightlessness."
+      },
+      "bodies": {
+        "en": "<p class=\"body-lead\">Ana Ferro has cooked on Halcyon Station for six years, in a galley where nothing stays in the pan unless she makes it.</p>\n<p>Her rules are simple: nothing that crumbs, nothing thin enough to splash, and everything served in something that closes.</p>\n<h2>Three dishes that work</h2>\n<ol>\n<li><strong>Thick stew.</strong> The thicker it is, the better it stays on the spoon.</li>\n<li><strong>Rolled flatbreads.</strong> No crumbs, and everything sealed inside.</li>\n<li><strong>Rice balls.</strong> Sticky rice holds together; loose grains are a week of cleaning.</li>\n</ol>\n<blockquote class=\"body-pullquote\">In orbit, a sauce is a decision you have to live with.</blockquote>\n<p>Her advice for travellers is shorter still: eat slowly, and keep your mouth closed while you chew.</p>"
+      }
+    },
+    {
+      "id": 16,
+      "daysAgo": 5,
+      "hour": 17,
+      "counter": 158,
+      "categories": [
+        3
+      ],
+      "authors": [
+        2
+      ],
+      "images": [
+        "cabin-window"
+      ],
+      "tags": [
+        "cruise",
+        "how-to"
+      ],
+      "titles": {
+        "en": "Choosing a cabin: windows, spin and noise"
+      },
+      "descriptions": {
+        "en": "On a nine-day crossing the cabin is most of the trip. What the deck plans do not say, and which cabins old hands ask for."
+      },
+      "bodies": {
+        "en": "<p>Deck plans show where a cabin is. They do not show what it is like to spend nine days in it. A few rules help.</p>\n<h2>Spin</h2>\n<p>On liners with a spinning section, cabins nearer the rim have more weight. More weight means a bed that feels like a bed, but also a stronger pull when you stand up.</p>\n<h2>Noise</h2>\n<p>Avoid cabins next to the air plant or above the engine bay, even if they are cheaper. The hum does not stop.</p>\n<h2>Windows</h2>\n<p>A cabin window is lovely and rarely necessary. The observation decks have the better view, and you will spend your evenings there anyway.</p>\n<div class=\"body-callout\"><p>Ask for a cabin in the middle of a corridor. Ends are closer to stairs, and stairs are where people talk at night.</p></div>"
+      }
+    },
+    {
+      "id": 17,
+      "daysAgo": 4,
+      "hour": 6,
+      "counter": 274,
+      "categories": [
+        1
+      ],
+      "authors": [
+        1
+      ],
+      "images": [
+        "veyra-dawn",
+        "veyra-ice"
+      ],
+      "tags": [
+        "veyra",
+        "photography"
+      ],
+      "titles": {
+        "en": "First light over Veyra's southern pole",
+        "de": "Erstes Licht über Veyras Südpol",
+        "es": "Primera luz sobre el polo sur de Veyra"
+      },
+      "descriptions": {
+        "en": "After a night of eleven years, the sun is rising over Veyra's south. Why it matters to the people who live there, and to visitors.",
+        "de": "Nach einer elf Jahre langen Nacht geht die Sonne über Veyras Süden auf. Warum das für die Menschen dort wichtig ist, und für Besucher.",
+        "es": "Tras una noche de once años, el sol sale sobre el sur de Veyra. Por qué importa a quienes viven allí, y a los visitantes."
+      },
+      "bodies": {
+        "en": "<p class=\"body-lead\">Veyra's poles have seasons that last for years. Last week the southern pole saw the sun for the first time in eleven.</p>\n<p>The light arrived as a thin line on the horizon and stayed there for an hour before it set again. Each day from now on it will stay a little longer.</p>\n<blockquote class=\"body-pullquote\">Children born at the Southpole Hab saw the sun for the first time.</blockquote>\n<p>For the station's staff it means the end of the long dark rota. For visitors it opens the geyser fields to daylight walks, and the ice lit low from the side is something photographers have waited a decade for.</p>\n<div class=\"body-facts\"><h3>Visiting this season</h3><ul><li>Daylight walks start next month.</li><li>Sunrise and sunset come within the same hour for the first weeks.</li><li>Book early: the hab sleeps forty guests.</li></ul></div>",
+        "de": "<p class=\"body-lead\">Veyras Pole haben Jahreszeiten, die Jahre dauern. Letzte Woche sah der Südpol die Sonne zum ersten Mal seit elf Jahren.</p>\n<p>Das Licht kam als dünne Linie am Horizont und blieb dort eine Stunde, bevor es wieder unterging. Von nun an bleibt es jeden Tag ein wenig länger.</p>\n<blockquote class=\"body-pullquote\">Kinder, die im Südpol-Habitat geboren wurden, sahen zum ersten Mal die Sonne.</blockquote>\n<p>Für das Stationspersonal bedeutet das das Ende des langen Dunkeldienstes. Für Besucher öffnet es die Geysirfelder für Wanderungen bei Tageslicht, und das flach von der Seite beleuchtete Eis ist etwas, worauf Fotografen ein Jahrzehnt gewartet haben.</p>\n<div class=\"body-facts\"><h3>Besuch in dieser Saison</h3><ul><li>Tageslichtwanderungen beginnen nächsten Monat.</li><li>In den ersten Wochen liegen Sonnenauf- und -untergang in derselben Stunde.</li><li>Früh buchen: Das Habitat hat Platz für vierzig Gäste.</li></ul></div>",
+        "es": "<p class=\"body-lead\">Los polos de Veyra tienen estaciones que duran años. La semana pasada, el polo sur vio el sol por primera vez en once.</p>\n<p>La luz llegó como una línea fina en el horizonte y se quedó allí una hora antes de ponerse de nuevo. A partir de ahora, cada día se quedará un poco más.</p>\n<blockquote class=\"body-pullquote\">Los niños nacidos en el hábitat del polo sur vieron el sol por primera vez.</blockquote>\n<p>Para el personal de la estación significa el fin del largo turno de oscuridad. Para los visitantes abre los campos de géiseres a paseos con luz de día, y el hielo iluminado de lado y a ras es algo que los fotógrafos llevan una década esperando.</p>\n<div class=\"body-facts\"><h3>Visitar esta temporada</h3><ul><li>Los paseos con luz de día empiezan el mes que viene.</li><li>Las primeras semanas, el amanecer y el atardecer caen en la misma hora.</li><li>Reserva pronto: el hábitat aloja a cuarenta huéspedes.</li></ul></div>"
+      }
+    },
+    {
+      "id": 18,
+      "daysAgo": 3,
+      "hour": 10,
+      "counter": 189,
+      "categories": [
+        2
+      ],
+      "authors": [
+        4
+      ],
+      "images": [
+        "transfer-timetable"
+      ],
+      "tags": [
+        "budget",
+        "halcyon-station"
+      ],
+      "titles": {
+        "en": "What the new transfer timetable means for travellers",
+        "de": "Was der neue Umsteigefahrplan für Reisende bedeutet",
+        "es": "Qué significa el nuevo horario de trasbordos para los viajeros"
+      },
+      "descriptions": {
+        "en": "From next month, shuttles between Halcyon Station and the surface ports leave every two hours. Who gains, and the connections that disappear.",
+        "de": "Ab nächstem Monat fahren die Shuttles zwischen der Halcyon-Station und den Bodenhäfen alle zwei Stunden. Wer gewinnt, und welche Verbindungen wegfallen.",
+        "es": "A partir del mes que viene, las lanzaderas entre la Estación Halcyon y los puertos de superficie salen cada dos horas. Quién gana y qué conexiones desaparecen."
+      },
+      "bodies": {
+        "en": "<p class=\"body-lead\">The shuttles between Halcyon Station and the surface ports are moving to a fixed timetable: one departure every two hours, day and night.</p>\n<p>Until now, shuttles left when they were full. That kept fares low but made connections a gamble, and missed liners were common.</p>\n<h2>Who gains</h2>\n<ul>\n<li>Travellers with a liner to catch: connections can now be planned.</li>\n<li>Night arrivals: there is always a shuttle within two hours.</li>\n</ul>\n<h2>What disappears</h2>\n<p>The early cheap departure, which left at dawn and filled with crew, will go. Off-peak fares remain, but only on the night shuttles.</p>\n<div class=\"body-callout\"><p>Tickets bought before the change stay valid on any shuttle within a day of their original date.</p></div>",
+        "de": "<p class=\"body-lead\">Die Shuttles zwischen der Halcyon-Station und den Bodenhäfen stellen auf einen festen Fahrplan um: eine Abfahrt alle zwei Stunden, Tag und Nacht.</p>\n<p>Bisher fuhren die Shuttles ab, wenn sie voll waren. Das hielt die Preise niedrig, machte Anschlüsse aber zum Glücksspiel, und verpasste Linienschiffe waren häufig.</p>\n<h2>Wer gewinnt</h2>\n<ul>\n<li>Reisende mit einem Linienschiff als Anschluss: Verbindungen lassen sich jetzt planen.</li>\n<li>Nachtankünfte: Innerhalb von zwei Stunden fährt immer ein Shuttle.</li>\n</ul>\n<h2>Was wegfällt</h2>\n<p>Die frühe günstige Abfahrt, die im Morgengrauen fuhr und sich mit Besatzung füllte, entfällt. Nebenzeit-Tarife bleiben, aber nur für die Nachtshuttles.</p>\n<div class=\"body-callout\"><p>Vor der Umstellung gekaufte Tickets gelten für jedes Shuttle innerhalb eines Tages ab dem ursprünglichen Datum.</p></div>",
+        "es": "<p class=\"body-lead\">Las lanzaderas entre la Estación Halcyon y los puertos de superficie pasan a un horario fijo: una salida cada dos horas, de día y de noche.</p>\n<p>Hasta ahora, las lanzaderas salían cuando se llenaban. Eso mantenía las tarifas bajas, pero hacía de cada conexión una apuesta, y perder el crucero era habitual.</p>\n<h2>Quién gana</h2>\n<ul>\n<li>Quien tiene un crucero que tomar: ahora se pueden planificar las conexiones.</li>\n<li>Las llegadas nocturnas: siempre hay una lanzadera en menos de dos horas.</li>\n</ul>\n<h2>Qué desaparece</h2>\n<p>La salida barata de primera hora, que partía al amanecer y se llenaba de tripulación, desaparece. Siguen las tarifas de hora valle, pero solo en las lanzaderas nocturnas.</p>\n<div class=\"body-callout\"><p>Los billetes comprados antes del cambio siguen siendo válidos en cualquier lanzadera dentro del día siguiente a su fecha original.</p></div>"
+      }
+    },
+    {
+      "id": 19,
+      "daysAgo": 2,
+      "hour": 15,
+      "counter": 231,
+      "categories": [
+        4
+      ],
+      "authors": [
+        1
+      ],
+      "images": [
+        "halcyon-promenade"
+      ],
+      "tags": [
+        "halcyon-station",
+        "how-to"
+      ],
+      "titles": {
+        "en": "Forty-eight hours on Halcyon Station",
+        "de": "Achtundvierzig Stunden auf der Halcyon-Station",
+        "es": "Cuarenta y ocho horas en la Estación Halcyon"
+      },
+      "descriptions": {
+        "en": "Most travellers only change ships at Halcyon. Stay two days instead: the promenade, the gardens, the yards and the best seat for watching departures.",
+        "de": "Die meisten Reisenden steigen auf der Halcyon-Station nur um. Bleiben Sie zwei Tage: die Promenade, die Gärten, die Werften und der beste Platz, um Abflüge zu sehen.",
+        "es": "La mayoría de los viajeros solo cambia de nave en Halcyon. Quédate dos días: el paseo, los jardines, los astilleros y el mejor sitio para ver las salidas."
+      },
+      "bodies": {
+        "en": "<p class=\"body-lead\">Halcyon Station is where most journeys in the Reach change ships, and most travellers see nothing of it but a gate. That is a pity.</p>\n<h2>Day one</h2>\n<p>Start on the promenade, the station's long curved street. Breakfast at one of the window cafés, then walk the full ring; it takes under an hour and you end where you began.</p>\n<p>In the afternoon, visit the hydroponic gardens on the lower deck, where most of the station's vegetables grow under violet light.</p>\n<h2>Day two</h2>\n<p>Book a morning tour of the shipyards, then spend the afternoon at the departures gallery, where liners leave the dock below your feet.</p>\n<div class=\"body-facts\"><h3>Practical</h3><ul><li>Rooms on the outer ring have more weight and sleep better.</li><li>The gardens close for an hour at noon.</li><li>Yard tours need ID and closed shoes.</li></ul></div>",
+        "de": "<p class=\"body-lead\">Auf der Halcyon-Station wechseln die meisten Reisenden in der Weite das Schiff, und die meisten sehen von ihr nichts als ein Gate. Das ist schade.</p>\n<h2>Erster Tag</h2>\n<p>Beginnen Sie auf der Promenade, der langen gebogenen Straße der Station. Frühstück in einem der Fenstercafés, dann einmal um den ganzen Ring; das dauert weniger als eine Stunde, und man endet, wo man begonnen hat.</p>\n<p>Am Nachmittag besuchen Sie die Hydrokulturgärten auf dem Unterdeck, wo das meiste Gemüse der Station unter violettem Licht wächst.</p>\n<h2>Zweiter Tag</h2>\n<p>Buchen Sie vormittags eine Führung durch die Werften und verbringen Sie den Nachmittag in der Abfluggalerie, wo die Linienschiffe unter Ihren Füßen ablegen.</p>\n<div class=\"body-facts\"><h3>Praktisches</h3><ul><li>Zimmer am Außenring haben mehr Gewicht, dort schläft man besser.</li><li>Die Gärten schließen mittags für eine Stunde.</li><li>Für Werftführungen braucht man einen Ausweis und geschlossene Schuhe.</li></ul></div>",
+        "es": "<p class=\"body-lead\">La Estación Halcyon es donde cambian de nave la mayoría de los viajes del Alcance, y casi todos los viajeros solo ven de ella una puerta de embarque. Es una lástima.</p>\n<h2>Primer día</h2>\n<p>Empieza en el paseo, la larga calle curva de la estación. Desayuna en uno de los cafés con ventana y recorre el anillo entero; se tarda menos de una hora y se termina donde se empezó.</p>\n<p>Por la tarde, visita los jardines hidropónicos de la cubierta inferior, donde crece casi toda la verdura de la estación bajo luz violeta.</p>\n<h2>Segundo día</h2>\n<p>Reserva por la mañana una visita a los astilleros y pasa la tarde en la galería de salidas, donde los cruceros dejan el muelle bajo tus pies.</p>\n<div class=\"body-facts\"><h3>Datos prácticos</h3><ul><li>Las habitaciones del anillo exterior tienen más peso y se duerme mejor.</li><li>Los jardines cierran una hora a mediodía.</li><li>Las visitas a los astilleros piden documento de identidad y calzado cerrado.</li></ul></div>"
+      }
+    },
+    {
+      "id": 20,
+      "daysAgo": 0,
+      "hour": 7,
+      "counter": 96,
+      "categories": [
+        5
+      ],
+      "authors": [
+        3
+      ],
+      "images": [
+        "clear-stars"
+      ],
+      "tags": [
+        "explainer"
+      ],
+      "titles": {
+        "en": "Why the stars do not twinkle in space",
+        "de": "Warum die Sterne im All nicht funkeln",
+        "es": "Por qué las estrellas no titilan en el espacio"
+      },
+      "descriptions": {
+        "en": "First-time travellers often say the stars look wrong from orbit. They are right: what makes stars twinkle is the air, and there is none.",
+        "de": "Wer zum ersten Mal reist, sagt oft, die Sterne sähen aus dem Orbit falsch aus. Zu Recht: Was Sterne funkeln lässt, ist die Luft, und die gibt es dort nicht.",
+        "es": "Quien viaja por primera vez suele decir que desde la órbita las estrellas se ven raras. Tiene razón: lo que las hace titilar es el aire, y allí no lo hay."
+      },
+      "bodies": {
+        "en": "<p class=\"body-lead\">From the window of an orbiting ship the stars are sharp, steady points. Many travellers find it oddly unsettling, and cannot say why.</p>\n<h2>It is the air</h2>\n<p>On a world with an atmosphere, starlight passes through layers of moving air before it reaches your eyes. Each layer bends the light slightly, and the bending changes from moment to moment. The star seems to flicker.</p>\n<blockquote class=\"body-pullquote\">A star does not twinkle. The air in front of it does.</blockquote>\n<h2>Planets twinkle less</h2>\n<p>Even on the ground, planets twinkle less than stars, because they show a tiny disc rather than a single point, and the flicker averages out across it.</p>\n<p>In orbit there is nothing to bend the light at all, which is why telescopes are put there, and why the view from the window looks like a photograph.</p>",
+        "de": "<p class=\"body-lead\">Vom Fenster eines Schiffes im Orbit aus sind die Sterne scharfe, ruhige Punkte. Viele Reisende finden das seltsam beunruhigend und können nicht sagen, warum.</p>\n<h2>Es ist die Luft</h2>\n<p>Auf einer Welt mit Atmosphäre durchquert das Sternenlicht Schichten bewegter Luft, bevor es das Auge erreicht. Jede Schicht lenkt das Licht ein wenig ab, und die Ablenkung ändert sich von Augenblick zu Augenblick. Der Stern scheint zu flackern.</p>\n<blockquote class=\"body-pullquote\">Nicht der Stern funkelt, sondern die Luft vor ihm.</blockquote>\n<h2>Planeten funkeln weniger</h2>\n<p>Selbst vom Boden aus funkeln Planeten weniger als Sterne, weil sie eine winzige Scheibe zeigen statt eines einzelnen Punktes, und das Flackern sich über sie ausgleicht.</p>\n<p>Im Orbit gibt es nichts, was das Licht ablenkt, deshalb stellt man Teleskope dorthin, und deshalb sieht der Blick aus dem Fenster aus wie ein Foto.</p>",
+        "es": "<p class=\"body-lead\">Desde la ventana de una nave en órbita, las estrellas son puntos nítidos y fijos. A muchos viajeros les resulta extrañamente inquietante, y no saben decir por qué.</p>\n<h2>Es el aire</h2>\n<p>En un mundo con atmósfera, la luz de las estrellas atraviesa capas de aire en movimiento antes de llegar a los ojos. Cada capa desvía un poco la luz, y la desviación cambia de un instante a otro. La estrella parece parpadear.</p>\n<blockquote class=\"body-pullquote\">No titila la estrella, sino el aire que tiene delante.</blockquote>\n<h2>Los planetas titilan menos</h2>\n<p>Incluso desde el suelo, los planetas titilan menos que las estrellas, porque muestran un disco diminuto en lugar de un solo punto, y el parpadeo se compensa en él.</p>\n<p>En órbita no hay nada que desvíe la luz, y por eso se colocan allí los telescopios, y por eso la vista desde la ventana parece una fotografía.</p>"
+      }
+    }
+  ],
+  "menu": {
+    "labels": {
+      "en": "Sections",
+      "de": "Rubriken",
+      "es": "Secciones"
+    },
+    "columns": 2,
+    "categories": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ]
+  },
+  "social": {
+    "bios": {
+      "en": "Travel writing from across the Reach: worlds, stations, ships and the people who cross between them — a pacod-cms demonstration website.",
+      "de": "Reisegeschichten aus der ganzen Weite: Welten, Stationen, Schiffe und die Menschen, die zwischen ihnen reisen — eine Demonstrations-Website von pacod-cms.",
+      "es": "Relatos de viaje de todo el Alcance: mundos, estaciones, naves y quienes viajan entre ellos; un sitio de demostración de pacod-cms."
+    },
+    "latestHeadings": {
+      "en": "Just landed",
+      "de": "Gerade gelandet",
+      "es": "Recién aterrizado"
+    },
+    "latestCount": 3,
+    "links": [
+      {
+        "titles": {
+          "en": "About this magazine",
+          "de": "Über dieses Magazin",
+          "es": "Sobre esta revista"
+        },
+        "url": "/p/about"
+      },
+      {
+        "titles": {
+          "en": "The latest stories",
+          "de": "Die neuesten Geschichten",
+          "es": "Las últimas historias"
+        },
+        "url": "/latest"
+      },
+      {
+        "titles": {
+          "en": "Forty-eight hours on Halcyon Station",
+          "de": "Achtundvierzig Stunden auf der Halcyon-Station",
+          "es": "Cuarenta y ocho horas en la Estación Halcyon"
+        },
+        "url": "/article/19"
+      },
+      {
+        "titles": {
+          "en": "Destinations",
+          "de": "Reiseziele",
+          "es": "Destinos"
+        },
+        "url": "/list/1"
+      },
+      {
+        "placement": "ICON",
+        "icon": "WEB",
+        "titles": {
+          "en": "Website",
+          "de": "Website",
+          "es": "Sitio web"
+        },
+        "url": "/"
+      }
+    ]
+  },
+  "promotions": {
+    "image": {
+      "name": "{name}: departures this week",
+      "key": "departures",
+      "motif": "rocket",
+      "colours": [
+        "#0b1020",
+        "#1b2d5c",
+        "#e0712c"
+      ],
+      "width": 300,
+      "height": 250,
+      "path": "/latest",
+      "alts": {
+        "en": "This week's departures from {name}",
+        "de": "Die Abflüge dieser Woche bei {name}",
+        "es": "Las salidas de esta semana en {name}"
+      }
+    },
+    "rotator": {
+      "id": "reach-sections",
+      "title": "{name}: sections",
+      "skeleton": "sidebar",
+      "rotationMs": 6000,
+      "slides": [
+        {
+          "key": "destinations",
+          "motif": "planet",
+          "colours": [
+            "#04060d",
+            "#141a33",
+            "#e09f3e"
+          ],
+          "path": "/list/1",
+          "titles": {
+            "en": "Destinations",
+            "de": "Reiseziele",
+            "es": "Destinos"
+          },
+          "alts": {
+            "en": "Destinations in {name}",
+            "de": "Reiseziele bei {name}",
+            "es": "Destinos en {name}"
+          }
+        },
+        {
+          "key": "guides",
+          "motif": "station",
+          "colours": [
+            "#030712",
+            "#111c34",
+            "#4cc9f0"
+          ],
+          "path": "/list/4",
+          "titles": {
+            "en": "Travel Guides",
+            "de": "Reiseführer",
+            "es": "Guías de viaje"
+          },
+          "alts": {
+            "en": "Travel guides in {name}",
+            "de": "Reiseführer bei {name}",
+            "es": "Guías de viaje en {name}"
+          }
+        },
+        {
+          "key": "science",
+          "motif": "nebula",
+          "colours": [
+            "#0b0420",
+            "#2c0f4a",
+            "#f72585"
+          ],
+          "path": "/list/5",
+          "titles": {
+            "en": "Science",
+            "de": "Wissenschaft",
+            "es": "Ciencia"
+          },
+          "alts": {
+            "en": "Science explained in {name}",
+            "de": "Wissenschaft erklärt bei {name}",
+            "es": "La ciencia explicada en {name}"
+          }
+        }
+      ]
+    }
+  },
+  "site": {
+    "taglines": {
+      "en": "Travel writing from across the Reach",
+      "de": "Reisegeschichten aus der ganzen Weite",
+      "es": "Relatos de viaje de todo el Alcance"
+    },
+    "descriptions": {
+      "en": "Destinations, stations, ships and practical guides for travellers between the worlds of the Reach.",
+      "de": "Reiseziele, Stationen, Schiffe und praktische Reiseführer für alle, die zwischen den Welten der Weite reisen.",
+      "es": "Destinos, estaciones, naves y guías prácticas para quienes viajan entre los mundos del Alcance."
+    }
+  },
+  "theme": {
+    "bg": "#f3f5fb",
+    "bg@dark": "#070a14",
+    "surface": "#ffffff",
+    "surface@dark": "#0e1426",
+    "line": "#d9deea",
+    "line@dark": "#222b45",
+    "ink": "#141a2e",
+    "ink@dark": "#e6eaf5",
+    "muted": "#3d4763",
+    "muted@dark": "#aeb7cf",
+    "faint": "#7a849c",
+    "faint@dark": "#6f7a95",
+    "accent": "#1b2d5c",
+    "accent@dark": "#1b2d5c",
+    "highlight": "#c4561d",
+    "highlight@dark": "#f2994a",
+    "tint": "#e8edf8",
+    "tint@dark": "#111a33",
+    "hover": "#e9ecf4",
+    "hover@dark": "#161f3a",
+    "panel": "#0b1020",
+    "panel@dark": "#04060d",
+    "font-display": "plex-sans",
+    "font-text": "plex-sans",
+    "font-label": "plex-mono"
+  }
+}

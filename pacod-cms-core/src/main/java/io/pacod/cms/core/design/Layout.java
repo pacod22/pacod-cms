@@ -38,6 +38,20 @@ public class Layout {
     private Instant publishedOn;
     private String publishedBy;
 
+    /**
+     * The draft as it was before design assist last replaced it, for one click to bring back
+     * (a swap: undoing twice redoes). Null when there is nothing to undo -- any other change to the
+     * draft, publishing or discarding clears it, so an undo never resurrects a stale draft.
+     */
+    private Map<String, List<Section>> beforeAssist;
+
+    /**
+     * The job that filled {@link #beforeAssist}, or null where a person did. A job run again from
+     * the start (a restart) keeps the slot it filled, so its undo still reaches the draft from
+     * before its first attempt.
+     */
+    private String beforeAssistJob;
+
     public Layout() {
     }
 
@@ -48,6 +62,11 @@ public class Layout {
     /** Whether the draft differs from what readers see. */
     public boolean hasUnpublishedChanges() {
         return draft != null && !draft.equals(published);
+    }
+
+    /** Whether design assist's last change to the draft can be undone. */
+    public boolean assistUndoable() {
+        return beforeAssist != null;
     }
 
     /** A deep copy of {@code regions}, so an edit of one copy never shows in the other. */

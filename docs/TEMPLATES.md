@@ -137,6 +137,27 @@ A set's stylesheet reads the properties (`var(--accent)`); its `themes` in the m
 the theme editor offers. Stylesheets are served from the jar under `/site-assets/`; a set names its
 own in `fragments/stylesheets.html`.
 
+## Article body blocks
+
+An article or page body (always inside `.article-body`) may hold a small set of styled blocks,
+written by authors from the editor's **Blocks** menu or by the studio's AI writing help:
+
+| Block | Markup |
+|---|---|
+| Lead paragraph | `<p class="body-lead">` |
+| Callout box | `<div class="body-callout">` |
+| Pull quote | `<blockquote class="body-pullquote">` |
+| Key facts box | `<div class="body-facts">` holding an `<h3>` and a `<ul>` |
+| Two columns | `<div class="body-columns">` |
+| Figure | `<figure class="body-figure">` with an `<img>` and a `<figcaption>`, optionally also `body-figure-left` or `body-figure-right` |
+
+The list is closed (`BodyBlocks` in core); the AI's answers lose any other class. `site.css` styles
+them under `.article-body .body-…` from the theme tokens, and the print views' `print.css` adapts
+them to paper and to the scientific format's columns. A set that links `site.css` gets them as they
+are. **A set that restyles `.article-body` must style every block too**, or bodies that use them
+render as plain paragraphs. Before renaming one, check the name against EasyList, EasyPrivacy and
+the Fanboy lists, as with `partner-`.
+
 ## Writing templates
 
 Thymeleaf runs in **restricted mode**: no `new`, no static calls, no bean references in

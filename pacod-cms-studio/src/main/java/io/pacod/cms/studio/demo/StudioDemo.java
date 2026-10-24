@@ -81,13 +81,25 @@ public class StudioDemo {
         return content.languages();
     }
 
+    public Set<String> languages(DemoContent.Demo demo) {
+        return content.languages(demo);
+    }
+
     public boolean supports(String language) {
         return content.supports(language);
     }
 
+    public boolean supports(DemoContent.Demo demo, String language) {
+        return content.supports(demo, language);
+    }
+
     /** The languages demo content is written in, named in {@code locale}: "English", «английски». */
     public String languageNames(Locale locale) {
-        return languages().stream().sorted()
+        return languageNames(DemoContent.Demo.JOURNAL, locale);
+    }
+
+    public String languageNames(DemoContent.Demo demo, Locale locale) {
+        return languages(demo).stream().sorted()
                 .map(code -> Locale.forLanguageTag(code).getDisplayLanguage(locale))
                 .collect(Collectors.joining(", "));
     }
@@ -98,13 +110,18 @@ public class StudioDemo {
      * @throws IllegalStateException when a picture could not be stored; running it again finishes
      */
     public Outcome install(Website website) {
+        return install(DemoContent.Demo.JOURNAL, website);
+    }
+
+    /** {@link #install(Website)}, of the demo named. */
+    public Outcome install(DemoContent.Demo demo, Website website) {
         return TenantContext.callAs(TenantDirectory.tenantOf(website), () -> {
             SiteSeedStep.Website about = new SiteSeedStep.Website(website.getId(), website.getName(),
                     website.getDefaultLanguage());
-            DemoContent.Result result = content.install(about);
+            DemoContent.Result result = content.install(demo, about);
             Outcome outcome;
             try {
-                outcome = promotions(result, website);
+                outcome = promotions(demo, result, website);
             } catch (MgmtOperationException | MediaException | DataAccessException | IllegalStateException e) {
                 log.error("Demo promotions for website {} were not written: {}", website.getId(), e.getMessage());
                 outcome = new Outcome(result, 0, e.getMessage());
@@ -116,8 +133,8 @@ public class StudioDemo {
         });
     }
 
-    private Outcome promotions(DemoContent.Result result, Website website) throws MediaException {
-        DemoContent.Promotions seed = content.seed().getPromotions();
+    private Outcome promotions(DemoContent.Demo demo, DemoContent.Result result, Website website) throws MediaException {
+        DemoContent.Promotions seed = content.seed(demo).getPromotions();
         if (seed == null) {
             return new Outcome(result, 0, "the seed has none");
         }

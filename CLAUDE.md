@@ -67,7 +67,9 @@ Locally the studio is **http://studio.localhost:8000/**. Sign in as `ID_ADMIN_EM
 
 - pacod-id at **http://id.localhost:8000/**, its mail at **http://localhost:8125/**;
 - the demo websites at **http://demo.localhost:8000/** (and http://localhost:8000/, also one of its
-  hosts) and, on a platform created since Phase 8, **http://minimal.localhost:8000/**;
+  hosts) and, on a platform created since Phase 8, **http://minimal.localhost:8000/** -- and, since
+  the space demo, **http://space.localhost:8000/** (an older platform: `make site-create SLUG=space
+  NAME=Starward HOSTS=space.localhost DEMO=space`);
 - all of it over HTTPS on 8443 too, from Caddy's local CA.
 
 `make up` needs a `pacod-id:dev` image or pacod-id's sources at `PACOD_ID_SRC` (`../pacod-id`):
@@ -132,7 +134,8 @@ server. Consequences:
   website and, on a platform with **no** websites, creates the demo websites in an organisation of
   their own — `demo` (`pacod.bootstrap.demo.{enabled,id,name,language,hosts}`) and, in the first
   one's organisation, `minimal` on the `minimal` template set (`pacod.bootstrap.demo.minimal.{enabled,
-  id,name,hosts}`) — each on its own, with the demo content unless `pacod.bootstrap.demo.content=false`
+  id,name,hosts}`) and `space` with the space-travels demo (`pacod.bootstrap.demo.space.{enabled,id,name,
+  hosts}`, `DEMO_SPACE_HOSTS`; a setter, so a hand-built bootstrap has none) — each on its own, with the demo content unless `pacod.bootstrap.demo.content=false`
   (*The demo content*); `IdentityLifecycle` starts the
   conversation with pacod-id (*Sign-in and roles*). Each step fails on its own at ERROR and the next
   start retries. **The site seeds nothing and builds no index** — it only serves websites that exist.
@@ -669,6 +672,63 @@ checks first only so its screens offer what would succeed.
   refusal. `PortalOrganisationsTest`, `PortalWebsitesTest`, `PortalMembersTest`, `DomainRulesTest`,
   `TokenExchangeTest` (exchange and provisioner on the wire), core's `SiteRetirementTest`,
   `PerSiteTest`, and `SiteLifecycleIT`.
+
+### Export and restore
+
+A website, or an organisation's websites, as one ZIP (`core.archive.SiteArchives`, declared by the
+studio's `ArchiveConfig` -- the site never scans `core.archive`), and back -- **always as a new
+website, never over one** (`studio.archive.PortalRestore`, routes in `MgmtArchiveController`).
+
+- **The archive**: `pacod-site.json` (format, version 1, the source's id, name, language, time zone,
+  template set, AI switch, counts), `db/<collection>.bson` (**raw BSON, mongodump's concatenated
+  format**, never JSON: a document comes back byte for byte, its `@DBRef`s and number types
+  included -- JSON reads `{$ref, $id}` as a pointer), `files/{assets,resources,private}/…`. An
+  organisation's: `pacod-organisation.json` and one such tree per website under `sites/<id>/`.
+- **Left out**: the analytics (`SKIPPED`: hour and day buckets, visitors, the crawler log), members
+  and roles (pacod-id's), the hosts, `backups/`. **`COLLECTIONS` plus `SKIPPED` must name every
+  website `@Document`** -- `SiteArchivesTest.everyCollectionIsDecided` scans core and fails when a
+  new document is in neither.
+- **Export** streams as it writes (no job, no temporary file): `GET
+  /sites/<id>/mgmt/settings/export` (`website.manage`) and `GET
+  /mgmt/organisations/{orgId}/export` (`org.manage`, every website but `DELETING` ones), an
+  attachment, `no-store`. Each website is written with it bound (`runAs`). Not a snapshot: a
+  website edited meanwhile exports what each collection held when it was read.
+- **An archive is untrusted.** `open()` reads every entry before anything is created and refuses,
+  naming why: an entry outside the layout or with a `..`, hidden or absolute segment; **a name twice**
+  (`getEntry`, which the checks read, answers the first; `entries()`, which `fill` copies, yields
+  both -- the second would go unmeasured; `fill` counts what it writes against the cap again); a collection
+  outside `COLLECTIONS`; a file outside the three trees or outside `EXTENSIONS`; a field name
+  starting `$` but a reference's `$ref`/`$id`; **a reference with `$db`** (Spring Data would read
+  another website's database through it) or to a collection outside `COLLECTIONS`; JavaScript,
+  pointer or symbol values; more than `MAX_ENTRIES` or, uncompressed, than `pacod.archive.max-bytes`
+  (2GB). Restore writes only into the new website's database and folder.
+- **Restore creates the website through the portal's own path** (`PortalWebsites.restore`: every
+  check of creating one, its automatic host, its pacod-id scope) with **`SiteProvisioner.create(…,
+  fill)`**: `fill` writes the archive after the indexes and **before the seed steps**, which then add
+  only what it lacked, and before the website turns `ACTIVE`. `SiteSettings.baseUrl` is unset (it
+  names the source's host); **nothing else is rewritten**: bookings' targets and absolute links in
+  bodies still name the source's origin. **The name readers see is `SiteSettings.names`**, which came
+  with the archive, so a website restored under another name gets it written there in its original
+  language (`PortalRestore.rename`); the control plane's `name` alone would show only in the studio. A `fill` that fails removes the website again (`retire` + `erase`) --
+  **only one still `PROVISIONING`**, never another of the same id; its id is free after
+  `SiteRetirement.SETTLE`. A template set the installation lacks becomes the default, said.
+- **An organisation's restore** is `PortalOrganisations.create` (the policy, the limit, the
+  restorer its admin), then each website under its own id where free, else `freeId`'s `-2`, `-3`…
+  (also skipping tombstones and taken hosts), `website.create` not re-checked for an organisation
+  this request made. More websites than `maxSitesPerOrg` is refused **before** the organisation
+  exists. One website failing is said in the flash, never undone.
+- **The upload is the request body** (`application/zip`, `fetch` from `mgmt.js`'s
+  `form[data-archive-restore]`), not multipart, whose 4 MB stays every other upload's: staged to
+  `<storage root>/tmp/`, deleted in `finally`. **Caddy lets only `/mgmt/sites/restore` and
+  `/mgmt/organisations/restore` carry `CMS_ARCHIVE_MAX_SIZE` (2 GiB)** (`@cms-archive` in
+  `cms.caddy`); keep it in step with `pacod.archive.max-bytes`. The answer is JSON (`location`, or
+  `error` at 413/422/403) and **the flash is filed for `location`** (`saveOutputFlashMap`), as a
+  redirect would. With scripting off the screen says restoring needs JavaScript.
+- Tests: `SiteArchivesTest` (the refusals, names, the collection list), `PortalRestoreTest`,
+  `PortalScreensTest.exports`/`restoreScreensRender`/`restorePosts`, and **`ArchiveIT`**: a website
+  of its own (`rho`) exported and restored as `rho-copy` against real MongoDB -- references
+  resolving, files copied (a `.DS_Store` not), no analytics, `baseUrl` gone, the source untouched,
+  served at its host -- and a `$db` reference refused before anything exists.
 
 ### The studio (management console)
 
@@ -1418,6 +1478,9 @@ drafts that an admin publishes.
   website's published layouts *and* drafts would leave out on the candidate set — then applies by
   setting `Website.templateSet` and evicting the directory; nothing is removed, and the sections
   come back on a switch back.
+- **Design assist** (*AI*) drafts a theme or a layout from a brief, refining the current draft
+  unless asked to start over, with one undo (a swap) on its card; the overview drafts the whole
+  website as a job.
 - **Menus are saved as edited, with no draft** (live within a minute). An item is addressed by its
   position, `2` or `2.1`, because `MenuItem` has no id (*Persistence*); labels post as
   `label_<lang>`; kind and target are checked by `SiteChrome`'s rules, so the studio cannot store an
@@ -1481,14 +1544,30 @@ own origin** with `?_preview=<token>`, never from the studio's: the page runs th
 
 ### The demo content
 
-"Demo Journal" (`core.seed.DemoContent`, `demo/demo-journal.json`): six sections, four authors,
-twenty articles (five also in German and Spanish), their pictures, tags, a "Sections" group in the
-main menu and a published link page; then, from the studio (`studio.demo.StudioDemo`), two bookings
-of the website's own. Fictional throughout: invented towns, people and festivals, `example.com` for
+Two demos (`DemoContent.Demo`: `journal`, `space`), one installer (`core.seed.DemoContent`). "Demo
+Journal" (`demo/demo-journal.json`): six sections, four authors, twenty articles (five also in
+German and Spanish), their pictures, tags, a "Sections" group in the main menu and a published link
+page; then, from the studio (`studio.demo.StudioDemo`), two bookings of the website's own.
+"Space travels" (`demo/demo-space.json`, default website name "Starward"): the same shape for a
+travel magazine of an invented star system (the Reach: Veyra, Tessaly, Orrin, Halcyon Station, Port
+Kestrel), its bodies **using the body's styled blocks** (lead, callout, pull quote, key facts), seven
+drawn space motifs (`STARFIELD`, `PLANET`, `ROCKET`, `STATION`, `NEBULA`, `MOONSCAPE`, `ASTEROIDS`,
+soft glows through `RadialGradientPaint`), and two optional parts the journal lacks: **`site`**
+(taglines and descriptions, each list written only while the website's is empty) and **`theme`**
+(token values, drafted *and* published only while the website has no `theme` document, cleaned by
+`ThemeCss.clean`) -- both through `useSiteAndTheme`, an optional setter, so hand-built installers
+need neither. Fictional throughout: invented towns, worlds, people and festivals, `example.com` for
 anything outside, no embed of any third party, nothing near the old subject.
 
+- **Which demo**: every entry point takes one and means the journal without it -- the new-website
+  form's `demoKind` select beside its checkbox (`NewSite.demoKind`, checked before anything exists:
+  `portal.site.error.demoKind`), `--demo[=space]` on `--create-site` and `--seed-demo` (`make
+  site-create … DEMO=1|space`, `make seed SITE=… DEMO=space`), and the bootstrap's `space` website.
+  `Demo.of` reads blank, `true` and `1` as the journal and anything unknown as none, refused. The
+  methods without a `Demo` (`install(website)`, `seed()`, `languages()`, …) are the journal's.
+
 - **Written only when asked**: the new-website form's checkbox, `--create-site --demo`
-  (`make site-create … DEMO=1`), `--seed-demo --site-id=` (`SeedDemoCommand`, what `make seed` runs
+  (`make site-create … DEMO=1|space`), `--seed-demo --site-id=` (`SeedDemoCommand`, what `make seed` runs
   in a one-off studio container), and `PlatformBootstrap`'s demo website. **Not a `SiteSeedStep`**,
   for the reason under *Architecture*. `core.seed` is scanned by the studio only;
   `DemoSiteRenderIT` builds the installer by hand.
@@ -1514,23 +1593,27 @@ anything outside, no embed of any third party, nothing near the old subject.
   published, named after the website, its link ids from `newLinkId`.
 - **The bookings** go through `MgmtBannerService` and `MgmtBannerLayoutService` (a creative and
   slides as `GeneratedFile`s, so their checks and folders apply): an image booking to `/latest` and
-  an HTML5 rotator `journal-sections` on the `sidebar` skeleton, three slides to three sections.
+  an HTML5 rotator `journal-sections` (the space demo's: `reach-sections`) on the `sidebar` skeleton,
+  three slides to three sections.
   **A target must be absolute**, so they use the website's public origin (`StudioSites`); with no
   host, or with any booking already there, there are none. A failure costs the bookings only
   (`Outcome.promotionsSkipped`). Their texts say `{name}` (`DemoContent.NAME`) where the website's
   name goes, so a website advertises itself, not "Demo Journal". Their file and folder names were
   checked against EasyList and EasyPrivacy: no size, no `ad`, `banner` or `house`.
-- Tests: `SeedIntegrityTest` (references, ids, whole translations, clean bodies, every address one
-  the site serves), `DemoContentTest` (what is written, refusals, the rerun), `DemoImagesTest`,
+- Tests: `SeedIntegrityTest`, **parameterised over every `Demo`** (references, ids, whole
+  translations, clean bodies -- a `class` only a `BodyBlocks` one --, every address one the site
+  serves, a theme `ThemeCss.clean` keeps whole), `DemoContentTest` (what is written, refusals, the
+  rerun, the space demo's taglines and theme only where absent), `DemoImagesTest` (every motif),
   `StudioDemoTest`, `PlatformBootstrapTest` (the fresh install's path),
   `PortalWebsitesTest.demoLanguageIsCheckedFirst`, `PortalScreensTest`'s demo cases, and
-  `DemoSiteRenderIT` (every page type on both sets).
+  `DemoSiteRenderIT` (every page type on both sets; the space demo on its own website, `tau`: blocks,
+  translations, pictures, the published theme linked, the taglines).
 
 ### Jobs
 
 `/mgmt/jobs` (`MgmtJobController`, `content.read`/`content.write`) is the website's background
 work, run by the studio itself: PDFs of articles (*PDF export*) and of journal issues (*Journal
-issues*), and AI translations. It replaced an external
+issues*), AI translations, and the whole website's design drafted from a brief (*AI*). It replaced an external
 Python runner and its `/mgmt/tools` queue.
 
 - **A `Job` lives in the control plane** (`core.control.data`, collection `job`), not the website's
@@ -1796,32 +1879,93 @@ feature's model is `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, 
   - In strict mode every property is `required`, so "leave it" is `null`.
   - **Then everything is checked again as if typed**: `ThemeCss.clean`, `SectionSettings.check`,
     HTML settings through `HtmlSafety`. Only what passes reaches the **draft**:
-    `DesignTheme.saveDraft` keeps the draft's CSS, and `DesignLayouts.replaceDraft` keeps the
-    page's own `primary`, id and region.
+    `DesignTheme.assistDraft` keeps the draft's CSS, and `DesignLayouts.assistDraft` keeps the
+    page's own `primary`, id and region, and **the sections the current set cannot render** (kept
+    for a switch back; the model is never shown them), at the end of their regions.
   - What failed is named in the flash. **An answer with nothing usable changes nothing**, and an
     empty layout (the mock's) must never wipe a draft.
+  - **It refines by default** (`Mode`, the forms' `mode`; only `replace` starts over): the user
+    message carries the current draft as JSON after the brief, and a theme's `null` then **keeps
+    the draft's value** (merged before the write) instead of leaving the template's.
+  - **One undo, a swap**: `assistDraft` keeps the draft it replaced in `Layout.beforeAssist` /
+    `Theme.beforeAssist`(`Css`), and `…/assist/undo` swaps the two (again redoes). **Every other
+    change, publishing and discarding clear the slot** (`forgetAssist`), so an undo never brings
+    back a stale draft. `beforeAssistJob` says a job filled it: a person's assist always refills
+    it, a job only when it is not its own — a job rerun from the start still undoes to the draft
+    from before its first attempt.
+  - **Who is attributed is an `Actor`** (`userId`, `jobId`): `Actor.signedIn()` on the screens; in
+    a job nobody is signed in, so `updatedBy` and `x-gw-user-id` come from the job's `by` param
+    (the queuer's `usr_` id — `Job.queuedBy` is a display name) and `x-gw-trace` is the job.
+- **The whole website from one brief** (`DESIGN_SITE`, `DesignSiteHandler`; the card on
+  `/mgmt/design`, `POST /mgmt/design/assist`, `design.write` plus AI): the theme, then every
+  `PageType`'s layout, one `DesignAssist` call each, `checkpoint()` between them, **each step
+  failing on its own** (logged, counted; the rest still run). One unfinished design job per
+  website; the overview shows it with **`POST /mgmt/design/assist/{jobId}/cancel`**, because the
+  jobs screen's cancel needs `content.write`, which a designer lacks — it cancels a `DESIGN_SITE`
+  job only. The brief is capped at `DesignSiteHandler.MAX_BRIEF` (900) so the page name prefixed
+  per layout stays inside `DesignAssist`'s 1,000. An unreadable control plane hides the card's
+  job, never the screen.
 - **Writing help** (`WritingAssist`, `MgmtAiController` at `/mgmt/ai/*`, `ai.use`, JSON for
-  `fetch`). It offers a passage rewritten six ways, a summary, and tags.
+  `fetch`). It offers a passage rewritten six ways (`/assist`), a summary (`/describe`), tags
+  (`/tags`), three title candidates from the editor's **unsaved** title and body (`/titles`), a
+  whole article from a brief (`/draft`: title, description, body, `Length` SHORT/MEDIUM/LONG), a
+  passage for the cursor in the voice of the body around it (`/write`), and a body laid out
+  (`/design-body`). Features `titles`, `draft`, `write`, `design-body`; all on
+  `pacod.ai.models.assist`.
   - Answers go back to the operator; **nothing is written here**.
   - A passage's answer may change its markup, so it cannot be held to a skeleton. **`HtmlSafety`**
     holds it to an allow-list instead: structure, emphasis, simple tables, and links that are
     http, https, mailto or relative. Images survive only where the selection already had the same
-    `src`. Never `style`, `class`, `on*`, scripts, frames or forms.
-  - A summary and tags are text only. Tags are at most eight, without commas.
+    `src`. Never `style`, `on*`, scripts, frames or forms. **`HtmlSafety.body`** (rewrites,
+    drafts, writes, layouts) adds `div`, `figure`, `figcaption` and a `class` that names a
+    **`BodyBlocks`** block on that block's own element; every other class goes and a `div` left
+    without one is unwrapped. `clean` (section settings) takes no class at all.
+  - **Drafts and written passages invent nothing**: the prompt allows only the brief's (and the
+    body's) facts and asks for a `[placeholder]` where one is missing. A draft is in
+    `original()`'s language.
+  - **A layout keeps every word, in order** (`keepsWording`: the source's words, lowercased, split
+    on non-letters, must be a subsequence of the answer's — headings, captions, a key-facts box and
+    a repeated pull quote may be *added*; a dropped, changed or moved word refuses the answer). It
+    is refused **before any call** for a body holding a frame, video, embed, script, style block or
+    form (`HtmlSafety.holdsEmbeds`): cleaning would drop it, and the wording check reads only text.
+    At most `MAX_BODY` (40,000) characters.
+  - A summary, tags and titles are text only. Tags are at most eight, without commas.
   - Without AI the endpoints answer 409 with `{error}` saying why, which `readJson` shows.
 - **In the editor** (`mgmt.js`), the toolbar's **first** button is "AI". At the end it fell into
   TinyMCE's ••• overflow.
   - It opens a dialog: what to do, then Ask, then a preview of the cleaned answer (rendered in the
-    studio's document), then Insert, which replaces the bookmarked selection.
+    studio's document), then Insert, which replaces the bookmarked selection. With a selection the
+    actions are the six rewrites and "lay out" (`/design-body`); **with none**, "write at the
+    cursor" (a brief textarea; `insertContent` at the bookmark) and "lay out the whole text"
+    (`setContent`). Inserts run in one `undoManager.transact` and `setDirty(true)`; changing the
+    action or brief after Ask makes Insert wait for a new Ask.
+  - **The preview styles the blocks** because the head fragment links `body-blocks.css`
+    (`link[data-body-blocks]`, scoped to `.mce-content-body` and `.ai-preview`), which `mgmt.js`
+    also hands TinyMCE as the second `content_css`. `importcss_file_filter` keeps importcss from
+    reading it, so the Format menu is what it was.
   - TinyMCE requires `text` on a dialog's cancel button; without it `windowManager.open` throws
     and nothing appears. The string is TinyMCE's own `'Cancel'`, which its language packs
     translate.
   - The action labels are literal `t('…')` keys, because `MgmtJsTextTest` sees only spelled-out
     keys.
-  - "Suggest a summary" and "Suggest tags" sit under their fields. They render `hidden`, have no
-    `name`, are inside `#article-form`, and fire an `input` event so the unsaved-changes guard sees
-    the change.
-  - Checked in a browser: the dialog, Ask, the preview, Insert, both suggestions.
+  - "Suggest a summary", "Suggest tags" and "Suggest titles" sit under their fields. They render
+    `hidden`, have no `name`, are inside `#article-form`, and fire an `input` event so the
+    unsaved-changes guard sees the change. The title candidates are `type="button"`s built into
+    `[data-ai-title-list]`.
+  - **"Draft with AI"** (`[data-ai-draft]`) is a card in `.editor-tail`, **outside
+    `#article-form`**, its controls without `name`, rendered `hidden`. It confirms before
+    replacing a title, description or body that holds text, then fills all three (the body in one
+    undo step) and fires `input`. `.card[hidden]` and `.field-actions[hidden]` are in `mgmt.css`'s
+    guard list.
+  - Checked in a browser (before the AI additions): the dialog, Ask, the preview, Insert, the
+    summary and tag suggestions. **Checked headless since** (mgmt.js and the vendored TinyMCE on a
+    bare page, CDP, no stack): the editor starts without console errors, the AI and Blocks buttons,
+    `body-blocks.css` inside the iframe, every block toggling on and off (the wrappers carry
+    `remove: 'all'`, or toggling off leaves a bare `<div>`), the dialog's seven actions with a
+    selection and write / lay out all without one, an image-only selection collapsed before the
+    bookmark (or "write at the cursor" replaces the image). **Not yet checked on a running stack**:
+    the fetch round trips, the draft card, the title list, design assist's refine and undo, the
+    design job.
 - **The installation screen tests the gateway** (`POST /mgmt/platform/ai-test`, `platform.manage`):
   `AiGateway.ping`, one call of at most 64 tokens with the default model and **no website or person
   attributed** (nothing is bound there; the headers are left out). The flash names the time, the
@@ -1845,9 +1989,15 @@ feature's model is `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, 
     mock does;
   - `TranslationWriterIT` uses real MongoDB: every id shape (int, slug, name), an absent list, a
     `$` value, case, and the compare-and-set refusing a changed menu;
-  - `HtmlSafetyTest` and `WritingAssistTest`;
-  - `MgmtScreenRenderTest.writingHelp`/`editorAiControls`, and `MgmtSecurityTest` pins the three
-    endpoints anonymously.
+  - `HtmlSafetyTest` (body mode too) and `WritingAssistTest` (titles, draft, write, the wording
+    check, the embed refusal);
+  - `DesignAssistTest` (refine shows the draft, a theme `null` keeps), `DesignLayoutsTest` and
+    `DesignThemeAndMenusTest` (undo, redo, one step, forgotten on other changes, a job's rerun,
+    unrendered sections kept), `DesignSiteHandlerTest`, `DesignScreensTest.designWholeSite`/
+    `designAssistUndo`;
+  - `BodyBlocksCssTest`: every `BodyBlocks` class is in `site.css` and `body-blocks.css`;
+  - `MgmtScreenRenderTest.writingHelp`/`editorAiControls`/`bodyBlocksStylesheet` (the draft card
+    outside the form, nothing named), and `MgmtSecurityTest` pins the seven endpoints anonymously.
 
 ### Studio languages
 
@@ -1921,8 +2071,8 @@ running site — under the organisation `org_it`, which it saves first, since th
 an explicit organisation that does not exist — and its subclasses check routing, host resolution,
 caches, storage and metrics stay apart; `SiteLifecycleIT` creates, serves and deletes a third and
 checks that a flush afterwards does not bring its database back. `LayoutRenderIT`,
-`TemplateSetIsolationIT` and `PreviewIT` add websites of their own where they change one (a layout,
-a template set, a tag manager), so the shared context's `alpha` and `beta` stay as the others
+`TemplateSetIsolationIT`, `PreviewIT` and `ArchiveIT` add websites of their own where they change one (a layout,
+a template set, a tag manager, an exported website), so the shared context's `alpha` and `beta` stay as the others
 expect; `FramingIT` reads the framing headers over real HTTP; `PublicArticlesIT` checks that only
 published articles reach a reader, and each website's sitemap; `DemoSiteRenderIT` gives two new
 websites (one per template set) the seed steps and the demo content, built by hand, and reads every
@@ -2090,7 +2240,7 @@ and `docs/RUNNING.md` (*Moving to pacod-net*) copies them.
   chosen key through it, and the skill's `traffic` goes to the site's own port for that reason.
   `X-Pacod-Print` (the PDF renderer's token, *PDF export*) is removed, so only a request on the
   compose network can carry one. `SERVER_FORWARD_HEADERS_STRATEGY=FRAMEWORK` on both applications.
-- **Body limits are `4MiB` (1 MiB for pacod-id), never `4MB`**: Caddy's `MB` is decimal, 4,000,000
+- **Body limits are `4MiB` (1 MiB for pacod-id; `CMS_ARCHIVE_MAX_SIZE`, 2 GiB, on the studio's two restore paths, *Export and restore*), never `4MB`**: Caddy's `MB` is decimal, 4,000,000
   bytes, while Spring's `4MB` is 4 MiB — with `MB`, a body between the two would be Caddy's bare
   413 instead of the application's sentence. Caddy enforces it while the upstream reads the body,
   so a 302 to sign-in at 5 MB is no evidence either way. Checked: 4,100,000 bytes reach the site,
@@ -2206,6 +2356,15 @@ icon font or CDN script. Keep in `site.css`: **`.video-container`** (the respons
 widgets and articles inject YouTube into), **`.article-body`**'s guards for legacy bodies (inline
 widths, `<font>`, `<style>`, Word markup, tables — a fresh seed will not show them), and real CSS
 rules for every hover state.
+
+**The body's styled blocks** (`core.design.BodyBlocks`: `body-lead`, `-callout`, `-pullquote`,
+`-facts`, `-columns`, `-figure` with `-left`/`-right`) are styled in `site.css` under
+`.article-body .body-…`, theme tokens only, and adapted in `print.css` (border, no fill, columns
+flattened inside `.sci-body`, the facts `<h3>` kept out of the section counters). `minimal` inherits
+them. The studio draws them in the editor from its own `mgmt-assets/body-blocks.css` (*AI*);
+`BodyBlocksCssTest` fails when either sheet lacks a block. The names were checked against EasyList,
+EasyPrivacy and both Fanboy lists (`.body-ad` and site-specific `.callout`s exist there); grep all
+four before renaming.
 
 **The article images are a scroll-snap strip (`.gallery`) that `initGallery()` upgrades into a
 carousel.** The template writes the strip only; **the script builds every control** and adds
