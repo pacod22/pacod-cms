@@ -44,9 +44,11 @@ On its first start the studio creates **three demo websites** in one demo organi
 **"Demo Journal"** (editorial) at **http://demo.localhost:8000/** and **http://localhost:8000/**,
 **"Demo Notes"** (minimal) at **http://minimal.localhost:8000/**, and **"Starward"**, a space-travel
 magazine for an invented star system, at **http://space.localhost:8000/**.
-Each has its languages, standing pages, settings, menus and the **demo content**: six sections,
-twenty published articles with generated pictures (some translated into German and Spanish), a
-link page and two bookings of its own. `*.localhost` resolves to your own machine on macOS and in current
+The two journals have six sections, twenty published articles with generated pictures (some
+translated into German and Spanish), a link page and two bookings of their own. Starward is the
+showcase: the image-led **magazine** template set, 24 long-form articles illustrated with NASA
+photographs, its own pages, menus, layouts and journal issues, and five invented advertisers with
+animated HTML5 creatives and their own pages. `*.localhost` resolves to your own machine on macOS and in current
 browsers, so no hosts file is needed.
 
 | | URL (development defaults, from `env/dev.env`) |
@@ -54,7 +56,7 @@ browsers, so no hosts file is needed.
 | Studio | http://studio.localhost:8000/ — the website list; a website's screens are under `/sites/<id>/mgmt/` |
 | Sign-in (pacod-id) | http://id.localhost:8000/ |
 | Mail catcher (every mail pacod-id sends) | http://localhost:8125/ |
-| Demo websites | http://demo.localhost:8000/ and http://localhost:8000/ (editorial); http://minimal.localhost:8000/ (minimal); http://space.localhost:8000/ (space travels) |
+| Demo websites | http://demo.localhost:8000/ and http://localhost:8000/ (editorial); http://minimal.localhost:8000/ (minimal); http://space.localhost:8000/ (magazine: Starward, the space travels) |
 | Over HTTPS (Caddy's local CA) | https://demo.localhost:8443/ — the studio's sign-in always returns to `STUDIO_ORIGIN`, locally http://studio.localhost:8000 |
 | Site, bypassing Caddy | http://localhost:8080/ (picks the website by host, like Caddy) |
 | Studio, bypassing Caddy | http://localhost:7070/mgmt-health — health only; signing in works only at the studio's configured address |
@@ -188,11 +190,14 @@ advertise, terms, privacy; `make reseed-pages SITE=<id>` rebuilds them for an ex
 `seed/languages.json` (the languages the website offers). **The privacy and terms pages ship as
 placeholders. Replace them before you publish.**
 
-**The demo content** (`pacod-cms-core/src/main/resources/demo/demo-journal.json`) is different: it
-is written only when someone asks for it — the new-website form's checkbox, `make site-create …
-DEMO=1`, `make seed SITE=<id>` — and only into a website that has no articles. Its pictures are
-drawn when it is written, at the website's image size, so the repository holds no photographs. Its
-places, people and festivals are invented; replace or delete any of it in the studio.
+**The demo content** (`pacod-cms-core/src/main/resources/demo/demo-journal.json` and
+`demo-space.json`) is different: it is written only when someone asks for it — the new-website
+form's checkbox, `make site-create … DEMO=1|space`, `make seed SITE=<id> [DEMO=space]` — and only into
+a website that has no articles. The journal's pictures are drawn when it is written, at the
+website's image size. Starward's are real photographs from NASA's missions and astronauts, captioned
+as the invented places of the Reach, each credited; where they come from and the rule for what may
+be shipped is `pacod-cms-core/src/main/resources/demo/space/photos/VENDORED.md`. Every place, person,
+festival and advertiser is invented; replace or delete any of it in the studio.
 
 **The original language of a website's content** is chosen when the website is created
 (`make site-create … LANGUAGE=de`; English by default) and stored on its record in the control
@@ -351,7 +356,7 @@ every setting a `.env` may hold. The secrets have no published default; `make ch
 | AI | `PACOD_GW_URL` (default `http://pacod-gw:8080`) `PACOD_GW_API_KEY` `PACOD_AI_MODEL` (default `@fast`) |
 | Portal | `PACOD_ID_PROVISIONER_TOKEN` (written by `make id-provisioner`; without it only platform admins create organisations) · `PACOD_SITE_DOMAIN` (new websites answer at `<id>.<domain>`) · `PACOD_ORG_CREATION` (`self-service` or `platform-admins`) · `PACOD_MAX_ORGS_PER_USER` `PACOD_MAX_SITES_PER_ORG` `PACOD_AI_FOR_NEW_ORGS` (starting values of the installation screen) |
 | Hosts | `STUDIO_HOST` `ID_HOST` (Caddy) · `DEMO_HOSTS`, `DEMO_MINIMAL_HOSTS`, `DEMO_SPACE_HOSTS` (the demo websites', on an empty platform) · `SITE_PUBLIC_SCHEME` `SITE_PUBLIC_PORT` (how the studio spells a website's address) |
-| Article image rules | `IMAGE_REQUIRED_WIDTH` `IMAGE_REQUIRED_HEIGHT` `IMAGE_MAX_BYTES` `IMAGE_DIMENSION_CHECK` `IMAGE_FILE_SIZE_CHECK` |
+| Article image rules | `IMAGE_REQUIRED_WIDTH` `IMAGE_REQUIRED_HEIGHT` (the minimum, and the shape: 600×400 by default) `IMAGE_MAX_BYTES` (400 KB) `IMAGE_DIMENSION_CHECK` `IMAGE_FILE_SIZE_CHECK` |
 | Statistics | `METRICS_VISITOR_SALT` `CRAWLER_TRACKING` `CRAWLER_VERIFY` |
 | CORS | `CORS_ALLOWED_ORIGINS` |
 | TLS in the JVM | `SSL_ENABLED` `SSL_KEYSTORE` `SSL_KEYSTORE_PASSWORD` `SSL_KEY_ALIAS` |

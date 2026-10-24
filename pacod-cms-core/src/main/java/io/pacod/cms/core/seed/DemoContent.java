@@ -86,15 +86,17 @@ public class DemoContent {
 
     /** The demos there are: an id the forms and commands name, and the seed it reads. */
     public enum Demo {
-        JOURNAL("journal", SEED),
-        SPACE("space", "demo/demo-space.json");
+        JOURNAL("journal", SEED, null),
+        SPACE("space", "demo/demo-space.json", "magazine");
 
         private final String id;
         private final String resource;
+        private final String templateSet;
 
-        Demo(String id, String resource) {
+        Demo(String id, String resource, String templateSet) {
             this.id = id;
             this.resource = resource;
+            this.templateSet = templateSet;
         }
 
         public String id() {
@@ -103,6 +105,15 @@ public class DemoContent {
 
         public String resource() {
             return resource;
+        }
+
+        /**
+         * The template set the demo is designed for -- its layouts are written only into a website
+         * on that set -- or null for whichever the website has. What a website created FOR the
+         * demo is given when nobody names a set ({@code --create-site --demo}, the bootstrap).
+         */
+        public String templateSet() {
+            return templateSet;
         }
 
         /** The demo named {@code id}, case ignored; blank, {@code true} or {@code 1} mean the journal. */
@@ -166,6 +177,29 @@ public class DemoContent {
                                 io.pacod.cms.core.repository.ThemeRepository themes) {
         this.siteSettings = siteSettings;
         this.themes = themes;
+    }
+
+    private io.pacod.cms.core.repository.PageRepository pageRepository;
+    private io.pacod.cms.core.repository.LanguageRepository languageRepository;
+    private io.pacod.cms.core.repository.LayoutRepository layoutRepository;
+    private io.pacod.cms.core.repository.JournalIssueRepository issueRepository;
+    private io.pacod.cms.core.design.TemplateSetCatalog templateSets;
+
+    /**
+     * Where a seed's standing pages, languages, layouts and journal issues go; optional for the
+     * same reason as {@link #useSiteAndTheme}: the journal's seed has none of them.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void useStandingContent(io.pacod.cms.core.repository.PageRepository pageRepository,
+                                   io.pacod.cms.core.repository.LanguageRepository languageRepository,
+                                   io.pacod.cms.core.repository.LayoutRepository layoutRepository,
+                                   io.pacod.cms.core.repository.JournalIssueRepository issueRepository,
+                                   io.pacod.cms.core.design.TemplateSetCatalog templateSets) {
+        this.pageRepository = pageRepository;
+        this.languageRepository = languageRepository;
+        this.layoutRepository = layoutRepository;
+        this.issueRepository = issueRepository;
+        this.templateSets = templateSets;
     }
 
     private final ArticleRepository articles;
@@ -303,10 +337,16 @@ public class DemoContent {
             }
         }
 
-        boolean menuGroup = addSectionsGroup(seed);
+        boolean menuGroup = seed.getMenus().isEmpty() ? addSectionsGroup(seed) : replaceMenus(seed);
         boolean socialPage = addSocialPage(seed, website, lang);
-        addSiteTexts(seed);
+        addSiteTexts(seed, website, lang);
         addTheme(seed);
+        addPages(seed, website, lang);
+        if (seed.isNarrowLanguages()) {
+            narrowLanguages(seed);
+        }
+        addLayouts(seed);
+        addIssues(seed, pictures, lang);
 
         Map<Integer, Category> categoryById = byId(categories.findAllById(
                 seed.getCategories().stream().map(CategorySeed::getId).toList()), Category::getId);
@@ -326,11 +366,15 @@ public class DemoContent {
 
     private ImageMedia storePicture(ImageSeed image, String filename, String lang) {
         long limit = imageService.isFileSizeCheckEnabled() ? imageService.getMaxImageBytes() : 0;
-        byte[] jpeg = DemoImages.jpeg(DemoImages.draw(image.getKey(), DemoImages.Motif.of(image.getMotif()),
-                image.getColours(), imageService.getRequiredWidth(), imageService.getRequiredHeight()), limit);
+        byte[] jpeg = image.getPhoto() != null
+                ? DemoPhotos.fit(DemoPhotos.read(image.getPhoto()), imageService.getRequiredWidth(),
+                        imageService.getRequiredHeight(), imageService.isDimensionCheckEnabled(), limit,
+                        image.getFocusX(), image.getFocusY())
+                : DemoImages.jpeg(DemoImages.draw(image.getKey(), DemoImages.Motif.of(image.getMotif()),
+                        image.getColours(), imageService.getRequiredWidth(), imageService.getRequiredHeight()), limit);
         ImageMedia stored;
         try {
-            stored = imageService.save(filename, "image/jpeg", jpeg, image.getCaptions().get(lang));
+            stored = imageService.save(filename, "image/jpeg", jpeg, caption(image, lang));
         } catch (MediaException e) {
             throw new IllegalStateException("Could not store the demo picture " + filename + ": " + e.getMessage(), e);
         }
@@ -339,6 +383,15 @@ public class DemoContent {
         stored.setAlts(alts);
         stored.setCreatedOn(LocalDateTime.now());
         return images.save(stored);
+    }
+
+    /** A picture's caption, its credit after it: a photograph says whose it is wherever it is shown. */
+    static String caption(ImageSeed image, String lang) {
+        String caption = image.getCaptions().get(lang);
+        if (image.getCredit() == null || image.getCredit().isBlank()) {
+            return caption;
+        }
+        return caption == null || caption.isBlank() ? image.getCredit() : caption + " " + image.getCredit();
     }
 
     private static Article toArticle(ArticleSeed seed, String lang, LocalDateTime now, Map<Integer, Category> categories,
@@ -363,6 +416,11 @@ public class DemoContent {
         article.setCategories(seed.getCategories().stream().map(categories::get).toList());
         article.setAuthors(seed.getAuthors().stream().map(authors::get).toList());
         article.setImages(seed.getImages().stream().map(pictures::get).toList());
+        if (!seed.getInline().isEmpty()) {
+            // Pictures placed inside the body by address: attached, so they are counted as used and
+            // never offered for deletion, and hidden, so the gallery does not show them twice.
+            article.setHiddenImageIds(seed.getInline().stream().map(key -> pictures.get(key).getId()).toList());
+        }
         article.setTags(seed.getTags());
         // Last: the setters above stamp lastModifiedOn with the clock.
         article.setLastModifiedOn(date);
@@ -415,24 +473,269 @@ public class DemoContent {
         return false;
     }
 
-    /** The seed's taglines and descriptions, each list only while the website's is empty. */
-    private void addSiteTexts(Seed seed) {
+    /**
+     * The seed's taglines, descriptions, contact details and profiles, each only while the
+     * website's is empty, and its footer note only while the website's is still the "© name"
+     * {@code SiteBootstrap} wrote. {@value #NAME} in a text is the website's name.
+     */
+    private void addSiteTexts(Seed seed, SiteSeedStep.Website website, String lang) {
         if (seed.getSite() == null || siteSettings == null) {
             return;
         }
+        SiteSeed texts = seed.getSite();
         io.pacod.cms.core.data.SiteSettings site = siteSettings.findById(io.pacod.cms.core.data.SiteSettings.ID)
                 .orElseGet(io.pacod.cms.core.data.SiteSettings::new);
         boolean changed = false;
-        if ((site.getTaglines() == null || site.getTaglines().isEmpty()) && !seed.getSite().getTaglines().isEmpty()) {
-            site.setTaglines(texts(seed.getSite().getTaglines()));
+        if ((site.getTaglines() == null || site.getTaglines().isEmpty()) && !texts.getTaglines().isEmpty()) {
+            site.setTaglines(texts(named(texts.getTaglines(), website)));
             changed = true;
         }
-        if ((site.getDescriptions() == null || site.getDescriptions().isEmpty()) && !seed.getSite().getDescriptions().isEmpty()) {
-            site.setDescriptions(texts(seed.getSite().getDescriptions()));
+        if ((site.getDescriptions() == null || site.getDescriptions().isEmpty()) && !texts.getDescriptions().isEmpty()) {
+            site.setDescriptions(texts(named(texts.getDescriptions(), website)));
+            changed = true;
+        }
+        List<TextItem> generated = TextItems.put(List.of(), lang, "© " + website.name());
+        if (!texts.getFooterNotes().isEmpty() && (site.getFooterNotes() == null || site.getFooterNotes().isEmpty()
+                || site.getFooterNotes().equals(generated))) {
+            site.setFooterNotes(texts(named(texts.getFooterNotes(), website)));
+            changed = true;
+        }
+        if (isBlank(site.getContactAddress()) && isBlank(site.getContactPhone()) && isBlank(site.getContactEmail())
+                && (texts.getContactAddress() != null || texts.getContactEmail() != null)) {
+            site.setContactAddress(texts.getContactAddress());
+            site.setContactPhone(texts.getContactPhone());
+            site.setContactEmail(texts.getContactEmail());
+            changed = true;
+        }
+        if ((site.getSocialProfiles() == null || site.getSocialProfiles().isEmpty()) && !texts.getSocialProfiles().isEmpty()) {
+            site.setSocialProfiles(new ArrayList<>(texts.getSocialProfiles()));
             changed = true;
         }
         if (changed) {
+            site.setLastModifiedOn(LocalDateTime.now());
             siteSettings.save(site);
+        }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    /** The texts with the website's name where they say {@value #NAME}. */
+    private static Map<String, String> named(Map<String, String> byLang, SiteSeedStep.Website website) {
+        Map<String, String> named = new LinkedHashMap<>();
+        byLang.forEach((code, text) -> named.put(code, text == null ? null : text.replace(NAME, website.name())));
+        return named;
+    }
+
+    /**
+     * The seed's menus in place of {@code SiteBootstrap}'s generic ones -- each only while it is
+     * still exactly what that step wrote, or absent: a menu an operator has touched stays theirs.
+     *
+     * @return whether the main menu was written
+     */
+    private boolean replaceMenus(Seed seed) {
+        SiteBootstrap.Seed generic;
+        try {
+            generic = SiteBootstrap.readSeed(objectMapper);
+        } catch (IOException | RuntimeException e) {
+            log.warn("Could not read the generic menus to compare with; the demo's menus are not written: {}", e.getMessage());
+            return false;
+        }
+        boolean main = false;
+        for (Map.Entry<String, List<SiteBootstrap.ItemSeed>> entry : seed.getMenus().entrySet()) {
+            String key = entry.getKey();
+            Menu current = menus.findById(key).orElse(null);
+            List<MenuItem> untouched = generic.getMenus().stream().filter(m -> key.equals(m.getKey())).findFirst()
+                    .map(m -> SiteBootstrap.toMenu(m).getItems()).orElse(null);
+            if (current != null && (untouched == null || !untouched.equals(current.getItems()))) {
+                log.info("Menu '{}' has been edited; the demo leaves it", key);
+                continue;
+            }
+            SiteBootstrap.MenuSeed menu = new SiteBootstrap.MenuSeed();
+            menu.setKey(key);
+            menu.setItems(entry.getValue());
+            menus.save(SiteBootstrap.toMenu(menu));
+            main |= Menu.MAIN.equals(key);
+        }
+        return main;
+    }
+
+    /**
+     * The seed's pages. A new slug is written while absent; a standing page the website already
+     * has ({@code seed/pages.json}: about, contact, advertise ...) is replaced only while it is
+     * still exactly what {@code PageBootstrap} wrote -- never an edited one.
+     */
+    private void addPages(Seed seed, SiteSeedStep.Website website, String lang) {
+        if (seed.getPages().isEmpty() || pageRepository == null) {
+            return;
+        }
+        Map<String, PageBootstrap.Seed> standing = new LinkedHashMap<>();
+        try {
+            PageBootstrap.readSeed(objectMapper).forEach(p -> standing.put(p.getSlug(), p));
+        } catch (IOException | RuntimeException e) {
+            log.warn("Could not read the standing pages to compare with; none is replaced: {}", e.getMessage());
+        }
+        for (PageSeed seedPage : seed.getPages()) {
+            io.pacod.cms.core.data.Page current = pageRepository.findById(seedPage.getSlug()).orElse(null);
+            if (current != null) {
+                PageBootstrap.Seed original = standing.get(seedPage.getSlug());
+                if (original == null || !sameText(current, PageBootstrap.toPage(original))) {
+                    continue;
+                }
+            }
+            io.pacod.cms.core.data.Page page = new io.pacod.cms.core.data.Page(seedPage.getSlug());
+            page.setSortOrder(seedPage.getSortOrder());
+            page.setPublished(seedPage.isPublished());
+            page.setOfficialInDefaultLanguageOnly(seedPage.isOfficialInDefaultLanguageOnly());
+            named(seedPage.getTitles(), website).forEach(page::putTitle);
+            named(seedPage.getBodies(), website).forEach(page::putBody);
+            named(seedPage.getDescriptions(), website).forEach(page::putDescription);
+            LocalDateTime now = LocalDateTime.now();
+            page.setCreatedOn(current != null && current.getCreatedOn() != null ? current.getCreatedOn() : now);
+            page.setLastModifiedOn(now);
+            pageRepository.save(page);
+        }
+    }
+
+    /** Whether two pages hold the same titles, bodies and descriptions in every language. */
+    private static boolean sameText(io.pacod.cms.core.data.Page a, io.pacod.cms.core.data.Page b) {
+        Set<String> codes = new TreeSet<>();
+        for (io.pacod.cms.core.data.Page page : List.of(a, b)) {
+            for (List<TextItem> items : java.util.Arrays.asList(page.getTitles(), page.getBodies(), page.getDescriptions())) {
+                if (items != null) {
+                    items.forEach(item -> codes.add(item.getLang()));
+                }
+            }
+        }
+        for (String code : codes) {
+            if (!java.util.Objects.equals(a.rawTitle(code), b.rawTitle(code))
+                    || !java.util.Objects.equals(a.rawBody(code), b.rawBody(code))
+                    || !java.util.Objects.equals(a.rawDescription(code), b.rawDescription(code))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The website's languages narrowed to the seed's: a demo written in one language would
+     * otherwise offer a switcher of five that all show the same text. A language goes only while it
+     * is exactly as {@code LanguageBootstrap} wrote it, is neither the original nor
+     * {@link LanguageChain#FALLBACK}, and no page holds text in it -- the studio's own rules for
+     * deleting one.
+     */
+    private void narrowLanguages(Seed seed) {
+        if (languageRepository == null || pageRepository == null) {
+            return;
+        }
+        Map<String, io.pacod.cms.core.data.Language> generic = new LinkedHashMap<>();
+        try {
+            LanguageBootstrap.readSeed(objectMapper).forEach(l -> generic.put(l.getCode(), l));
+        } catch (IOException | RuntimeException e) {
+            log.warn("Could not read the seeded languages to compare with; none is removed: {}", e.getMessage());
+            return;
+        }
+        Set<String> keep = completeLanguages(seed);
+        List<io.pacod.cms.core.data.Page> pages = pageRepository.findAll();
+        for (io.pacod.cms.core.data.Language language : languageRepository.findAll()) {
+            String code = language.getCode();
+            if (keep.contains(code) || code.equals(LanguageChain.original()) || code.equals(LanguageChain.FALLBACK)
+                    || !language.equals(generic.get(code))
+                    || pages.stream().anyMatch(page -> page.hasAnyTextIn(code))) {
+                continue;
+            }
+            languageRepository.deleteById(code);
+        }
+    }
+
+    /**
+     * The seed's layouts, published, each only while the website has none for that page type, and
+     * only on the template set they were designed for ({@link Seed#getLayoutSet()}) -- where every
+     * one must resolve without an issue, or it is not written: a section a set cannot render is
+     * dropped from the page without a word.
+     */
+    private void addLayouts(Seed seed) {
+        if (seed.getLayouts().isEmpty() || layoutRepository == null || templateSets == null) {
+            return;
+        }
+        String set = TenantContext.current().templateSet();
+        if (!set.equals(seed.getLayoutSet())) {
+            log.info("The demo's layouts are for the {} set, not {}; the set's own defaults stay", seed.getLayoutSet(), set);
+            return;
+        }
+        io.pacod.cms.core.design.TemplateSetManifest manifest = templateSets.orDefault(set);
+        java.time.Instant now = java.time.Instant.now();
+        for (Map.Entry<String, Map<String, List<SectionSeed>>> entry : seed.getLayouts().entrySet()) {
+            io.pacod.cms.core.design.PageType pageType = io.pacod.cms.core.design.PageType.valueOf(entry.getKey());
+            if (layoutRepository.existsById(pageType.name())) {
+                continue;
+            }
+            Map<String, List<io.pacod.cms.core.design.Section>> regions = toRegions(entry.getValue());
+            List<io.pacod.cms.core.design.LayoutResolver.Issue> issues =
+                    io.pacod.cms.core.design.LayoutResolver.resolve(manifest, pageType, regions).issues();
+            if (!issues.isEmpty()) {
+                log.error("The demo's {} layout does not fit the {} set and is not written: {}", pageType, set, issues);
+                continue;
+            }
+            io.pacod.cms.core.design.Layout layout = new io.pacod.cms.core.design.Layout(pageType);
+            layout.setDraft(io.pacod.cms.core.design.Layout.copy(regions));
+            layout.setPublished(io.pacod.cms.core.design.Layout.copy(regions));
+            layout.setUpdatedOn(now);
+            layout.setPublishedOn(now);
+            layoutRepository.save(layout);
+        }
+    }
+
+    /** A seed layout's regions as sections, each one's settings checked as the studio checks them. */
+    static Map<String, List<io.pacod.cms.core.design.Section>> toRegions(Map<String, List<SectionSeed>> seed) {
+        Map<String, List<io.pacod.cms.core.design.Section>> regions = new LinkedHashMap<>();
+        seed.forEach((region, sections) -> {
+            List<io.pacod.cms.core.design.Section> out = new ArrayList<>();
+            for (SectionSeed section : sections) {
+                io.pacod.cms.core.design.SectionType type = io.pacod.cms.core.design.SectionType.byId(section.getType())
+                        .orElseThrow(() -> new IllegalStateException("Unknown section type " + section.getType()));
+                io.pacod.cms.core.design.SectionSettings.Result checked =
+                        io.pacod.cms.core.design.SectionSettings.check(type, section.getSettings());
+                if (!checked.ok()) {
+                    throw new IllegalStateException("Section " + section.getType() + " in " + region + ": " + checked.errors());
+                }
+                out.add(io.pacod.cms.core.design.Section.of(type, checked.settings()));
+            }
+            regions.put(region, out);
+        });
+        return regions;
+    }
+
+    /**
+     * The seed's journal issues, published, while the website has none. No PDF is made: the
+     * pages list an issue's articles and link a PDF only once one exists.
+     */
+    private void addIssues(Seed seed, Map<String, ImageMedia> pictures, String lang) {
+        if (seed.getIssues().isEmpty() || issueRepository == null || issueRepository.count() > 0) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        int id = 1;
+        for (IssueSeed seedIssue : seed.getIssues()) {
+            io.pacod.cms.core.data.JournalIssue issue = new io.pacod.cms.core.data.JournalIssue();
+            issue.setId(id++);
+            issue.setVolume(seedIssue.getVolume());
+            issue.setNumber(seedIssue.getNumber());
+            LocalDateTime month = now.minusMonths(seedIssue.getMonthsAgo());
+            issue.setYear(month.getYear());
+            issue.setMonth(month.getMonthValue());
+            issue.setTitles(texts(seedIssue.getTitles()));
+            issue.setEditorials(texts(seedIssue.getEditorials()));
+            ImageMedia cover = pictures.get(seedIssue.getCover());
+            issue.setCoverImageId(cover == null ? null : cover.getId());
+            issue.setArticleIds(new ArrayList<>(seedIssue.getArticles()));
+            issue.setLanguages(new ArrayList<>(List.of(lang)));
+            issue.setStatus(io.pacod.cms.core.data.IssueStatus.PUBLISHED);
+            issue.setCreatedOn(now);
+            issue.setLastModifiedOn(now);
+            issue.setPublishedOn(now);
+            issueRepository.insert(issue);
         }
     }
 
@@ -464,7 +767,7 @@ public class DemoContent {
         SocialPage page = new SocialPage();
         page.setPublished(true);
         page.putName(lang, website.name());
-        social.getBios().forEach(page::putBio);
+        named(social.getBios(), website).forEach(page::putBio);
         social.getLatestHeadings().forEach(page::putLatestHeading);
         page.setShowLatestArticles(true);
         page.setLatestArticlesCount(social.getLatestCount());
@@ -495,7 +798,14 @@ public class DemoContent {
             required.add(a.getDescriptions());
             required.add(a.getBodies());
         });
-        required.add(seed.getMenu().getLabels());
+        if (!seed.getCategories().isEmpty() && seed.getMenus().isEmpty()) {
+            required.add(seed.getMenu().getLabels());
+        }
+        seed.getPages().forEach(p -> {
+            required.add(p.getTitles());
+            required.add(p.getBodies());
+        });
+        seed.getIssues().forEach(i -> required.add(i.getTitles()));
         required.add(seed.getSocial().getBios());
         required.add(seed.getSocial().getLatestHeadings());
         seed.getSocial().getLinks().forEach(l -> required.add(l.getTitles()));
@@ -565,12 +875,106 @@ public class DemoContent {
         private SiteSeed site;
         /** Theme token values ({@code ThemeToken} ids), drafted and published where there is no theme; optional. */
         private Map<String, String> theme;
+        /** Menus by key, written in place of the generic ones while those are untouched; optional. */
+        private Map<String, List<SiteBootstrap.ItemSeed>> menus = new LinkedHashMap<>();
+        /** Standing pages and the advertisers' pages; optional. */
+        private List<PageSeed> pages = new ArrayList<>();
+        /** Whether the website's languages are narrowed to the ones the seed is written in. */
+        private boolean narrowLanguages;
+        /** The template set {@link #layouts} are designed for. */
+        private String layoutSet;
+        /** Page type to region to sections, published where the page type has no layout; optional. */
+        private Map<String, Map<String, List<SectionSeed>>> layouts = new LinkedHashMap<>();
+        /** Journal issues, published, where the website has none; optional. */
+        private List<IssueSeed> issues = new ArrayList<>();
+        /** The advertisers, with their pages' slugs, creatives and bookings: the studio writes them. */
+        private List<PartnerSeed> partners = new ArrayList<>();
+        /** The website's favicon, logos and share picture: the studio writes them. */
+        private BrandSeed brand;
     }
 
     @Data
     public static class SiteSeed {
         private Map<String, String> taglines = new LinkedHashMap<>();
         private Map<String, String> descriptions = new LinkedHashMap<>();
+        private Map<String, String> footerNotes = new LinkedHashMap<>();
+        private String contactAddress;
+        private String contactPhone;
+        private String contactEmail;
+        private List<io.pacod.cms.core.data.SiteSettings.SocialProfile> socialProfiles = new ArrayList<>();
+    }
+
+    @Data
+    public static class PageSeed {
+        private String slug;
+        private Integer sortOrder = 0;
+        private boolean published = true;
+        private boolean officialInDefaultLanguageOnly;
+        private Map<String, String> titles = new LinkedHashMap<>();
+        private Map<String, String> bodies = new LinkedHashMap<>();
+        private Map<String, String> descriptions = new LinkedHashMap<>();
+    }
+
+    @Data
+    public static class SectionSeed {
+        private String type;
+        private Map<String, Object> settings = new LinkedHashMap<>();
+    }
+
+    @Data
+    public static class IssueSeed {
+        private int volume;
+        private int number;
+        /** How many months before the install the issue is dated. */
+        private int monthsAgo;
+        private String cover;
+        private List<Integer> articles = new ArrayList<>();
+        private Map<String, String> titles = new LinkedHashMap<>();
+        private Map<String, String> editorials = new LinkedHashMap<>();
+    }
+
+    /**
+     * One advertiser. Its landing page is one of {@link Seed#getPages()} ({@link #page}); its
+     * creatives are a folder on the studio's classpath, imported as a banner layout of id
+     * {@link #id}, with the demo photographs it names copied in.
+     */
+    @Data
+    public static class PartnerSeed {
+        private String id;
+        private String name;
+        /** The slug of its landing page. */
+        private String page;
+        /** The classpath folder holding its creatives. */
+        private String folder;
+        /** Demo photographs copied into the folder: file name there, to image key. */
+        private Map<String, String> photos = new LinkedHashMap<>();
+        private List<BookingSeed> bookings = new ArrayList<>();
+    }
+
+    @Data
+    public static class BookingSeed {
+        private String name;
+        /** HTML5: a file of the advertiser's folder. IMAGE: a classpath picture, uploaded. */
+        private String type = "HTML5";
+        private String file;
+        private String image;
+        private String alt;
+        private String size;
+        private String placement;
+        private List<String> pages = new ArrayList<>();
+        private int sortOrder;
+    }
+
+    @Data
+    public static class BrandSeed {
+        /** Classpath SVGs. */
+        private String favicon;
+        private String logoLight;
+        private String logoDark;
+        /** The logos are written only for a website of this name: they spell it. */
+        private String logoName;
+        /** The image key the share picture is cut from. */
+        private String share;
     }
 
     @Data
@@ -591,8 +995,17 @@ public class DemoContent {
     @Data
     public static class ImageSeed {
         private String key;
+        /** Drawn: one of {@link DemoImages.Motif}, with {@link #colours}. */
         private String motif;
         private List<String> colours = new ArrayList<>();
+        /** Or a photograph: its classpath path, its credit line, where it came from. */
+        private String photo;
+        private String credit;
+        private String source;
+        private String nasaId;
+        /** The crop's centre in the photograph, 0..1. */
+        private double focusX = 0.5;
+        private double focusY = 0.5;
         private Map<String, String> captions = new LinkedHashMap<>();
         private Map<String, String> alts = new LinkedHashMap<>();
     }
@@ -606,6 +1019,8 @@ public class DemoContent {
         private List<Integer> categories = new ArrayList<>();
         private List<Integer> authors = new ArrayList<>();
         private List<String> images = new ArrayList<>();
+        /** Of {@link #images}, the ones placed inside the body by address: hidden from the gallery. */
+        private List<String> inline = new ArrayList<>();
         private List<String> tags = new ArrayList<>();
         private Map<String, String> titles = new LinkedHashMap<>();
         private Map<String, String> descriptions = new LinkedHashMap<>();

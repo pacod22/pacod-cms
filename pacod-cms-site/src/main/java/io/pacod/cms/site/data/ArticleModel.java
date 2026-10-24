@@ -200,6 +200,56 @@ public class ArticleModel extends Article {
         return defaultText;
     }
 
+    /**
+     * Minutes to read the body at 230 words a minute, never under one: the magazine set's byline.
+     * A method, not a getter, so the article's JSON on /web/v1 does not change.
+     */
+    public int readingMinutes() {
+        String text = getText();
+        if (text == null || text.isBlank()) {
+            return 1;
+        }
+        String plain = text.replaceAll("<[^>]*>", " ").strip();
+        int words = plain.isEmpty() ? 0 : plain.split("\\s+").length;
+        return Math.max(1, Math.round(words / 230f));
+    }
+
+    /** An author's job title, first name, last name or bio in this article's language. */
+    public String authorText(List<TextItem> items, String defaultText) {
+        return getLocalizedText(items, defaultText, this.getLang());
+    }
+
+    /** One author's name in this article's language: first and last, as the magazine set prints it. */
+    public String authorName(Author author) {
+        if (author == null) {
+            return "";
+        }
+        return java.util.stream.Stream.of(authorText(author.getFirstnames(), author.getFirstname()),
+                        authorText(author.getLastnames(), author.getLastname()))
+                .filter(n -> n != null && !n.isBlank())
+                .collect(java.util.stream.Collectors.joining(" "));
+    }
+
+    /** The authors' names alone, joined: the byline under the magazine set's headline. */
+    public String authorNames() {
+        if (getAuthors() == null) {
+            return "";
+        }
+        return getAuthors().stream().map(this::authorName).filter(n -> !n.isBlank())
+                .collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    /** An author's initials, for the avatar beside the bio: "LV". */
+    public String authorInitials(Author author) {
+        StringBuilder initials = new StringBuilder(2);
+        for (String part : authorName(author).split("\\s+")) {
+            if (!part.isEmpty() && initials.length() < 2) {
+                initials.appendCodePoint(part.codePointAt(0));
+            }
+        }
+        return initials.toString().toUpperCase(java.util.Locale.ROOT);
+    }
+
     public String getDateAsText() {
         if (memoDateAsText == null) {
             memoDateAsText = this.getDate() != null

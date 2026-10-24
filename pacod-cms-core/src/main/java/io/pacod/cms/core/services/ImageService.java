@@ -47,6 +47,15 @@ public class ImageService {
     /**
      * The size a new upload must be, in pixels and in bytes.
      *
+     * <p><b>The pixel rule is a minimum and a shape, not an exact size.</b> An upload passes when it
+     * is at least {@code required-width} x {@code required-height} and in those proportions, within
+     * one pixel of rounding ({@link #fitsDimensions}): with the defaults, 600x400, 1200x800 and
+     * 1600x1067 all pass, 1600x900 does not. The properties keep their names (and
+     * {@code IMAGE_REQUIRED_*} theirs), so an operator's setting keeps working; they once
+     * meant "exactly". The shape is what the layout needs -- every thumbnail and gallery slide is
+     * cropped to nothing and drawn at that ratio -- while a larger picture is what a wide page
+     * needs to stay sharp.
+     *
      * <p>Settings, not {@code public static final} constants: the console's
      * {@code MgmtControllerAdvice} and {@code UploadSizeAdvice} autowire this service to read
      * them, so there is no second copy of a number to drift -- the same reason the console
@@ -77,7 +86,7 @@ public class ImageService {
     @Value("${app.image.required-height:400}")
     private int requiredHeight;
 
-    @Value("${app.image.max-bytes:131072}")
+    @Value("${app.image.max-bytes:409600}")
     private DataSize maxImageBytes;
 
     /**
@@ -89,9 +98,9 @@ public class ImageService {
      * scroll-snap gallery strip whose slides are one column wide -- with it off the site goes on
      * rendering, nothing crops and nothing fails, but those thumbnails and slides carry mixed
      * aspect ratios. The file-size check is about WEIGHT: what a reader downloads, and what the
-     * storage holds. An operator who wants a 1200x800 hero image has no reason to also accept a 3MB
-     * one, and an operator who wants a large 600x400 photograph has no reason to give up the
-     * layout. One flag could not express either.
+     * storage holds. An operator who wants a 1800x1200 photograph has no reason to also accept a
+     * 3MB one, and an operator who accepts any shape has no reason to give up the weight limit.
+     * One flag could not express either.
      *
      * <p><b>Neither switch reaches the content type or the {@code ImageIO} readability check.</b>
      * See {@link #ALLOWED_CONTENT_TYPES} for why that is not an omission.
@@ -231,6 +240,7 @@ public class ImageService {
      * are getters on the service rather than constants because a constant cannot be configured and
      * a second copy of the number would drift.
      */
+    /** The smallest width an upload may have; with the height, also the shape it must have. */
     public int getRequiredWidth() {
         return requiredWidth;
     }
@@ -241,6 +251,24 @@ public class ImageService {
 
     public long getMaxImageBytes() {
         return maxImageBytes.toBytes();
+    }
+
+    /**
+     * Whether a picture of {@code width} x {@code height} meets the rule of a minimum of
+     * {@code minWidth} x {@code minHeight}: at least that size, and in its proportions within one
+     * pixel of rounding -- {@code |height * minWidth - width * minHeight| <= minWidth}, so a
+     * 1600-wide picture at 600:400 may be 1066 or 1067 high, not 1065.
+     *
+     * <p>Static, because what states the rule (the console's help text and notes) and what
+     * prepares a picture for it (the demo's photographs) must apply the same arithmetic.
+     */
+    public static boolean fitsDimensions(int width, int height, int minWidth, int minHeight) {
+        return width >= minWidth && height >= minHeight && fitsShape(width, height, minWidth, minHeight);
+    }
+
+    /** The shape half of {@link #fitsDimensions}: the proportions, within one pixel. */
+    public static boolean fitsShape(int width, int height, int minWidth, int minHeight) {
+        return Math.abs((long) height * minWidth - (long) width * minHeight) <= minWidth;
     }
 
     /** False when {@code app.image.dimension-check.enabled} is off; see the field's javadoc. */
@@ -355,7 +383,8 @@ public class ImageService {
      * endpoint, so none of these may move to the client.
      *
      * <p>Two of the rules are switchable and two are not. {@code app.image.dimension-check.enabled}
-     * governs the pixel size and {@code app.image.file-size-check.enabled} the byte cap, each
+     * governs the pixel size -- a minimum and a shape, two refusals -- and
+     * {@code app.image.file-size-check.enabled} the byte cap, each
      * independently of the other -- all four combinations are supported and none is special-cased.
      * The empty-file, content-type and readability checks are not negotiable at any setting; see
      * {@link #ALLOWED_CONTENT_TYPES}.
@@ -415,11 +444,18 @@ public class ImageService {
             return;
         }
 
-        if (image.getWidth() != requiredWidth || image.getHeight() != requiredHeight) {
+        if (image.getWidth() < requiredWidth || image.getHeight() < requiredHeight) {
             throw new MediaException(String.format(
-                    "%s is %dx%d; the site layout requires exactly %dx%d.",
+                    "%s is %dx%d; the site layout requires at least %dx%d.",
                     filename, image.getWidth(), image.getHeight(), requiredWidth, requiredHeight),
-                    "articles.media.dimensions",
+                    "articles.media.tooSmall",
+                    filename, image.getWidth(), image.getHeight(), requiredWidth, requiredHeight);
+        }
+        if (!fitsShape(image.getWidth(), image.getHeight(), requiredWidth, requiredHeight)) {
+            throw new MediaException(String.format(
+                    "%s is %dx%d; the site layout requires the proportions of %dx%d.",
+                    filename, image.getWidth(), image.getHeight(), requiredWidth, requiredHeight),
+                    "articles.media.shape",
                     filename, image.getWidth(), image.getHeight(), requiredWidth, requiredHeight);
         }
     }

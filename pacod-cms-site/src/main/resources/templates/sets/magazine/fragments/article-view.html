@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*
+  One article, in two parts, shared by article.html (/article/{id}) and index.html (/latest).
+
+    articleHead  the section, the headline, the description as a dek, the byline, and the lead
+                 picture full width with its caption -- above the columns;
+    articleView  where the layout's primary section stands: the body, the rest of the pictures,
+                 the keywords, the authors.
+
+  The lead picture is the first VISIBLE image (visibleImages(), never images: an image the studio
+  hid is one placed inside the body, and must not lead the page). With a video the video leads, and
+  every picture goes to the gallery.
+
+  The gallery is editorial's: a scroll-snapped strip that site.js upgrades to a carousel, building
+  every control itself -- nothing here is a control, nothing in it is hidden.
+
+  The print view is not this: article-print stays editorial's, bare.
+*/-->
+<th:block th:fragment="articleHead(article, lang)">
+    <header class="shell mz-article-head"
+            th:with="cat=${article.categories != null and !article.categories.isEmpty() ? article.categories[0] : null}">
+        <nav class="mz-article-head__trail" th:aria-label="#{nav.home}">
+            <a th:href="@{/(lang=${lang})}" th:text="#{nav.home}">Home</a>
+            <th:block th:if="${cat != null}">
+                <span aria-hidden="true">/</span>
+                <a class="mz-kicker" th:href="@{/list/{id}(id=${cat.id}, lang=${lang})}" th:text="${cat.name}">Section</a>
+            </th:block>
+        </nav>
+
+        <h1 class="article-title mz-article-head__title" id="article-title" th:utext="${article.title}">Title</h1>
+        <p class="mz-article-head__dek" th:if="${!#strings.isEmpty(article.description)}"
+           th:utext="${article.description}">Dek</p>
+
+        <div class="mz-byline">
+            <span class="mz-byline__names" id="authors"
+                  th:if="${article.showArticleInfo() and !#strings.isEmpty(article.authorNames())}"
+                  th:text="#{magazine.byline(${article.authorNames()})}">By someone</span>
+            <span class="mz-byline__facts">
+                <span th:text="${article.dateAsText}">01.01.2026</span>
+                <span aria-hidden="true">·</span>
+                <span th:text="#{magazine.readingTime(${article.readingMinutes()})}">5 min read</span>
+                <span aria-hidden="true">·</span>
+                <span class="mz-reads">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="1.8" aria-hidden="true" focusable="false">
+                        <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    <span th:text="${article.counter != null ? article.counter : 0}">0</span>
+                </span>
+            </span>
+            <span class="byline__meta" th:if="${article.hasTranslation(lang)}"
+                  th:text="#{article.aiTranslated}">* AI-translated content</span>
+            <span class="mz-byline__actions">
+                <a class="mz-button mz-button--ghost mz-button--small" target="_blank" rel="noopener"
+                   th:if="${pdf != null}" th:href="${pdf}" th:text="#{article.pdf}">PDF</a>
+                <th:block th:if="${site != null and site.facebookAppId() != null}"
+                          th:with="shareUrl=${site.url('/article/' + article.id + '?lang=' + lang)}">
+                    <div class="fb-share-button" th:data-href="${shareUrl}"
+                         data-layout="button_count" data-action="share" data-size="large"></div>
+                </th:block>
+            </span>
+        </div>
+    </header>
+
+    <figure class="mz-hero" th:if="${!#strings.isEmpty(article.embedded)}">
+        <div class="shell"><div class="video-container" th:utext="${article.embedded}"></div></div>
+    </figure>
+    <th:block th:if="${#strings.isEmpty(article.embedded) and !article.visibleImages().isEmpty()}"
+              th:with="lead=${article.visibleImages()[0]}">
+        <figure class="mz-hero">
+            <img th:src="'/assets/img/articles/' + ${lead.filename}" th:alt="${lead.altFor(lang)}" fetchpriority="high"/>
+            <figcaption class="shell mz-hero__caption" th:if="${!#strings.isEmpty(lead.caption)}"
+                        th:text="${lead.caption}">Caption</figcaption>
+        </figure>
+    </th:block>
+</th:block>
+
+<th:block th:fragment="articleView(article, lang)">
+    <article class="mz-article" th:attr="aria-labelledby='article-title'">
+        <div class="article-body mz-body" id="text" th:utext="${article.text}"></div>
+
+        <div class="gallery mz-gallery"
+             th:with="skip=${#strings.isEmpty(article.embedded) ? 1 : 0}"
+             th:if="${article.visibleImages().size() > (#strings.isEmpty(article.embedded) ? 1 : 0)}"
+             th:data-label-gallery="#{article.gallery}"
+             th:data-label-previous="#{article.gallery.previous}"
+             th:data-label-next="#{article.gallery.next}"
+             th:data-label-image="#{article.gallery.image}">
+            <figure class="gallery__item" th:each="image, i : ${article.visibleImages()}" th:if="${i.index >= skip}">
+                <img th:src="'/assets/img/articles/' + ${image.filename}" th:alt="${image.altFor(lang)}" loading="lazy"/>
+                <figcaption class="mz-gallery__caption" th:if="${!#strings.isEmpty(image.caption)}"
+                            th:text="${image.caption}">Caption</figcaption>
+            </figure>
+        </div>
+
+        <div class="tags-block mz-tags" th:if="${article.hasTags()}">
+            <div class="tags-block__title" th:text="#{article.keywords}">Keywords</div>
+            <div class="tags">
+                <a class="chip" th:each="tag : ${article.translatedTags}"
+                   th:href="@{/list/{id}(id=${tag.name})}" th:text="${tag.translate(lang)}">tag</a>
+            </div>
+        </div>
+
+        <section class="mz-authors" th:if="${article.showArticleInfo() and article.authors != null and !article.authors.isEmpty()}">
+            <h2 class="mz-authors__title" th:text="#{magazine.aboutAuthor}">About the author</h2>
+            <div class="mz-author" th:each="author : ${article.authors}" th:if="${author != null}">
+                <span class="mz-author__mark" aria-hidden="true" th:text="${article.authorInitials(author)}">LV</span>
+                <div class="mz-author__text">
+                    <span class="mz-author__name" th:text="${article.authorName(author)}">Name</span>
+                    <!--/* th:with on a block of its own: th:if is evaluated before th:with on one
+                           element, so the name would not exist yet in the condition. */-->
+                    <th:block th:with="role=${article.authorText(author.titles, author.title)},
+                                       bio=${article.authorText(author.descriptions, author.description)}">
+                        <span class="mz-author__role" th:if="${!#strings.isEmpty(role)}" th:text="${role}">Role</span>
+                        <p class="mz-author__bio" th:if="${!#strings.isEmpty(bio)}" th:text="${bio}">Bio</p>
+                    </th:block>
+                </div>
+            </div>
+        </section>
+    </article>
+</th:block>
+</body>
+</html>

@@ -534,8 +534,8 @@
                             */-->
                             <span class="hint"
                                   th:with="dimHint=${imageRules.dimensionCheck()}
-                                                   ? #{articles.edit.images.dimExact(${imageRules.width()}, ${imageRules.height()})}
-                                                   : #{articles.edit.images.dimFree(${imageRules.width()}, ${imageRules.height()})},
+                                                   ? #{articles.edit.images.dimMin(${imageRules.width()}, ${imageRules.height()}, ${imageRules.ratioWidth()}, ${imageRules.ratioHeight()})}
+                                                   : #{articles.edit.images.dimFree(${imageRules.width()}, ${imageRules.height()}, ${imageRules.ratioWidth()}, ${imageRules.ratioHeight()})},
                                            sizeHint=${imageRules.fileSizeCheck()}
                                                    ? #{articles.edit.images.sizeMax(${imageRules.maxKilobytes()})}
                                                    : #{articles.edit.images.sizeFree(${imageRules.transportKilobytes()})}"

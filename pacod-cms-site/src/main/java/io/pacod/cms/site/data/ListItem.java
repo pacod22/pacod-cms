@@ -28,6 +28,19 @@ public class ListItem {
     private String titleClasses;
     private String titleOverlayClasses;
 
+    /**
+     * The first category, for a card's kicker in the magazine set. No bean getter on purpose
+     * ({@link #kickerId()}, {@link #kickerName()}): the /web/v1 lists serialise this class, and a
+     * getter would add a field to every one of them.
+     */
+    @lombok.Getter(lombok.AccessLevel.NONE)
+    @lombok.Setter(lombok.AccessLevel.NONE)
+    private Integer kickerId;
+
+    @lombok.Getter(lombok.AccessLevel.NONE)
+    @lombok.Setter(lombok.AccessLevel.NONE)
+    private String kickerName;
+
     public ListItem(Article article) {
         this(article, null);
     }
@@ -49,6 +62,12 @@ public class ListItem {
 
             this.titleClasses = article.getTitleClasses();
             this.titleOverlayClasses = article.getTitleOverlayClasses();
+            if (article.getCategories() != null) {
+                article.getCategories().stream().filter(java.util.Objects::nonNull).findFirst().ifPresent(category -> {
+                    this.kickerId = category.getId();
+                    this.kickerName = getLocalizedText(category.getNames(), category.getName(), lang);
+                });
+            }
         } else {
             log.error("Cannot initialize WebArticle. The article object was null!");
         }
@@ -105,6 +124,31 @@ public class ListItem {
         return slug;
     }
     */
+
+    /** The first category's id, or null: where a card's kicker links. */
+    public Integer kickerId() {
+        return kickerId;
+    }
+
+    /** The first category's name in this item's language, or null. */
+    public String kickerName() {
+        return kickerName;
+    }
+
+    /** The authors' names alone, without their job titles: "Liora Venn, Tomas Arkwright". */
+    public String authorNames() {
+        if (authors == null) {
+            return "";
+        }
+        return authors.stream().filter(java.util.Objects::nonNull)
+                .map(a -> java.util.stream.Stream.of(
+                                getLocalizedText(a.getFirstnames(), a.getFirstname(), lang),
+                                getLocalizedText(a.getLastnames(), a.getLastname(), lang))
+                        .filter(n -> n != null && !n.isBlank())
+                        .collect(java.util.stream.Collectors.joining(" ")))
+                .filter(n -> !n.isBlank())
+                .collect(java.util.stream.Collectors.joining(", "));
+    }
 
     /** How many authors the byline names, for the template's "Author:" / "Authors:" label. */
     public int getAuthorCount() {

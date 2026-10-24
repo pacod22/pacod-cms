@@ -425,7 +425,7 @@ Set per service, not globally:
 | `PACOD_SITE_DOMAIN` | `cms-studio` | new websites answer at `<id>.<domain>` (compose default `localhost`); never the studio's registrable domain |
 | `PACOD_ORG_CREATION` | `cms-studio` | `self-service` (default) or `platform-admins`, a ceiling the installation screen cannot lift |
 | `PACOD_MAX_ORGS_PER_USER`, `PACOD_MAX_SITES_PER_ORG`, `PACOD_AI_FOR_NEW_ORGS` | `cms-studio` | starting values (3, 5, false); the installation screen owns them once saved |
-| `IMAGE_REQUIRED_WIDTH`, `IMAGE_REQUIRED_HEIGHT`, `IMAGE_MAX_BYTES`, `IMAGE_DIMENSION_CHECK`, `IMAGE_FILE_SIZE_CHECK` | `cms-studio` | what an uploaded article image must be; read at startup |
+| `IMAGE_REQUIRED_WIDTH`, `IMAGE_REQUIRED_HEIGHT`, `IMAGE_MAX_BYTES`, `IMAGE_DIMENSION_CHECK`, `IMAGE_FILE_SIZE_CHECK` | `cms-studio` | what an uploaded article image must be: at least 600×400, in that shape, and 400 KB by default; read at startup |
 | `SITE_PUBLIC_SCHEME`, `SITE_PUBLIC_PORT` | `cms-studio` | how the studio spells a website's address |
 | `DEMO_HOSTS` (as `PACOD_BOOTSTRAP_DEMO_HOSTS`), `DEMO_MINIMAL_HOSTS` (as `PACOD_BOOTSTRAP_DEMO_MINIMAL_HOSTS`), `DEMO_SPACE_HOSTS` (as `PACOD_BOOTSTRAP_DEMO_SPACE_HOSTS`) | `cms-studio` | the three demo websites' hosts, used only on an empty platform |
 | `PACOD_PDF_GOTENBERG_URL` | `cms-studio` | Gotenberg, for PDF export (compose: `http://cms-gotenberg:3000`); blank switches it off |

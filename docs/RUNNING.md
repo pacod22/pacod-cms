@@ -73,10 +73,20 @@ demo websites with the demo content:
 
 - **"Demo Journal"** (editorial template set) at http://demo.localhost:8000/ and http://localhost:8000/
 - **"Demo Notes"** (minimal template set) at http://minimal.localhost:8000/
-- **"Starward"**, the space-travels demo, at http://space.localhost:8000/
+- **"Starward"**, the space-travels demo (magazine template set), at http://space.localhost:8000/
 
-A platform created before the space demo existed gets it with `make site-create SLUG=space
-NAME=Starward HOSTS=space.localhost DEMO=space`.
+**A platform created before the current Starward** -- before the space demo existed, or with its
+earlier, thinner version -- gets it on a website of its own. Demo content goes only into a website
+without articles, so an existing `space` website has to go first: in the studio open it, *Settings
+→ Delete this website*, type its id; wait three minutes (`SiteRetirement.SETTLE`) until the id is
+free again, then:
+
+```bash
+make site-create SLUG=space NAME=Starward HOSTS=space.localhost DEMO=space
+```
+
+`DEMO=space` without `TEMPLATE=` puts it on the magazine set it was designed for. On dev,
+`make destroy && make up` gives the same on a fresh platform (and drops every account).
 
 pacod-id's sign-in pages are at http://id.localhost:8000/, and every mail it sends lands in pacod-mailpit,
 http://localhost:8125/. **Create an account** on the sign-in page makes an account with no role,
@@ -115,7 +125,7 @@ Or put the ports in `.env`. pacod-id's issuer and the studio's sign-in addresses
   for the studio. So `studio.stage.example.com` with `demo.stage.example.com` is refused.
 - **DNS**, pointing at the server:
   - the studio's host and pacod-id's;
-  - `demo.<site domain>` and `minimal.<site domain>`, for the demo websites;
+  - `demo.<site domain>`, `minimal.<site domain>` and `space.<site domain>`, for the demo websites;
   - ideally `*.<site domain>` too, for the websites testers create.
 - **Ports 80 and 443** reachable from the internet. Caddy obtains its certificates over them.
 - pacod-id's and the mock gateway's images or sources on the server (*What a machine needs*).
@@ -279,8 +289,8 @@ website between installations; the dumps above remain the way to back up the who
 4. **The studio bootstraps the platform**, at every start:
    - it builds the control plane's indexes;
    - it re-provisions every website that is out of date;
-   - on an empty platform with demo websites on (dev, stage), it creates `demo` and `minimal` with
-     the demo content.
+   - on an empty platform with demo websites on (dev, stage), it creates `demo`, `minimal` and
+     `space` (on the magazine set) with the demo content.
 
    It also tells pacod-id its roles and registers every organisation and website there.
 5. **`make up` waits** until the studio, and the demo website where there is one, answer through
@@ -302,13 +312,17 @@ make site-create SLUG=acme NAME="Acme News" HOSTS=acme.example-sites.net,www.acm
 ```
 
 - `ORG=org_…` puts it in an existing organisation; without it, it gets an organisation of its own.
-- `DEMO=1` installs the demo content.
+- `DEMO=1` installs the demo content; `DEMO=space` the space travels, on the magazine set unless
+  `TEMPLATE=` names another.
 - Its hosts must resolve to the server, except on dev.
 
 **The demo content** is *Demo Journal*: six sections, four authors, twenty published articles with
 generated pictures (five also in German and Spanish), a link page and two bookings -- or, with
-`DEMO=space`, *Space travels*: the same for a travel magazine of an invented star system, with its
-own theme and taglines. To add it to an existing website:
+`DEMO=space`, *Space travels* ("Starward"): 24 long-form articles with NASA photographs captioned as
+the places of an invented star system, its own about, contact and advertise pages, menus, layouts
+for the magazine set, two journal issues, a theme, a favicon and share picture, and five invented
+advertisers with HTML5 creatives and pages of their own. It narrows the website's languages to
+English, the one it is written in. To add it to an existing website:
 
 ```bash
 make seed SITE=acme              # Demo Journal

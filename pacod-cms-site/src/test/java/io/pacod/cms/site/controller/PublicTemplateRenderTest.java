@@ -327,11 +327,11 @@ class PublicTemplateRenderTest {
     /**
      * Every view, on every installed template set -- each set's engine built as production builds
      * it, with the set's chain of folders ({@code TemplateSetCatalog.chain}) -- with no key left
-     * unresolved, each set's stylesheet linked, and each set's shape: editorial has an aside,
-     * minimal does not.
+     * unresolved, each set's stylesheet linked, and each set's shape: editorial and magazine have an
+     * aside, minimal does not.
      */
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings = {"editorial", "minimal"})
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"editorial", "minimal", "magazine"})
     @DisplayName("Every view renders on every template set")
     void everyViewRendersOnEverySet(String set) {
         engine = io.pacod.cms.site.render.TemplateSets.engine(new io.pacod.cms.core.design.TemplateSetCatalog().chain(set),
@@ -359,12 +359,65 @@ class PublicTemplateRenderTest {
             if (!view.equals("error") && !view.equals("search-google")) {
                 if (set.equals("minimal")) {
                     assertThat(html).as("%s on %s", view, set).contains("/site-assets/minimal.css").doesNotContain("layout__aside");
+                } else if (set.equals("magazine")) {
+                    assertThat(html).as("%s on %s", view, set).contains("/site-assets/magazine.css", "layout__aside", "mz-header")
+                            .doesNotContain("minimal.css");
                 } else {
-                    assertThat(html).as("%s on %s", view, set).contains("layout__aside").doesNotContain("minimal.css");
+                    assertThat(html).as("%s on %s", view, set).contains("layout__aside").doesNotContain("minimal.css")
+                            .doesNotContain("magazine.css");
                 }
             }
         });
         assertThat(views.get("landing")).contains("/article/7?lang=en", "/article/8?lang=en");
+    }
+
+    /**
+     * The magazine set's own promises, each of which would fail silently: a class name a blocker's
+     * generic rules hide (Fanboy's social list hid site.css's footer profiles until this set renamed
+     * them), a creative frame that loses its booking id or gains a sandbox (its clicks stop
+     * counting), the lead picture without its credit, the cover story, the reading time and the
+     * author box.
+     */
+    @Test
+    @DisplayName("the magazine set: no blocker-bait class, counted creative frames, the credit under the lead picture")
+    void magazineSetGuards() {
+        engine = io.pacod.cms.site.render.TemplateSets.engine(new io.pacod.cms.core.design.TemplateSetCatalog().chain("magazine"),
+                new io.pacod.cms.site.config.ThymeleafConfig().messageSource(), false, List.of());
+        Article featured = article(7, true, null);
+        featured.getImages().get(0).setCaption("Tessaly backlit. Image: NASA/JPL-Caltech/Space Science Institute.");
+        featured.getAuthors().get(0).setTitle("Destinations editor");
+        featured.getAuthors().get(0).setDescription("Has crossed the Reach eleven times.");
+        io.pacod.cms.site.data.LandingSlot cover = new io.pacod.cms.site.data.LandingSlot(null, "",
+                List.of(new ListItem(featured, "en")));
+        io.pacod.cms.site.render.Regions home = new io.pacod.cms.site.render.Regions(Map.of(
+                "top", List.of(new io.pacod.cms.site.render.RenderedSection("c", "article-list", "articleList",
+                        Map.of("style", "hero", "source", "latest", "count", 1, "offset", 0), cover)),
+                "main", List.of(new io.pacod.cms.site.render.RenderedSection("l", "article-list", "articleList",
+                        Map.of("style", "cards", "source", "latest", "count", 6, "offset", 1, "heading", "Latest"),
+                        new io.pacod.cms.site.data.LandingSlot(null, "Latest", list(5).getPage().getContent())))));
+        Map<String, String> views = Map.of(
+                "landing", render("landing", Map.of("lang", "en", "regions", home)),
+                "article", render("article", Map.of("article", new ArticleModel(featured, "en", List.of()), "lang", "en")),
+                "list", render("list", Map.of("list", list(8), "lang", "en")));
+
+        java.util.regex.Pattern classes = java.util.regex.Pattern.compile("class=\"([^\"]*)\"");
+        views.forEach((view, html) -> {
+            java.util.regex.Matcher found = classes.matcher(html);
+            while (found.find()) {
+                for (String name : found.group(1).split("\\s+")) {
+                    assertThat(name).as(view).doesNotStartWith("ad-").doesNotStartWith("sponsor")
+                            .doesNotStartWith("promo").doesNotStartWith("social-").doesNotStartWith("share-")
+                            .doesNotStartWith("follow-").isNotEqualTo("site-footer__social");
+                }
+            }
+            assertThat(html).as(view).contains("data-partner=\"90\"", "data-partner=\"91\"", "/site-assets/magazine.css")
+                    .doesNotContain("sandbox", "??");
+        });
+        assertThat(views.get("landing")).contains("mz-cover", "Cover story", "/article/7?lang=en", "mz-grid--mosaic");
+        assertThat(views.get("article"))
+                .contains("<figcaption class=\"shell mz-hero__caption\">Tessaly backlit. Image: NASA/JPL-Caltech/Space Science Institute.</figcaption>",
+                        "1 min read", "About the author", "Has crossed the Reach eleven times.", "Destinations editor");
+        assertThat(views.get("list")).contains("mz-grid--lead", "Култура");
     }
 
     private static io.pacod.cms.site.services.IssueReader.IssueView issueView() {
@@ -459,7 +512,7 @@ class PublicTemplateRenderTest {
      * and no HTML5 creative's frame, which may load its advertiser's tags.
      */
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings = {"editorial", "minimal"})
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"editorial", "minimal", "magazine"})
     @DisplayName("a preview carries its token and the draft theme, and tells no third party")
     void previewHead(String set) {
         engine = io.pacod.cms.site.render.TemplateSets.engine(new io.pacod.cms.core.design.TemplateSetCatalog().chain(set),

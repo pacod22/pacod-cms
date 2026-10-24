@@ -109,6 +109,7 @@ public class MgmtControllerAdvice {
      * every other assertion -- so {@code MgmtScreenRenderTest}'s nested property contexts are what
      * pin it.
      *
+     * @param width the smallest width an upload may have; with {@code height}, also its shape
      * @param maxKilobytes this application's cap. Meaningful only while {@code fileSizeCheck}.
      * @param dimensionCheck whether {@code width} and {@code height} are a rule or the house style.
      * @param fileSizeCheck whether {@code maxKilobytes} is a rule or merely a recommendation.
@@ -120,6 +121,26 @@ public class MgmtControllerAdvice {
     public record ImageRules(int width, int height, long maxKilobytes,
                              boolean dimensionCheck, boolean fileSizeCheck,
                              long transportKilobytes) {
+
+        /** The shape's width in lowest terms: 3 for 600x400. */
+        public int ratioWidth() {
+            return width / gcd(width, height);
+        }
+
+        /** The shape's height in lowest terms: 2 for 600x400. */
+        public int ratioHeight() {
+            return height / gcd(width, height);
+        }
+
+        /** Whether a stored picture meets the rule as an upload would; unknown sizes do. */
+        public boolean fits(Integer pictureWidth, Integer pictureHeight) {
+            return pictureWidth == null || pictureHeight == null
+                    || ImageService.fitsDimensions(pictureWidth, pictureHeight, width, height);
+        }
+
+        private static int gcd(int a, int b) {
+            return b == 0 ? Math.max(1, a) : gcd(b, a % b);
+        }
     }
 
     public record BannerRules(long maxKilobytes, String contentTypes) {

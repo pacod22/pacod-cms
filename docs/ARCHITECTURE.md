@@ -90,7 +90,7 @@ website's data into another's.
 
 ## Rendering a page
 
-A website renders with its **template set** (`editorial` or `minimal`; [`TEMPLATES.md`](TEMPLATES.md)). Each
+A website renders with its **template set** (`editorial`, `minimal` or `magazine`; [`TEMPLATES.md`](TEMPLATES.md)). Each
 page type has a **layout** — regions holding ordered sections — stored per website, edited as a
 draft in the studio and published. `PageComposer` resolves the layout against the set, looks up each
 section's data, and hands the templates `Regions` of ready sections; templates never query. The

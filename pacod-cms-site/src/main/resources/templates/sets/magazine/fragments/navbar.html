@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*
+  The magazine's masthead: one sticky bar -- the brand, the main menu, the tools.
+
+  Everything editorial's navbar promises still holds, because pages this set inherits (search,
+  the standing pages, the issues, the error page) render this fragment:
+
+    * the menu is the website's `main` Menu, every address built by SiteChrome; a group opens its
+      panel on :hover / :focus-within, no JavaScript;
+    * below 1080px the menu folds behind #nav-toggle, which site.js drives by toggling .is-open
+      on #site-nav -- the two ids are its contract;
+    * #site-search-form's FIRST submit button is the magnifier, so Enter searches the site; the
+      Google button submits the same box to /search-google through form= and formaction=, and
+      exists only with a Programmable Search engine;
+    * #theme-toggle's glyph and title are set by site.js from its two data-title-* attributes.
+
+  The brand: the logo pair when the website has one (masthead__logo-light/-dark, site.css swaps
+  them for .night); otherwise the website's name in the display face, after its own favicon as an
+  emblem when it has one of its own -- never the platform's, which would brand every website the
+  same.
+*/-->
+<th:block th:fragment="navbar(lang)">
+    <header class="mz-header">
+        <div class="shell mz-header__bar">
+            <a class="mz-brand masthead__logo" href="/" th:href="@{/(lang=${lang})}">
+                <th:block th:if="${site != null and site.logoLight() != null}">
+                    <img class="masthead__logo-light" th:src="${site.logoLight()}" th:alt="${site.name(lang)}"/>
+                    <img class="masthead__logo-dark" th:src="${site.logoDark()}" alt="" aria-hidden="true"/>
+                </th:block>
+                <th:block th:unless="${site != null and site.logoLight() != null}">
+                    <img class="mz-brand__mark" alt="" aria-hidden="true"
+                         th:if="${site != null and site.favicon() != null and site.favicon() != '/site-assets/favicon.svg'}"
+                         th:src="${site.favicon()}"/>
+                    <span class="mz-brand__name" th:text="${site?.name(lang)}">Website</span>
+                </th:block>
+            </a>
+
+            <nav class="mz-nav" id="site-nav" th:aria-label="#{nav.menu}">
+                <button class="mz-nav__toggle" type="button" id="nav-toggle" aria-expanded="false"
+                        aria-controls="site-nav-items">
+                    <span class="mz-nav__burger" aria-hidden="true"></span>
+                    <span th:text="#{nav.menu}">Menu</span>
+                </button>
+                <div class="mz-nav__items" id="site-nav-items">
+                    <div class="nav-item" th:each="entry : ${site != null ? site.menu('main', lang) : {}}">
+                        <a class="nav-item__label" th:unless="${entry.group()}" th:href="${entry.href()}"
+                           th:text="${entry.label()}"
+                           th:target="${entry.external() ? '_blank' : null}" th:rel="${entry.external() ? 'noopener' : null}">Link</a>
+                        <th:block th:if="${entry.group()}">
+                            <button class="nav-item__label" type="button" th:text="${entry.label()}">Group</button>
+                            <div class="nav-menu" th:style="${'--cols:' + entry.panelColumns()}">
+                                <a class="nav-menu__link" th:each="child : ${entry.children()}"
+                                   th:href="${child.href()}" th:text="${child.label()}"
+                                   th:target="${child.external() ? '_blank' : null}" th:rel="${child.external() ? 'noopener' : null}">Link</a>
+                            </div>
+                        </th:block>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="mz-tools">
+                <form class="site-search mz-search" id="site-search-form" action="/search" method="get" role="search">
+                    <button class="site-search__icon" type="submit"
+                            th:title="#{nav.search}" th:aria-label="#{nav.search}">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" aria-hidden="true" focusable="false">
+                            <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+                        </svg>
+                    </button>
+                    <label class="visually-hidden" for="site-search-input" th:text="#{nav.search}">Search</label>
+                    <input class="site-search__input" id="site-search-input" type="search" name="q"
+                           th:value="${q}" th:placeholder="#{nav.search.placeholder}"/>
+                    <input type="hidden" name="lang" th:value="${lang}"/>
+                </form>
+
+                <button class="tool-button" type="submit" th:if="${site?.googleCseCx() != null}"
+                        form="site-search-form" formaction="/search-google"
+                        th:title="#{nav.search.google}" th:aria-label="#{nav.search.google}">G</button>
+
+                <th:block th:with="langLinks=${site != null ? site.languageLinks(lang) : {}}">
+                <div class="lang-menu" th:unless="${langLinks.size() < 2}">
+                    <button class="lang-select" type="button" aria-haspopup="true" th:aria-label="#{nav.language}">
+                        <span th:text="${lang != null ? #strings.toUpperCase(lang) : ''}">EN</span>
+                    </button>
+                    <div class="lang-menu__list">
+                        <a class="lang-menu__item" th:each="l : ${langLinks}" th:href="${l.href()}"
+                           th:hreflang="${l.code()}" th:lang="${l.code()}" th:text="${l.name()}"
+                           th:attr="aria-current=${l.current() ? 'true' : null}">English</a>
+                    </div>
+                </div>
+                </th:block>
+
+                <button class="tool-button" type="button" id="theme-toggle"
+                        th:data-title-day="#{theme.toNight}"
+                        th:data-title-night="#{theme.toDay}">☀</button>
+            </div>
+        </div>
+    </header>
+</th:block>
+</body>
+</html>

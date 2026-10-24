@@ -66,8 +66,8 @@ public class PageBootstrap implements SiteSeedStep {
         }
 
         List<Seed> seeds;
-        try (InputStream in = new ClassPathResource(SEED).getInputStream()) {
-            seeds = objectMapper.readerForListOf(Seed.class).readValue(in);
+        try {
+            seeds = readSeed(objectMapper);
         } catch (IOException | RuntimeException e) {
             // RuntimeException as well as IOException: Spring Boot 4.1 ships Jackson 3
             // (tools.jackson.*), whose parse failures are UNCHECKED -- catching IOException alone
@@ -90,7 +90,17 @@ public class PageBootstrap implements SiteSeedStep {
         log.info("Seeded {} standing page(s) from {}", written, SEED);
     }
 
-    private Page toPage(Seed seed) {
+    /**
+     * The seed's pages, as read from the classpath. Also what {@code DemoContent} compares a
+     * website's pages with: a page still equal to its seed is one nobody has edited.
+     */
+    static List<Seed> readSeed(ObjectMapper objectMapper) throws IOException {
+        try (InputStream in = new ClassPathResource(SEED).getInputStream()) {
+            return objectMapper.readerForListOf(Seed.class).readValue(in);
+        }
+    }
+
+    static Page toPage(Seed seed) {
         Page page = new Page(seed.getSlug());
         page.setSortOrder(seed.getSortOrder());
         page.setPublished(seed.isPublished());

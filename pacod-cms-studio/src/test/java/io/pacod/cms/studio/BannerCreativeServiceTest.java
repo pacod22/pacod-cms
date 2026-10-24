@@ -17,9 +17,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * The banner upload rules, which are deliberately not the article image rules.
  *
- * <p>{@code ImageService} enforces exactly 600x400 and 128 KB as layout constraints for the
- * article carousel. Banner creatives are 728x90, 300x250, 300x600 and whatever else is booked,
- * and an animated GIF leaderboard routinely exceeds 128 KB -- so these tests pin that the two
+ * <p>{@code ImageService} enforces at least 600x400 in 3:2 and 400 KB as layout constraints for
+ * the article carousel. Banner creatives are 728x90, 300x250, 300x600 and whatever else is booked,
+ * and an animated GIF leaderboard routinely exceeds the article cap -- so these tests pin that the two
  * sets of rules stay apart.
  */
 class BannerCreativeServiceTest {

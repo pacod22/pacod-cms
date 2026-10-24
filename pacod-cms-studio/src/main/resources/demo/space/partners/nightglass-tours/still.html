@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<!-- The source of still.jpg, Nightglass Tours' image creative (an invented advertiser), rendered
+     once at 600x500 -- twice the 300x250 it is shown at -- by headless Chrome. How: VENDORED.md in
+     the folder above. The photograph is the space demo's lantern-butterfly, copied in as art/. -->
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="/site-assets/fonts/fonts.css">
+<style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 600px; height: 500px; overflow: hidden; background: #05060d; }
+    body { position: relative; font-family: 'Inter', sans-serif; color: #fff; -webkit-font-smoothing: antialiased; }
+    img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 38% 50%; }
+    .shade { position: absolute; inset: 0; background:
+        radial-gradient(120% 90% at 85% 15%, rgba(5, 6, 13, 0) 0%, rgba(5, 6, 13, .35) 60%),
+        linear-gradient(180deg, rgba(5, 6, 13, .55) 0%, rgba(5, 6, 13, .05) 35%, rgba(5, 6, 13, .6) 62%, rgba(5, 6, 13, .95) 100%); }
+    .mark { position: absolute; top: 30px; left: 34px; display: flex; align-items: center; gap: 12px;
+        font: 700 20px/1 'Inter', sans-serif; letter-spacing: .32em; text-transform: uppercase; }
+    .mark svg { width: 34px; height: 34px; }
+    .notice { position: absolute; top: 16px; right: 20px; font-size: 15px; letter-spacing: .16em; text-transform: uppercase; color: rgba(255, 255, 255, .62); }
+    .words { position: absolute; left: 34px; right: 34px; bottom: 34px; }
+    h1 { margin: 0; font: 500 58px/1.02 'Fraunces', serif; letter-spacing: -.02em; }
+    h1 em { font-style: italic; color: #ffb4c8; }
+    p { margin: 14px 0 0; font-size: 21px; color: rgba(255, 255, 255, .82); }
+    .go { display: inline-block; margin-top: 22px; padding: 15px 26px; border-radius: 999px; background: #e8487a; color: #fff;
+        font-size: 18px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<img src="art/butterfly.jpg" alt="">
+<div class="shade"></div>
+<div class="mark"><svg viewBox="0 0 32 32"><path d="M2 16s5.5-9 14-9 14 9 14 9-5.5 9-14 9S2 16 2 16z" fill="none" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="5" fill="#e8487a"/><circle cx="17.6" cy="14.4" r="1.6" fill="#fff"/></svg>Nightglass</div>
+<div class="notice">Advertisement</div>
+<div class="words">
+    <h1>See the Lantern with <em>your own eyes.</em></h1>
+    <p>Lantern nights on Veyra &middot; Aurora flights over Calder</p>
+    <span class="go">Six nights from 2,400 marks</span>
+</div>
+</body>
+</html>

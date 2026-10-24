@@ -166,7 +166,8 @@ public class PlatformBootstrap {
             createDemo(first.getOrganisationId(), minimalId, minimalName, minimalHosts, MINIMAL_SET, DemoContent.Demo.JOURNAL);
         }
         if (spaceEnabled && first != null) {
-            createDemo(first.getOrganisationId(), spaceId, spaceName, spaceHosts, null, DemoContent.Demo.SPACE);
+            createDemo(first.getOrganisationId(), spaceId, spaceName, spaceHosts, DemoContent.Demo.SPACE.templateSet(),
+                    DemoContent.Demo.SPACE);
         }
     }
 

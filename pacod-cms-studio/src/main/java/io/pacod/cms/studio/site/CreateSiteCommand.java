@@ -27,7 +27,8 @@ import java.util.List;
  * is created, named {@code --org-name} (else the website's name), with a generated id.
  *
  * {@code --template-set} must name a set this installation has (else it is refused before anything
- * is created); without it the website renders with the default set.
+ * is created); without it the website renders with the demo's own set when {@code --demo} names a
+ * demo designed for one (the space demo: magazine), else with the default set.
  *
  * {@code --demo} starts it with the demo content ({@link StudioDemo}): the journal, or with
  * {@code --demo=space} the space travels; a content language the demo is not written in, or a demo
@@ -67,15 +68,15 @@ public class CreateSiteCommand implements ApplicationRunner {
         }
         int status = 0;
         try {
-            SiteProvisioner.NewWebsite request = request(args);
-            if (request.templateSet() != null && catalog.find(request.templateSet()).isEmpty()) {
-                throw new IllegalArgumentException("No template set " + request.templateSet() + "; this installation has "
-                        + catalog.all().stream().map(m -> m.id()).toList());
-            }
             boolean withDemo = args.containsOption(DEMO);
             DemoContent.Demo which = withDemo ? SeedDemoCommand.demo(args).orElseThrow(() -> new IllegalArgumentException(
                     "--demo names no demo; there are " + Arrays.stream(DemoContent.Demo.values()).map(DemoContent.Demo::id).toList()))
                     : null;
+            SiteProvisioner.NewWebsite request = forDemo(request(args), which);
+            if (request.templateSet() != null && catalog.find(request.templateSet()).isEmpty()) {
+                throw new IllegalArgumentException("No template set " + request.templateSet() + "; this installation has "
+                        + catalog.all().stream().map(m -> m.id()).toList());
+            }
             if (withDemo && !demo.supports(which, request.defaultLanguage())) {
                 throw new IllegalArgumentException("Demo content is written in " + demo.languages(which)
                         + ", not in " + request.defaultLanguage());
@@ -102,6 +103,20 @@ public class CreateSiteCommand implements ApplicationRunner {
         return new SiteProvisioner.NewWebsite(orgId, value(args, "org-name", name), id, name,
                 value(args, "language", "en"), value(args, "timezone", "UTC"), hosts, null,
                 value(args, "template-set", null));
+    }
+
+    /**
+     * The request on the demo's own template set when it names none: {@code --demo=space} alone
+     * makes the magazine website its layouts were designed for. An explicit {@code --template-set}
+     * wins.
+     */
+    static SiteProvisioner.NewWebsite forDemo(SiteProvisioner.NewWebsite request, DemoContent.Demo which) {
+        if (request.templateSet() != null || which == null || which.templateSet() == null) {
+            return request;
+        }
+        return new SiteProvisioner.NewWebsite(request.organisationId(), request.organisationName(), request.siteId(),
+                request.name(), request.defaultLanguage(), request.timezone(), request.hosts(), request.createdBy(),
+                which.templateSet());
     }
 
     private static String required(ApplicationArguments args, String option) {

@@ -727,7 +727,7 @@ class MgmtScreenRenderTest {
                 // its flag off there is no refusal to promise. The two switches are independent,
                 // so this is the both-on corner; DimensionCheckOff and FileSizeCheckOff below are
                 // the other two, and their mixed forms are ImageServiceValidationTest's.
-                .contains("точно 600×400 px, до 128 KB, най-много 10 на статия")
+                .contains("поне 600×400 px, 3:2, до 128 KB, най-много 10 на статия")
                 // The editor is vendored in this jar, never loaded off a storage volume where its
                 // version, its CVEs and whether it still resolves its own files go unseen.
                 .contains("/mgmt-assets/tinymce/tinymce.min.js")
@@ -2041,7 +2041,7 @@ class MgmtScreenRenderTest {
     @DisplayName("a refused upload comes back as JSON carrying the reason, not an error page")
     void refusedUploadIsJson() throws Exception {
         when(articleService.addImage(anyInt(), any()))
-                .thenThrow(new MediaException("garden.png is 601x400; the site layout requires exactly 600x400."));
+                .thenThrow(new MediaException("garden.png is 1600x900; the site layout requires the proportions of 600x400."));
 
         MockMultipartFile upload =
                 new MockMultipartFile("file", "garden.png", "image/png", new byte[]{1, 2, 3});
@@ -2051,7 +2051,7 @@ class MgmtScreenRenderTest {
         mockMvc.perform(multipart("/mgmt/articles/42/images/upload").file(upload).with(csrf()))
                 .andExpect(status().isConflict())
                 .andExpect(content().contentTypeCompatibleWith("application/json"))
-                .andExpect(content().string(containsString("601x400")));
+                .andExpect(content().string(containsString("1600x900")));
     }
 
     @Test
@@ -2062,7 +2062,7 @@ class MgmtScreenRenderTest {
         // a 302 that reads as success.
         when(articleService.addImage(anyInt(), any()))
                 .thenReturn(new ImageMedia(9))
-                .thenThrow(new MediaException("wide.png is 601x400; the site layout requires exactly 600x400."));
+                .thenThrow(new MediaException("wide.png is 1600x900; the site layout requires the proportions of 600x400."));
 
         mockMvc.perform(multipart("/mgmt/articles/42/images")
                         .file(new MockMultipartFile("file", "garden.png", "image/png", new byte[]{1}))
@@ -2083,7 +2083,7 @@ class MgmtScreenRenderTest {
     @DisplayName("a refused upload comes back as a message rather than an error page")
     void refusedUploadIsReportedToTheOperator() throws Exception {
         when(articleService.addImage(anyInt(), any()))
-                .thenThrow(new MediaException("garden.png is 601x400; the site layout requires exactly 600x400."));
+                .thenThrow(new MediaException("garden.png is 1600x900; the site layout requires the proportions of 600x400."));
 
         MockMultipartFile upload =
                 new MockMultipartFile("file", "garden.png", "image/png", new byte[]{1, 2, 3});
@@ -2091,7 +2091,7 @@ class MgmtScreenRenderTest {
         mockMvc.perform(multipart("/mgmt/articles/42/images").file(upload).with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(flash().attribute("error",
-                        org.hamcrest.Matchers.containsString("601x400")));
+                        org.hamcrest.Matchers.containsString("1600x900")));
     }
 
     // ---- the jobs screens ------------------------------------------------------------------
@@ -3120,7 +3120,7 @@ class MgmtScreenRenderTest {
      * build -- is inherited from the enclosing class.
      *
      * <p>What is under test is not the refusal (that is {@code ImageServiceValidationTest}'s) but
-     * the sentences: a screen that goes on promising "точно 600×400 px" while the server accepts
+     * the sentences: a screen that goes on promising "поне 600×400 px, 3:2" while the server accepts
      * anything still renders, still answers 200, and still passes every assertion above. The
      * build cannot see a stale promise; only a rendered string can.
      */
@@ -3154,28 +3154,28 @@ class MgmtScreenRenderTest {
         }
 
         @Test
-        @DisplayName("the editor stops promising an exact size but still states the other limits")
+        @DisplayName("the editor stops promising a size and shape but still states the other limits")
         void editorHintFollowsTheSetting() throws Exception {
             String html = mockMvc.perform(get("/mgmt/articles/42"))
                     .andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString();
 
             org.assertj.core.api.Assertions.assertThat(html)
-                    .doesNotContain("точно 600×400 px")
+                    .doesNotContain("\"hint\">поне 600×400 px")
                     // The whole sentence. WxH is named as a recommendation rather than dropped --
                     // an operator with no number in front of them has nothing to aim at, and
                     // 600×400 is the shape every image uploaded under the default rule has. The
                     // byte cap and the per-article cap are untouched by THIS switch and go on being
                     // stated; dropping them would trade one wrong clause for a missing one. The cap
                     // reads 2048 KB because this context also binds app.image.max-bytes=2MB.
-                    .contains("размерите не се проверяват (препоръчително 600×400 px), "
+                    .contains("размерите не се проверяват (препоръчително поне 600×400 px, 3:2), "
                             + "до 2048 KB, най-много 10 на статия");
         }
 
         @Test
         @DisplayName("the image detail screen stops calling an off-size file non-standard")
         void detailNoteFollowsTheSetting() throws Exception {
-            // fileOf() is stubbed at 800x531, which is off-size at the default 600x400 -- so with
+            // fileOf() is stubbed at 800x531, which is off-shape at the default 600x400 -- so with
             // the check on this screen carries the note, and this asserts it has gone rather than
             // that it was never there.
             String html = mockMvc.perform(get("/mgmt/images/3"))
@@ -3215,11 +3215,11 @@ class MgmtScreenRenderTest {
             org.assertj.core.api.Assertions.assertThat(html)
                     .doesNotContain("до 128 KB")
                     // The whole sentence: the dimension clause is untouched by this switch and
-                    // still promises exactly, while the weight clause names the SERVER's ceiling
+                    // still promises a size and shape, while the weight clause names the SERVER's ceiling
                     // in place of the console's. 4096 KB is spring.servlet.multipart.max-file-size
                     // read back, which this module sets to Caddy's request_body max_size -- not a
                     // number written down here a second time.
-                    .contains("точно 600×400 px, теглото не се проверява "
+                    .contains("поне 600×400 px, 3:2, теглото не се проверява "
                             + "(сървърът приема до 4096 KB), най-много 10 на статия");
         }
 

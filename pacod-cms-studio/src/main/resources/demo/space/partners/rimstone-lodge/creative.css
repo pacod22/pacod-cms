@@ -1,0 +1,83 @@
+/* Rimstone Lodge -- an invented advertiser of the Starward demonstration website.
+   index.html is the rectangle: 250 high, fluid in width (300 in the column, wider where the column
+   folds under the content). Two photographs cross-fade: the rim by day, the blue hour. */
+
+:root {
+    --clay: #b4532a;
+    --sand: #f3e3cf;
+    --night: #1a0f0b;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--night); overflow: hidden; }
+body { font-family: 'Inter', system-ui, sans-serif; color: var(--sand); -webkit-font-smoothing: antialiased; }
+
+.piece { position: relative; display: block; width: 100%; height: 100%; color: inherit; text-decoration: none; overflow: hidden; }
+
+.slide { position: absolute; inset: 0; }
+.slide img { width: 100%; height: 100%; object-fit: cover; }
+.slide--day img { animation: drift 16s ease-in-out infinite alternate; }
+.slide--dusk { animation: fade 12s ease-in-out infinite; }
+.slide--dusk img { object-position: 50% 60%; }
+
+.shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(26, 15, 11, .62) 0%, rgba(26, 15, 11, .12) 30%, rgba(26, 15, 11, .2) 45%, rgba(26, 15, 11, .9) 100%);
+}
+
+.notice {
+    position: absolute;
+    top: 7px;
+    right: 9px;
+    font-size: 8.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: rgba(243, 227, 207, .7);
+}
+
+.mark {
+    position: absolute;
+    top: 14px;
+    left: 16px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font: 600 12px/1 'Fraunces', Georgia, serif;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+}
+.mark svg { width: 22px; height: 22px; }
+
+.words { position: absolute; left: 16px; right: 16px; bottom: 16px; }
+.headline {
+    display: block;
+    font: 500 26px/1.05 'Fraunces', Georgia, serif;
+    letter-spacing: -.015em;
+    color: #fff;
+    animation: rise .9s ease-out both .2s;
+}
+.headline em { font-style: italic; color: #f7c9a8; }
+.sub { display: block; margin-top: 6px; font-size: 11.5px; color: rgba(243, 227, 207, .82); animation: rise .9s ease-out both .45s; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.price { font-size: 11px; color: rgba(243, 227, 207, .82); }
+.price b { font-size: 14px; color: #fff; }
+.go {
+    padding: 8px 13px;
+    border-radius: 999px;
+    background: var(--clay);
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.piece:hover .go { background: #cf6535; }
+
+@media (min-width: 420px) { .headline { font-size: 32px; } }
+
+@keyframes drift { from { transform: scale(1.04); } to { transform: scale(1.14) translateX(-2%); } }
+@keyframes fade { 0%, 40% { opacity: 0; } 50%, 90% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } .slide--dusk { opacity: 0; } }

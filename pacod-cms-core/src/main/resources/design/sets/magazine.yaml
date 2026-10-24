@@ -1,0 +1,70 @@
+# The magazine template set: image-led. A full-bleed cover story, photographs in a mosaic, an
+# article page that opens on its picture with the caption and credit under it, the authors at the
+# foot. Templates: pacod-cms-site/src/main/resources/templates/sets/magazine/. It extends editorial:
+# what it does not override -- the standing pages, search, the issues, the error page, the social
+# page, the print views, the advertising markup -- comes from there, restyled by magazine.css.
+#
+# Regions: on the home page `top` (full width, above everything: a hero there is the cover story,
+# anything else sits in the shell), main, aside (under the advertising column) and wide (full width,
+# below both). An article has a wide region too, under the article and its aside. Pages, lists and
+# search keep editorial's two.
+#
+# The default layouts name no category and no heading: a website has neither of its own yet.
+id: magazine
+name: Magazine
+description: Image-led -- a full-bleed cover story, photographs in a mosaic, articles that open on their picture.
+extends: editorial
+sections: [primary, article-list, rich-text, call-to-action, search-box, social-links]
+pageTypes:
+  HOME:
+    regions: [top, main, aside, wide]
+    layout:
+      top:
+        - {type: article-list, settings: {source: latest, count: 1, style: hero}}
+      main:
+        - {type: article-list, settings: {source: latest, count: 7, offset: 1, style: cards}}
+      aside:
+        - {type: article-list, settings: {source: most-read, count: 5, style: ranked}}
+  ARTICLE:
+    regions: [main, aside, wide]
+    layout:
+      main: [{type: primary}]
+      aside:
+        - {type: article-list, settings: {source: most-read, count: 5, style: ranked}}
+  CATEGORY:
+    regions: [main, aside]
+    layout:
+      main: [{type: primary}]
+  LATEST:
+    regions: [main, aside, wide]
+    layout:
+      main: [{type: primary}]
+  PAGE:
+    regions: [main, aside]
+    layout:
+      main: [{type: primary}]
+  SEARCH:
+    regions: [main, aside]
+    layout:
+      main: [{type: primary}]
+
+# Starting points for a website's theme. Panel is the dark of the cover, the call-to-action band and
+# the footer, in both modes; accent carries white text (buttons, the active page); highlight is
+# links, kickers and hover.
+themes:
+  nightfall:
+    name: Nightfall
+    tokens: {bg: "#f5f3ee", surface: "#ffffff", line: "#e2ddd2", ink: "#12151f", muted: "#464c5c",
+             faint: "#868c9b", accent: "#1b2a55", highlight: "#c2541b", tint: "#ece7dc", hover: "#efebe3",
+             panel: "#0a0e1a", "bg@dark": "#090c14", "surface@dark": "#10141f", "line@dark": "#222a3b",
+             "ink@dark": "#eceff5", "muted@dark": "#b3b9c8", "faint@dark": "#7a8193", "accent@dark": "#2c4185",
+             "highlight@dark": "#f0a35a", "tint@dark": "#141a29", "hover@dark": "#161c2b", "panel@dark": "#05070d",
+             font-display: fraunces, font-text: inter, font-label: inter, shell: 1320}
+  newsprint:
+    name: Newsprint
+    tokens: {bg: "#fbfaf7", surface: "#ffffff", line: "#e6e3dc", ink: "#161616", muted: "#4a4a4a",
+             faint: "#8c8c8c", accent: "#161616", highlight: "#b3261e", tint: "#f2f0ea", hover: "#f3f1ec",
+             panel: "#161616", "bg@dark": "#121212", "surface@dark": "#1a1a1a", "line@dark": "#2c2c2c",
+             "ink@dark": "#f0f0f0", "muted@dark": "#c2c2c2", "faint@dark": "#828282", "accent@dark": "#3a3a3a",
+             "highlight@dark": "#ff7a6b", "tint@dark": "#1d1d1d", "hover@dark": "#202020", "panel@dark": "#0a0a0a",
+             font-display: fraunces, font-text: georgia, font-label: inter, shell: 1240}

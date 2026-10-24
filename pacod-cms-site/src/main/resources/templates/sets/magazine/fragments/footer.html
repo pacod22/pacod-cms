@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*
+  The magazine's footer: the website's name and description large, then the footer menu, the
+  contact details and the profiles, then its note. All of it the website's own data (SiteSettings,
+  the `footer` Menu); each column renders only when it has something to say.
+*/-->
+<footer th:fragment="footer(lang)" class="site-footer mz-footer">
+    <div class="shell mz-footer__grid">
+        <div class="mz-footer__brand" th:if="${site != null}">
+            <span class="mz-footer__name" th:text="${site.name(lang)}">Website</span>
+            <p class="mz-footer__tagline" th:if="${site.tagline(lang) != null}" th:text="${site.tagline(lang)}">Tagline</p>
+            <p class="mz-footer__about" th:if="${site.description(lang) != null}" th:text="${site.description(lang)}">About</p>
+            <div class="mz-footer__profiles" th:unless="${site.socialProfiles().isEmpty()}">
+                <a th:each="profile : ${site.socialProfiles()}" th:href="${profile.url}"
+                   th:text="${#strings.toUpperCase(profile.network)}" target="_blank" rel="noopener">NETWORK</a>
+            </div>
+        </div>
+
+        <th:block th:with="links=${site != null ? site.menu('footer', lang) : {}}">
+            <div class="site-footer__col" th:unless="${links.isEmpty()}">
+                <span class="site-footer__label" th:text="${site.name(lang)}">Website</span>
+                <a th:each="entry : ${links}" th:unless="${entry.group()}" th:href="${entry.href()}"
+                   th:text="${entry.label()}"
+                   th:target="${entry.external() ? '_blank' : null}" th:rel="${entry.external() ? 'noopener' : null}">Link</a>
+            </div>
+        </th:block>
+
+        <div class="site-footer__col" th:if="${site != null and site.hasContact()}">
+            <span class="site-footer__label" th:text="#{footer.contact}">Contact</span>
+            <span class="site-footer__text">
+                <th:block th:each="line : ${site.contactAddressLines()}">
+                    <span th:text="${line}">Address</span><br/>
+                </th:block>
+                <th:block th:if="${site.contactPhone() != null}">
+                    <a th:href="${'tel:' + site.contactPhone().replace(' ', '')}" th:text="${site.contactPhone()}">Phone</a><br/>
+                </th:block>
+                <a th:if="${site.contactEmail() != null}" th:href="${'mailto:' + site.contactEmail()}"
+                   th:text="${site.contactEmail()}">E-mail</a>
+            </span>
+        </div>
+    </div>
+
+    <div class="site-footer__bottom" th:if="${site != null}">
+        <div class="shell site-footer__bottom-inner">
+            <span th:text="${site.footerNote(lang) ?: site.name(lang)}">©</span>
+        </div>
+    </div>
+</footer>
+</body>
+</html>

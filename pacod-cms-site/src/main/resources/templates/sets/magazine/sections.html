@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*
+  The magazine set's sections: one fragment per section type, named as SectionType.fragment()
+  names it, each taking (s, lang) -- s a RenderedSection whose data PageComposer has already
+  looked up. Fragments only read.
+
+  topRegion is the home page's `top`: a hero there is the full-width cover story; any other
+  section sits in the shell, as everywhere else.
+
+  An inclusion runs before th:case/th:if on the same element, hence every switch wraps its
+  th:replace in a block of its own.
+*/-->
+
+<th:block th:fragment="region(sections, lang)">
+    <th:block th:each="s : ${sections}">
+        <th:block th:unless="${s.primary}">
+            <th:block th:replace="~{sections :: ${s.fragment}(s=${s}, lang=${lang})}"></th:block>
+        </th:block>
+    </th:block>
+</th:block>
+
+<th:block th:fragment="topRegion(sections, lang)">
+    <th:block th:each="s : ${sections}">
+        <th:block th:if="${s.type == 'article-list' and s.setting('style') == 'hero' and !s.data.isEmpty()}">
+            <th:block th:replace="~{fragments/widgets :: cover(${s.data}, ${lang})}"></th:block>
+        </th:block>
+        <th:block th:unless="${s.primary or (s.type == 'article-list' and s.setting('style') == 'hero')}">
+            <div class="shell mz-top-section">
+                <th:block th:replace="~{sections :: ${s.fragment}(s=${s}, lang=${lang})}"></th:block>
+            </div>
+        </th:block>
+    </th:block>
+</th:block>
+
+<!--/* An article list, by style. Its heading is the section's own, else the category's name, else
+       "Most read" for that source -- decided by PageComposer. */-->
+<th:block th:fragment="articleList(s, lang)">
+    <section class="section mz-section" th:with="named=${s.data}" th:if="${!s.data.isEmpty()}"
+             th:classappend="'mz-section--' + ${s.setting('style')}">
+        <th:block th:switch="${s.setting('style')}">
+            <th:block th:case="'hero'">
+                <div class="section-head" th:if="${!#strings.isEmpty(named.name)}">
+                    <h2 class="section-head__title" th:text="${named.name}">Heading</h2>
+                </div>
+                <th:block th:replace="~{fragments/widgets :: hero(${named}, ${lang})}"></th:block>
+            </th:block>
+            <th:block th:case="'list'">
+                <th:block th:replace="~{fragments/widgets :: vertical(${named}, ${lang})}"></th:block>
+            </th:block>
+            <th:block th:case="'ranked'">
+                <th:block th:replace="~{fragments/widgets :: ranked(${named}, ${lang})}"></th:block>
+            </th:block>
+            <th:block th:case="'video'">
+                <div class="section-head" th:if="${!#strings.isEmpty(named.name)}">
+                    <h2 class="section-head__title" th:text="${named.name}">Video</h2>
+                    <a class="section-head__link" th:if="${named.categoryId != null}"
+                       th:href="@{/list/{id}(id=${named.categoryId}, lang=${lang})}"
+                       th:text="#{list.showAll}">All articles</a>
+                </div>
+                <th:block th:replace="~{fragments/widgets :: videos(${named}, ${lang})}"></th:block>
+            </th:block>
+            <th:block th:case="*">
+                <th:block th:replace="~{fragments/widgets :: cards(${named}, ${lang}, true)}"></th:block>
+            </th:block>
+        </th:block>
+    </section>
+</th:block>
+
+<!--/* Text the website's owner wrote, as trusted as an article body: .article-body carries the
+       guards for pasted markup and the body blocks' styles. */-->
+<th:block th:fragment="richText(s, lang)">
+    <section class="section mz-section mz-section--text">
+        <div class="section-head" th:if="${s.setting('heading') != null}">
+            <h2 class="section-head__title" th:text="${s.setting('heading')}">Heading</h2>
+        </div>
+        <div class="article-body" th:utext="${s.setting('html')}">Text</div>
+    </section>
+</th:block>
+
+<!--/* A band in the panel's dark, the heading set large. */-->
+<th:block th:fragment="callToAction(s, lang)">
+    <section class="section mz-band">
+        <div class="mz-band__inner">
+            <h2 class="mz-band__title" th:text="${s.setting('heading')}">Heading</h2>
+            <p class="mz-band__text" th:if="${s.setting('text') != null}" th:text="${s.setting('text')}">Text</p>
+            <a class="mz-button" th:href="${s.setting('url')}" th:text="${s.setting('label')}">Label</a>
+        </div>
+    </section>
+</th:block>
+
+<!--/* Not the navbar's form: its id and the Google button belong to the navbar alone. */-->
+<th:block th:fragment="searchBox(s, lang)">
+    <section class="section mz-section mz-searchbox">
+        <div class="section-head" th:if="${s.setting('heading') != null}">
+            <h2 class="section-head__title" th:text="${s.setting('heading')}">Heading</h2>
+        </div>
+        <form class="mz-searchbox__form" action="/search" method="get" role="search">
+            <input type="hidden" name="lang" th:value="${lang}">
+            <input class="mz-searchbox__input" type="search" name="q" th:placeholder="#{search.placeholder}"
+                   th:aria-label="#{nav.search}">
+            <button class="mz-button" type="submit" th:text="#{search.submit}">Search</button>
+        </form>
+    </section>
+</th:block>
+
+<th:block th:fragment="socialLinks(s, lang)">
+    <section class="section mz-section mz-follow" th:if="${site != null and !site.socialProfiles().isEmpty()}">
+        <div class="section-head">
+            <h2 class="section-head__title" th:text="${s.setting('heading') ?: #messages.msg('section.follow')}">Follow</h2>
+        </div>
+        <ul class="mz-follow__list">
+            <li th:each="profile : ${site.socialProfiles()}">
+                <a th:href="${profile.url}" th:text="${profile.network}" target="_blank" rel="noopener">Network</a>
+            </li>
+        </ul>
+    </section>
+</th:block>
+
+</body>
+</html>

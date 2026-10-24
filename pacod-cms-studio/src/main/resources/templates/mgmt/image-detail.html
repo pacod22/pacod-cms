@@ -265,7 +265,9 @@
                                     <!--/* Not an error: the check runs on upload only, so an image
                                            stored before the rule applied, or while it was off,
                                            keeps its size. Worth naming, because these are the
-                                           images whose thumbnails will be cropped.
+                                           images whose thumbnails will be cropped. Larger is
+                                           fine: only a picture below the minimum or out of its
+                                           shape is named.
 
                                            Gated on the check being on as well: with it off, a
                                            differently sized image is exactly what the console
@@ -273,8 +275,8 @@
                                            setting as a fault on every row it touches. */-->
                                     <span class="note"
                                           th:if="${imageRules.dimensionCheck()
-                                                   and (file.width() != imageRules.width() or file.height() != imageRules.height())}"
-                                          th:text="#{articles.image.nonStandard(${imageRules.width()}, ${imageRules.height()})}"></span>
+                                                   and !imageRules.fits(file.width(), file.height())}"
+                                          th:text="#{articles.image.nonStandard(${imageRules.width()}, ${imageRules.height()}, ${imageRules.ratioWidth()}, ${imageRules.ratioHeight()})}"></span>
                                 </dd>
                                 <dd th:if="${file.width() == null}" class="muted"
                                     th:text="#{articles.image.unknownFormat}">unrecognised format</dd>

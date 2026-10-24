@@ -11,6 +11,7 @@ import io.pacod.cms.core.repository.BannerLayoutRepository;
 import io.pacod.cms.core.repository.BannerRepository;
 import io.pacod.cms.core.seed.DemoContent;
 import io.pacod.cms.core.seed.DemoImages;
+import io.pacod.cms.core.seed.DemoPhotos;
 import io.pacod.cms.core.seed.SiteSeedStep;
 import io.pacod.cms.core.tenant.TenantContext;
 import io.pacod.cms.core.tenant.TenantDirectory;
@@ -60,8 +61,24 @@ public class StudioDemo {
     public record Outcome(DemoContent.Result content, int promotions, String promotionsSkipped) {
     }
 
+    /** The platform's own favicon: a website still showing it has not chosen one. */
+    static final String PLATFORM_FAVICON = "/site-assets/favicon.svg";
+
     private final DemoContent content;
     private final StudioSites sites;
+    private io.pacod.cms.core.repository.SiteSettingsRepository siteSettings;
+    private String storageRoot;
+
+    /**
+     * Where a seed's brand files go: the website's own storage, and its settings. Optional, so the
+     * hand-built instances of the tests need neither.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void useBrand(io.pacod.cms.core.repository.SiteSettingsRepository siteSettings,
+                         @org.springframework.beans.factory.annotation.Value("${pacod.storage.root:}") String storageRoot) {
+        this.siteSettings = siteSettings;
+        this.storageRoot = storageRoot;
+    }
     private final MgmtBannerService bannerService;
     private final MgmtBannerLayoutService layoutService;
     private final BannerRepository banners;
@@ -126,6 +143,12 @@ public class StudioDemo {
                 log.error("Demo promotions for website {} were not written: {}", website.getId(), e.getMessage());
                 outcome = new Outcome(result, 0, e.getMessage());
             }
+            try {
+                brand(content.seed(demo));
+            } catch (java.io.IOException | DataAccessException | IllegalStateException e) {
+                // The articles and the bookings stand without a favicon of their own.
+                log.error("Demo brand files for website {} were not written: {}", website.getId(), e.getMessage());
+            }
             log.info("Demo content for website {}: {} articles, {} promotions{}", website.getId(),
                     result.articles(), outcome.promotions(),
                     outcome.promotionsSkipped() == null ? "" : " (" + outcome.promotionsSkipped() + ")");
@@ -134,8 +157,9 @@ public class StudioDemo {
     }
 
     private Outcome promotions(DemoContent.Demo demo, DemoContent.Result result, Website website) throws MediaException {
-        DemoContent.Promotions seed = content.seed(demo).getPromotions();
-        if (seed == null) {
+        DemoContent.Seed full = content.seed(demo);
+        DemoContent.Promotions seed = full.getPromotions();
+        if (seed == null && full.getPartners().isEmpty()) {
             return new Outcome(result, 0, "the seed has none");
         }
         if (banners.count() > 0) {
@@ -150,6 +174,9 @@ public class StudioDemo {
         String lang = LanguageChain.original();
         int written = 0;
 
+        if (seed == null) {
+            return new Outcome(result, partners(full, origin), null);
+        }
         DemoContent.PromotionSeed image = seed.getImage();
         if (image != null) {
             BannerForm form = new BannerForm();
@@ -203,6 +230,125 @@ public class StudioDemo {
             written++;
         }
         return new Outcome(result, written, null);
+    }
+
+    /**
+     * The advertisers: each one's folder of creatives imported as a banner layout of its id
+     * (IMPORTED: the studio serves it as it is and builds nothing over it), then its bookings, each
+     * at its size, placement and pages as the seed gives them -- {@code suggestedSize} would say TOP
+     * for every imported layout, which has no dimensions of its own. An advertiser whose layout id
+     * is already taken is left out whole.
+     *
+     * <p>A creative links the advertiser's page on the website itself ({@code /p/<slug>}); an image
+     * booking's target is that page's absolute address, as a target must be.
+     */
+    private int partners(DemoContent.Seed seed, String origin) throws MediaException {
+        int written = 0;
+        for (DemoContent.PartnerSeed partner : seed.getPartners()) {
+            boolean html5 = partner.getBookings().stream().anyMatch(b -> BannerType.HTML5.name().equals(b.getType()));
+            if (html5 && layouts.existsById(partner.getId())) {
+                log.info("A banner layout '{}' exists; the demo's advertiser {} is left out", partner.getId(), partner.getName());
+                continue;
+            }
+            if (html5) {
+                layoutService.importArchive(partner.getId(), partner.getName(),
+                        new GeneratedFile(partner.getId() + ".zip", "application/zip", archive(seed, partner)));
+            }
+            for (DemoContent.BookingSeed booking : partner.getBookings()) {
+                BannerForm form = new BannerForm();
+                form.setName(booking.getName());
+                form.setType(BannerType.valueOf(booking.getType()));
+                form.setPlacement(BannerPlacement.valueOf(booking.getPlacement()));
+                form.setSize(BannerSize.valueOf(booking.getSize()));
+                form.setSortOrder(booking.getSortOrder());
+                form.setPages(new ArrayList<>(booking.getPages()));
+                form.setActive(true);
+                if (form.getType() == BannerType.HTML5) {
+                    form.setSource("/resources/banners/" + partner.getId() + "/" + booking.getFile());
+                    bannerService.create(form);
+                } else {
+                    form.setTargetUrl(origin + "/p/" + partner.getPage());
+                    form.setAltText(booking.getAlt());
+                    Integer id = bannerService.create(form).getId();
+                    String name = booking.getImage().substring(booking.getImage().lastIndexOf('/') + 1);
+                    bannerService.uploadCreative(id, new GeneratedFile(name, "image/jpeg", DemoPhotos.read(booking.getImage())));
+                }
+                written++;
+            }
+        }
+        return written;
+    }
+
+    /**
+     * An advertiser's folder as a ZIP, built in memory: its files from the classpath, and the demo
+     * photographs it names, cut to 1200x800 -- the creatives are at most a leaderboard's width.
+     */
+    static byte[] archive(DemoContent.Seed seed, DemoContent.PartnerSeed partner) {
+        String base = partner.getFolder().endsWith("/") ? partner.getFolder() : partner.getFolder() + "/";
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(out)) {
+            for (org.springframework.core.io.Resource resource : new org.springframework.core.io.support
+                    .PathMatchingResourcePatternResolver().getResources("classpath*:" + base + "**")) {
+                String url = resource.getURL().toString();
+                int at = url.lastIndexOf(base);
+                String name = at < 0 ? "" : url.substring(at + base.length());
+                if (name.isEmpty() || name.endsWith("/") || !resource.isReadable()) {
+                    continue;
+                }
+                zip.putNextEntry(new java.util.zip.ZipEntry(name));
+                try (java.io.InputStream in = resource.getInputStream()) {
+                    in.transferTo(zip);
+                }
+                zip.closeEntry();
+            }
+            for (java.util.Map.Entry<String, String> photo : partner.getPhotos().entrySet()) {
+                DemoContent.ImageSeed image = seed.getImages().stream().filter(i -> i.getKey().equals(photo.getValue()))
+                        .findFirst().orElseThrow(() -> new IllegalStateException("No demo picture " + photo.getValue()));
+                zip.putNextEntry(new java.util.zip.ZipEntry(photo.getKey()));
+                zip.write(DemoImages.jpeg(DemoPhotos.frame(DemoPhotos.read(image.getPhoto()), 1200, 800,
+                        image.getFocusX(), image.getFocusY()), 300 * 1024));
+                zip.closeEntry();
+            }
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Could not pack the creatives of " + partner.getId() + ": " + e.getMessage(), e);
+        }
+        return out.toByteArray();
+    }
+
+    /**
+     * The website's favicon and share picture, into its own storage ({@code /assets/brand/}, which
+     * the site serves): the favicon only while the website still shows the platform's, the share
+     * picture only while it has none. A website's settings have no studio screen, so these are the
+     * demo's to fill.
+     */
+    void brand(DemoContent.Seed seed) throws java.io.IOException {
+        DemoContent.BrandSeed brand = seed.getBrand();
+        if (brand == null || siteSettings == null || storageRoot == null || storageRoot.isBlank()) {
+            return;
+        }
+        java.nio.file.Path folder = io.pacod.cms.core.tenant.SiteStorage.siteRoot(storageRoot).resolve("assets/brand");
+        io.pacod.cms.core.data.SiteSettings settings = siteSettings.findById(io.pacod.cms.core.data.SiteSettings.ID)
+                .orElseGet(io.pacod.cms.core.data.SiteSettings::new);
+        boolean changed = false;
+        if (brand.getFavicon() != null && (settings.getFavicon() == null || PLATFORM_FAVICON.equals(settings.getFavicon()))) {
+            java.nio.file.Files.createDirectories(folder);
+            java.nio.file.Files.write(folder.resolve("favicon.svg"), DemoPhotos.read(brand.getFavicon()));
+            settings.setFavicon("/assets/brand/favicon.svg");
+            changed = true;
+        }
+        if (brand.getShare() != null && (settings.getOgImage() == null || settings.getOgImage().isBlank())) {
+            DemoContent.ImageSeed image = seed.getImages().stream().filter(i -> i.getKey().equals(brand.getShare()))
+                    .findFirst().orElseThrow(() -> new IllegalStateException("No demo picture " + brand.getShare()));
+            java.nio.file.Files.createDirectories(folder);
+            java.nio.file.Files.write(folder.resolve("share.jpg"), DemoImages.jpeg(DemoPhotos.frame(
+                    DemoPhotos.read(image.getPhoto()), 1200, 630, image.getFocusX(), image.getFocusY()), 400 * 1024));
+            settings.setOgImage("/assets/brand/share.jpg");
+            changed = true;
+        }
+        if (changed) {
+            settings.setLastModifiedOn(java.time.LocalDateTime.now());
+            siteSettings.save(settings);
+        }
     }
 
     /** The seed's text with the website's name where it says {@value DemoContent#NAME}. */

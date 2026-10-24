@@ -68,8 +68,9 @@ Locally the studio is **http://studio.localhost:8000/**. Sign in as `ID_ADMIN_EM
 - pacod-id at **http://id.localhost:8000/**, its mail at **http://localhost:8125/**;
 - the demo websites at **http://demo.localhost:8000/** (and http://localhost:8000/, also one of its
   hosts) and, on a platform created since Phase 8, **http://minimal.localhost:8000/** -- and, since
-  the space demo, **http://space.localhost:8000/** (an older platform: `make site-create SLUG=space
-  NAME=Starward HOSTS=space.localhost DEMO=space`);
+  the space demo, **http://space.localhost:8000/**, "Starward" on the magazine set (an older
+  platform, or one with the previous Starward: delete it in its settings, then `make site-create
+  SLUG=space NAME=Starward HOSTS=space.localhost DEMO=space`);
 - all of it over HTTPS on 8443 too, from Caddy's local CA.
 
 `make up` needs a `pacod-id:dev` image or pacod-id's sources at `PACOD_ID_SRC` (`../pacod-id`):
@@ -134,7 +135,7 @@ server. Consequences:
   website and, on a platform with **no** websites, creates the demo websites in an organisation of
   their own — `demo` (`pacod.bootstrap.demo.{enabled,id,name,language,hosts}`) and, in the first
   one's organisation, `minimal` on the `minimal` template set (`pacod.bootstrap.demo.minimal.{enabled,
-  id,name,hosts}`) and `space` with the space-travels demo (`pacod.bootstrap.demo.space.{enabled,id,name,
+  id,name,hosts}`) and `space` with the space-travels demo on the magazine set (`pacod.bootstrap.demo.space.{enabled,id,name,
   hosts}`, `DEMO_SPACE_HOSTS`; a setter, so a hand-built bootstrap has none) — each on its own, with the demo content unless `pacod.bootstrap.demo.content=false`
   (*The demo content*); `IdentityLifecycle` starts the
   conversation with pacod-id (*Sign-in and roles*). Each step fails on its own at ERROR and the next
@@ -330,6 +331,22 @@ installs — there is no upload, because Thymeleaf is code.
   then the shared `_base`: Thymeleaf caches parsed templates per engine *by name*, so two sets in one
   engine would share whichever `article` was asked for first. `minimal` extends `editorial`,
   overriding the page templates, `sections.html` and `fragments/stylesheets`.
+- **`magazine` extends `editorial` too: image-led** (the space demo's set). It overrides `landing`,
+  `article`, `index`, `list`, `sections.html` and the fragments `widgets` (a `cover` beside every
+  editorial style), `article-view` (two fragments: `articleHead` -- headline, dek, byline with
+  reading time, the lead picture full width with its caption -- above the columns, `articleView`
+  where the primary stands -- body, the rest of the pictures as editorial's `.gallery`, tags, an
+  author box), `navbar` (one sticky bar; the ids site.js needs, `#site-nav`/`#nav-toggle`/
+  `#theme-toggle`/`#site-search-form`, kept), `footer` and `stylesheets` (`site.css`, then
+  `magazine.css`). It inherits `head`, **`ad-sidebar`** (so `data-partner`, no `sandbox`, the
+  blocker-safe class names), the standing page, search, issues, error, social and print views,
+  restyled. **Its `widgets.html` must define every fragment the inherited templates call**
+  (`metaLine`, `authors`). HOME has a fourth region, **`top`** (`sections :: topRegion`: a hero
+  there is the full-width cover story); ARTICLE and LATEST a `wide` one. `magazine.css` ties
+  site.css's non-token colours (`--greenText`, `--ink2`, `--ph1` …) to tokens, so a theme reaches
+  links and body text; its own classes start `mz-`. View-model helpers it uses are methods, not
+  getters (`ArticleModel.readingMinutes()`, `authorNames()`; `ListItem.kickerName()`), so `/web/v1`
+  JSON does not change. Its chrome strings are `magazine.*` in all six bundles.
 - **`TemplateSetViewResolver` is the bean `thymeleafViewResolver`**, so Boot's backs off, and
   **implements `ViewResolver` directly and caches nothing itself**: a caching resolver keys its cache
   by view name and would hand the first website's `article` to every website. Each set's own
@@ -372,6 +389,12 @@ installs — there is no upload, because Thymeleaf is code.
   properties and appends the CSS, with `@import` removed and `expression(`, `behavior:`,
   `-moz-binding`, `javascript:`, `vbscript:` and `</` neutralised, capped at 50,000 characters —
   defence in depth, since a website's owner already runs script of their own. Presets are the manifests' `themes`.
+- **The font allow-list (`ThemeToken.FONTS`) is served two ways, and every set loads both**: Lora
+  and IBM Plex from Google Fonts, linked by editorial's `fragments/head`, and **Fraunces and Inter
+  self-hosted** (`/site-assets/fonts/`, OFL woff2 from `@fontsource-variable` 5.3.0, Inter with
+  Cyrillic, licences beside them), linked by the same head through `fonts/fonts.css`. A browser
+  fetches only the faces a page renders. A font id added later must be loaded by that head, or a
+  theme naming it falls back on every set. Same-origin, so a website's HTML5 creatives use them too.
 - **`/theme.css?v=<hash>` is an external `text/css` sheet**, never inline (nothing in it can close a
   `<style>`), `nosniff`, immutable for a year at its current version and a minute at any other
   address; linked from `fragments/head` after the set's own sheets (`fragments/stylesheets`), and
@@ -820,10 +843,16 @@ static resource handler can never serve a file under `/mgmt/`.
 - **The upload rules are settings, and the two limits switch independently.**
   `app.image.required-width`/`-height`/`max-bytes`, `app.image.dimension-check.enabled`,
   `app.image.file-size-check.enabled` are `@Value` fields on `ImageService` with defaults (600, 400,
-  128 KB, on, on) **in the annotations only** — every application and test profile scans the class,
+  400 KB, on, on) **in the annotations only** — every application and test profile scans the class,
   and a default-less `@Value` fails startup wherever the property is absent. `MgmtControllerAdvice`
   and `UploadSizeAdvice` **autowire the service**, so help text and rule cannot disagree. Set on
   `cms-studio` only (`IMAGE_*`), read at startup.
+  - **The pixel rule is a minimum and a shape, not an exact size** (it was exactly 600×400 until
+    the Starward rebuild; the property names stayed, so operators' settings still bind): at least
+    W×H and within one pixel of its proportions, `|h·W − w·H| ≤ W` (`ImageService.fitsDimensions`,
+    static so the studio's `ImageRules.fits` and the demo's photographs apply the same arithmetic).
+    Two refusals, `articles.media.tooSmall` and `articles.media.shape`; the hint states the ratio
+    in lowest terms (`ImageRules.ratioWidth`/`ratioHeight`). The test profile still pins 128 KB.
   - **Two flags because two rules**: pixels are layout, bytes are weight; all four combinations
     work, none special-cased (`ImageServiceValidationTest` pins the mixed pairs).
   - **The content-type, empty-file and `ImageIO.read() == null` checks are unconditional** ("is
@@ -1546,18 +1575,29 @@ own origin** with `?_preview=<token>`, never from the studio's: the page runs th
 
 Two demos (`DemoContent.Demo`: `journal`, `space`), one installer (`core.seed.DemoContent`). "Demo
 Journal" (`demo/demo-journal.json`): six sections, four authors, twenty articles (five also in
-German and Spanish), their pictures, tags, a "Sections" group in the main menu and a published link
+German and Spanish), drawn pictures, tags, a "Sections" group in the main menu and a published link
 page; then, from the studio (`studio.demo.StudioDemo`), two bookings of the website's own.
-"Space travels" (`demo/demo-space.json`, default website name "Starward"): the same shape for a
-travel magazine of an invented star system (the Reach: Veyra, Tessaly, Orrin, Halcyon Station, Port
-Kestrel), its bodies **using the body's styled blocks** (lead, callout, pull quote, key facts), seven
-drawn space motifs (`STARFIELD`, `PLANET`, `ROCKET`, `STATION`, `NEBULA`, `MOONSCAPE`, `ASTEROIDS`,
-soft glows through `RadialGradientPaint`), and two optional parts the journal lacks: **`site`**
-(taglines and descriptions, each list written only while the website's is empty) and **`theme`**
-(token values, drafted *and* published only while the website has no `theme` document, cleaned by
-`ThemeCss.clean`) -- both through `useSiteAndTheme`, an optional setter, so hand-built installers
-need neither. Fictional throughout: invented towns, worlds, people and festivals, `example.com` for
-anything outside, no embed of any third party, nothing near the old subject.
+
+**"Space travels"** (`demo/demo-space.json`, default website name "Starward") is the premium one: a
+travel magazine of an invented star system, the Reach (Calder and Port Kestrel, Halcyon Station,
+Selka, Orrin and its Gediz Rim, Tessaly and its moons Veyra and Thule, Mirren, Kesh, Aster, the
+Lantern nebula), in **English only**, on
+the **magazine** template set it was designed for (`Demo.templateSet()`):
+
+- **24 long-form articles** (700-1,200 words, every `BodyBlocks` block, five authors with bios),
+  **37 NASA photographs** captioned as the Reach's places, each caption ending with its credit
+  (`demo/space/photos/`, provenance and the rule for what may be shipped in its `VENDORED.md`;
+  `ImageSeed.photo`/`credit`/`nasaId`/`source`), some placed inside a body as a figure
+  (`ArticleSeed.inline`: attached and hidden from the gallery);
+- its own **pages** -- about, contact and advertise in place of the generic ones, and five
+  advertisers' pages (`/p/aurelian-lines` …) -- its **menus**, **layouts** for every page type,
+  two published **journal issues** (no PDFs), the website's contact details, `example.com`
+  profiles and footer note, its **theme**, and the **advertisers** and **brand** files (below);
+- the website's `language` collection **narrowed to English** (`narrowLanguages`), so the switcher
+  is hidden.
+
+Fictional throughout: invented worlds, people, companies and offers, `example.com` for anything
+outside, no third-party embed. The photographs are real and say whose they are.
 
 - **Which demo**: every entry point takes one and means the journal without it -- the new-website
   form's `demoKind` select beside its checkbox (`NewSite.demoKind`, checked before anything exists:
@@ -1565,7 +1605,8 @@ anything outside, no embed of any third party, nothing near the old subject.
   site-create … DEMO=1|space`, `make seed SITE=… DEMO=space`), and the bootstrap's `space` website.
   `Demo.of` reads blank, `true` and `1` as the journal and anything unknown as none, refused. The
   methods without a `Demo` (`install(website)`, `seed()`, `languages()`, …) are the journal's.
-
+  **`--create-site --demo=space` without `--template-set` makes a magazine website**
+  (`CreateSiteCommand.forDemo`), as the bootstrap does; the new-website form stays explicit.
 - **Written only when asked**: the new-website form's checkbox, `--create-site --demo`
   (`make site-create … DEMO=1|space`), `--seed-demo --site-id=` (`SeedDemoCommand`, what `make seed` runs
   in a one-off studio container), and `PlatformBootstrap`'s demo website. **Not a `SiteSeedStep`**,
@@ -1573,41 +1614,65 @@ anything outside, no embed of any third party, nothing near the old subject.
   `DemoSiteRenderIT` builds the installer by hand.
 - **Refused before anything is written** (`DemoContent.Refused`): a website that has articles
   (`HAS_ARTICLES`), and a content language the seed is not complete in (`LANGUAGE`; `languages()`
-  is the intersection of every text's languages, English today). The scalars are written in
-  `original()` and only the other languages go into `titles`/`texts`/…, so English text never sits
-  under another language's code. The form names the languages through `StudioDemo.languageNames`.
-- **Rerunnable**: everything but the articles is written only while absent, by fixed id or (a
-  picture) by file name, and the articles go last in one `saveAll` — a run that died halfway is
-  finished by running it again, and the article check still holds.
+  is the intersection of every text's languages -- pages' and issues' included -- English today).
+  The scalars are written in `original()` and only the other languages go into `titles`/`texts`/…,
+  so English text never sits under another language's code. **An existing website cannot be given
+  the new Starward**: delete it and create it again (`docs/RUNNING.md`).
+- **Rerunnable, and never over an operator's edit**: everything but the articles is written only
+  while absent -- by fixed id, by file name (a picture), by slug (a page) -- or, where a seed step
+  wrote something generic first, **only while it is still exactly that**: a standing page equal to
+  `PageBootstrap.toPage` of its seed, a menu equal to `SiteBootstrap.toMenu`, a language row equal to
+  `LanguageBootstrap`'s (and only one neither `original()` nor `FALLBACK` and holding no page text),
+  a footer note still `"© name"`, a favicon still the platform's. Layouts, issues and pages go
+  **before** the articles, which go last in one `saveAll` -- a run that died halfway is finished by
+  running it again, and the article check still holds.
+- **Layouts only on their set** (`Seed.layoutSet`): written per page type while it has none, each
+  checked with `LayoutResolver` first (a section the set cannot render would be dropped without a
+  word; one with issues is not written, and logged). On another set the set's defaults stay.
 - **A newer article has a higher id** (`SeedIntegrityTest.idsFollowTheDates`): the latest list,
   the hero and `/latest` order by `_id` descending, as the studio's max-plus-one ids imply; dates
   are relative to the install, and today's hour that has not come yet moves to yesterday.
-- **The pictures are drawn at install time** (`DemoImages`): gradients and shapes, **never text**
-  (a runtime image may have no fonts, and drawing a glyph there throws), `TYPE_INT_RGB` (the JPEG
-  writer mangles alpha), seeded by the key so a test can pin them, at `ImageService`'s required size
-  with the quality stepped down until the file fits its byte limit. They are stored by
-  **`ImageService.save(name, type, bytes, caption)`** — the upload's own `validate` and write — with
-  alt text per language. Files are `demo-<key>.jpg`.
-- **The menu group** is added after "Latest" only when the main menu links no category at all, so an
-  operator's own sections are never doubled. **The link page** is written only while absent,
-  published, named after the website, its link ids from `newLinkId`.
-- **The bookings** go through `MgmtBannerService` and `MgmtBannerLayoutService` (a creative and
-  slides as `GeneratedFile`s, so their checks and folders apply): an image booking to `/latest` and
-  an HTML5 rotator `journal-sections` (the space demo's: `reach-sections`) on the `sidebar` skeleton,
-  three slides to three sections.
-  **A target must be absolute**, so they use the website's public origin (`StudioSites`); with no
-  host, or with any booking already there, there are none. A failure costs the bookings only
-  (`Outcome.promotionsSkipped`). Their texts say `{name}` (`DemoContent.NAME`) where the website's
-  name goes, so a website advertises itself, not "Demo Journal". Their file and folder names were
-  checked against EasyList and EasyPrivacy: no size, no `ad`, `banner` or `house`.
-- Tests: `SeedIntegrityTest`, **parameterised over every `Demo`** (references, ids, whole
-  translations, clean bodies -- a `class` only a `BodyBlocks` one --, every address one the site
-  serves, a theme `ThemeCss.clean` keeps whole), `DemoContentTest` (what is written, refusals, the
-  rerun, the space demo's taglines and theme only where absent), `DemoImagesTest` (every motif),
-  `StudioDemoTest`, `PlatformBootstrapTest` (the fresh install's path),
+- **Pictures are stored as uploads are** -- **`ImageService.save(name, type, bytes, caption)`**, the
+  upload's own `validate` and write -- with alt text per language; files are `demo-<key>.jpg`.
+  The journal's are **drawn** (`DemoImages`: gradients and shapes, **never text** -- a runtime image
+  may have no fonts, and drawing a glyph there throws -- `TYPE_INT_RGB`, seeded by the key, at the
+  required size). The space demo's are **shipped photographs fitted to the website's live rules**
+  (`DemoPhotos.fit`): cropped to the rule's shape, kept at their size above the minimum, the quality
+  stepped down and then the size, never below the minimum, until the byte limit holds -- or refused,
+  never stored to fail. New keys never reuse an old file name (old files are reused by name).
+- **The menu group** (the journal) is added after "Latest" only when the main menu links no category
+  at all. **The link page** is written only while absent, published, named after the website, its
+  link ids from `newLinkId`. `{name}` (`DemoContent.NAME`) in pages, footer notes, taglines and
+  bios is the website's name.
+- **The bookings** go through `MgmtBannerService` and `MgmtBannerLayoutService`, so their checks
+  and folders apply, only while the website has none, and need its public origin (`StudioSites`) --
+  a failure costs the bookings only (`Outcome.promotionsSkipped`). The journal: an image booking to
+  `/latest` and an HTML5 rotator `journal-sections` on the `sidebar` skeleton. **The space demo:
+  five invented advertisers** (`Seed.partners`): each folder of hand-written HTML5 creatives
+  (`pacod-cms-studio/src/main/resources/demo/space/partners/<id>/`, fluid, reduced-motion aware,
+  one link to the advertiser's `/p/<slug>`, the website's own fonts) is packed into a ZIP in memory
+  with the demo photographs it names and imported (IMPORTED); its bookings are made **at the size,
+  placement and pages the seed gives** (`suggestedSize` says TOP for any imported layout); one
+  IMAGE booking uploads a still rendered once from HTML (`partners/VENDORED.md`). Every name was
+  checked against EasyList, EasyPrivacy and both Fanboy lists.
+- **The brand files** (`Seed.brand`, `StudioDemo.brand`): a favicon SVG and a 1200x630 share
+  picture written into the website's storage, `/assets/brand/`, which the site serves; set only while
+  the website still shows the platform's favicon / has no share image. The magazine set's masthead
+  shows the favicon beside the website's name, set in the display face -- no logo files, so a
+  website of any name looks right.
+- Tests: `SeedIntegrityTest`, **parameterised over every `Demo`** (references, ids, translations
+  -- the journal's at least four --, clean bodies -- a `class` only a `BodyBlocks` one, a `src` only
+  a demo picture's --, pages and their links, menus, every layout resolving on its set, issues, a
+  picture drawn or a credited 3:2 photograph, every shipped photograph used, a theme
+  `ThemeCss.clean` keeps whole), `DemoContentTest` (what is written, refusals, the rerun, photographs
+  fitted to a stricter rule, each untouched-only guard, layouts only on their set), `DemoPhotosTest`,
+  `DemoImagesTest` (every motif), `StudioDemoTest` (the advertisers' archives -- every link inside a
+  page the seed writes, no outside address --, their bookings, the brand files), `CreateSiteCommandTest`,
+  `PlatformBootstrapTest` (the fresh install's path; `space` on magazine),
   `PortalWebsitesTest.demoLanguageIsCheckedFirst`, `PortalScreensTest`'s demo cases, and
-  `DemoSiteRenderIT` (every page type on both sets; the space demo on its own website, `tau`: blocks,
-  translations, pictures, the published theme linked, the taglines).
+  `DemoSiteRenderIT` (every page type on editorial and minimal; the space demo on its own magazine
+  website, `tau`: the cover, blocks, figures, credits, pages, issues, the narrowed languages, the
+  published theme).
 
 ### Jobs
 
@@ -2104,9 +2169,9 @@ checks that a flush afterwards does not bring its database back. `LayoutRenderIT
 `TemplateSetIsolationIT`, `PreviewIT` and `ArchiveIT` add websites of their own where they change one (a layout,
 a template set, a tag manager, an exported website), so the shared context's `alpha` and `beta` stay as the others
 expect; `FramingIT` reads the framing headers over real HTTP; `PublicArticlesIT` checks that only
-published articles reach a reader, and each website's sitemap; `DemoSiteRenderIT` gives two new
-websites (one per template set) the seed steps and the demo content, built by hand, and reads every
-page type back. The base points `app.image.folder` into its storage root, so a picture written there
+published articles reach a reader, and each website's sitemap; `DemoSiteRenderIT` gives three new
+websites (the journal on editorial and on minimal, the space demo on magazine) the seed steps and
+the demo content, built by hand, and reads every page type back. The base points `app.image.folder` into its storage root, so a picture written there
 is one the site serves. **One `MongoDBContainer`, started in a static block**, not `@Container` (which
 stops it after each class while Spring keeps the cached context pointed at it); **the JDK
 `HttpClient` on HTTP/1.1** (Tomcat refuses the h2c upgrade) **with

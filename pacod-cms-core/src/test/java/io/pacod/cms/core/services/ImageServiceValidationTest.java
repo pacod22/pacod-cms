@@ -52,7 +52,7 @@ class ImageServiceValidationTest {
      */
     private static final int DEFAULT_WIDTH = 600;
     private static final int DEFAULT_HEIGHT = 400;
-    private static final long DEFAULT_MAX_BYTES = 128L * 1024L;
+    private static final long DEFAULT_MAX_BYTES = 400L * 1024L;
 
     private ImageMediaRepository repository;
     private ImageService service;
@@ -120,7 +120,7 @@ class ImageServiceValidationTest {
     }
 
     @Test
-    @DisplayName("an image of exactly the required size is stored")
+    @DisplayName("an image of exactly the minimum size is stored")
     void acceptsACorrectlySizedImage() throws Exception {
         byte[] content = png(DEFAULT_WIDTH, DEFAULT_HEIGHT);
 
@@ -133,16 +133,57 @@ class ImageServiceValidationTest {
     }
 
     @Test
-    @DisplayName("the wrong dimensions are refused, and nothing is written to disk")
-    void rejectsWrongDimensions() throws Exception {
-        byte[] content = png(DEFAULT_WIDTH + 1, DEFAULT_HEIGHT);
+    @DisplayName("a larger image in the same proportions is stored, within a pixel of rounding")
+    void acceptsLargerImagesOfTheSameShape() throws Exception {
+        // 1600 wide at 3:2 is 1066.67 high: both roundings pass, the next pixel down does not.
+        assertThat(service.save(file("a.png", "image/png", png(1200, 800)))).isNotNull();
+        assertThat(service.save(file("b.png", "image/png", png(1600, 1067)))).isNotNull();
+        assertThat(service.save(file("c.png", "image/png", png(1600, 1066)))).isNotNull();
+        assertThat(service.save(file("d.png", "image/png", png(DEFAULT_WIDTH + 1, DEFAULT_HEIGHT)))).isNotNull();
 
-        assertThatThrownBy(() -> service.save(file("wide.png", "image/png", content)))
+        assertThatThrownBy(() -> service.save(file("e.png", "image/png", png(1600, 1065))))
                 .isInstanceOf(MediaException.class)
-                .hasMessageContaining("601x400");
+                .hasMessageContaining("1600x1065; the site layout requires the proportions of 600x400");
+    }
+
+    @Test
+    @DisplayName("an image below the minimum is refused, and nothing is written to disk")
+    void rejectsASmallImage() throws Exception {
+        // In the right shape, so it is the minimum that refuses it.
+        byte[] content = png(DEFAULT_WIDTH / 2, DEFAULT_HEIGHT / 2);
+
+        assertThatThrownBy(() -> service.save(file("small.png", "image/png", content)))
+                .isInstanceOf(MediaException.class)
+                .hasMessageContaining("300x200; the site layout requires at least 600x400");
 
         assertThat(imageFolder.toFile().list()).isEmpty();
         verify(repository, never()).save(any(ImageMedia.class));
+    }
+
+    @Test
+    @DisplayName("an image of another shape is refused, however large, and nothing is written")
+    void rejectsTheWrongShape() throws Exception {
+        byte[] content = png(1600, 900);
+
+        assertThatThrownBy(() -> service.save(file("wide.png", "image/png", content)))
+                .isInstanceOf(MediaException.class)
+                .hasMessageContaining("1600x900; the site layout requires the proportions of 600x400");
+
+        assertThat(imageFolder.toFile().list()).isEmpty();
+        verify(repository, never()).save(any(ImageMedia.class));
+    }
+
+    @Test
+    @DisplayName("the shared arithmetic: a minimum and a shape")
+    void fitsDimensions() {
+        assertThat(ImageService.fitsDimensions(600, 400, 600, 400)).isTrue();
+        assertThat(ImageService.fitsDimensions(1500, 1000, 600, 400)).isTrue();
+        assertThat(ImageService.fitsDimensions(1600, 1067, 600, 400)).isTrue();
+        assertThat(ImageService.fitsDimensions(1600, 1065, 600, 400)).isFalse();
+        assertThat(ImageService.fitsDimensions(450, 300, 600, 400)).isFalse();
+        assertThat(ImageService.fitsShape(450, 300, 600, 400)).isTrue();
+        assertThat(ImageService.fitsDimensions(1600, 1200, 800, 600)).isTrue();
+        assertThat(ImageService.fitsDimensions(1600, 1067, 800, 600)).isFalse();
     }
 
     @Test
@@ -232,13 +273,18 @@ class ImageServiceValidationTest {
         configure(800, 600, DEFAULT_MAX_BYTES, true, true);
 
         assertThat(service.save(file("wide.png", "image/png", png(800, 600)))).isNotNull();
+        assertThat(service.save(file("large.png", "image/png", png(1600, 1200)))).isNotNull();
 
-        // And the shipped default is the one refused here, which is what proves the check reads
-        // the setting rather than a constant that happens to agree with it.
+        // And the shipped default is the one refused here, twice over -- too small, and 3:2 where
+        // 4:3 is configured -- which is what proves the check reads the setting rather than a
+        // constant that happens to agree with it.
         assertThatThrownBy(() -> service.save(
                         file("small.png", "image/png", png(DEFAULT_WIDTH, DEFAULT_HEIGHT))))
                 .isInstanceOf(MediaException.class)
-                .hasMessageContaining("600x400; the site layout requires exactly 800x600");
+                .hasMessageContaining("600x400; the site layout requires at least 800x600");
+        assertThatThrownBy(() -> service.save(file("photo.png", "image/png", png(1200, 800))))
+                .isInstanceOf(MediaException.class)
+                .hasMessageContaining("1200x800; the site layout requires the proportions of 800x600");
     }
 
     @Test
@@ -315,16 +361,16 @@ class ImageServiceValidationTest {
     }
 
     @Test
-    @DisplayName("dimensions only: an off-size image is refused, an oversize one is not")
+    @DisplayName("dimensions only: an off-shape image is refused, an oversize one is not")
     void enforcesDimensionsWithoutTheByteCap() throws Exception {
         // One of the two mixed combinations, and the pair is the point: they are what prove there
         // are two flags rather than one flag read twice. Wanting a uniform layout is no reason to
         // refuse a heavy photograph.
         configure(DEFAULT_WIDTH, DEFAULT_HEIGHT, DEFAULT_MAX_BYTES, true, false);
 
-        assertThatThrownBy(() -> service.save(file("wide.png", "image/png", png(1024, 300))))
+        assertThatThrownBy(() -> service.save(file("wide.png", "image/png", png(1600, 600))))
                 .isInstanceOf(MediaException.class)
-                .hasMessageContaining("requires exactly");
+                .hasMessageContaining("requires the proportions");
 
         // A correctly sized PNG well past the cap: accepted, because nothing is capping it here.
         byte[] heavy = noisyPng(DEFAULT_WIDTH, DEFAULT_HEIGHT);

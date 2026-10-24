@@ -32,9 +32,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The demo content as a reader meets it, against a real MongoDB: two new English websites, one on
- * each template set, provisioned with the seed steps the studio runs and then given the demo
- * content. Every page type answers with something in it -- a list that rendered empty at 200 is
+ * The demo content as a reader meets it, against a real MongoDB: three new English websites -- the
+ * journal on the editorial and the minimal set, the space travels on the magazine set -- provisioned
+ * with the seed steps the studio runs and then given the demo content. Every page type answers with something in it -- a list that rendered empty at 200 is
  * what this exists to catch -- the translations are served, and the pictures are files the site
  * serves.
  *
@@ -65,13 +65,17 @@ class DemoSiteRenderIT extends TwoWebsitesIT {
     ImageService imageService;
     @Autowired
     io.pacod.cms.core.repository.ThemeRepository themes;
+    @Autowired
+    io.pacod.cms.core.repository.LayoutRepository layouts;
+    @Autowired
+    io.pacod.cms.core.repository.JournalIssueRepository issues;
 
     /** Ids of their own: the context, and so every website in it, is shared by every IT class. */
     @BeforeAll
     void demoWebsites() {
         demoWebsite("omicron", "Omicron Journal", EDITORIAL, null);
         demoWebsite("sigma", "Sigma Notes", MINIMAL, "minimal");
-        demoWebsite("tau", "Tau Travels", SPACE, null, DemoContent.Demo.SPACE);
+        demoWebsite("tau", "Tau Travels", SPACE, DemoContent.Demo.SPACE.templateSet(), DemoContent.Demo.SPACE);
     }
 
     private void demoWebsite(String id, String name, String host, String templateSet) {
@@ -94,6 +98,7 @@ class DemoSiteRenderIT extends TwoWebsitesIT {
         DemoContent demo = new DemoContent(articles, categories, authors, images, tags, menus, socialPages,
                 imageService, mapper);
         demo.useSiteAndTheme(settings, themes);
+        demo.useStandingContent(pages, languages, layouts, issues, new io.pacod.cms.core.design.TemplateSetCatalog());
         TenantContext.runAs(tenant, () -> {
             // What the studio's provisioning writes before anyone can ask for demo content.
             new LanguageBootstrap(languages, mapper).seed(about);
@@ -172,26 +177,39 @@ class DemoSiteRenderIT extends TwoWebsitesIT {
     }
 
     @Test
-    @DisplayName("the space travels: a complete website -- its articles in their styled blocks, translations, pictures, theme and taglines")
+    @DisplayName("the space travels on the magazine set: a cover story, long articles in their blocks, photographs with credits, pages, issues")
     void spaceTravels() {
         assertThat(page(SPACE, "/")).as("home")
-                .contains("Why the stars do not twinkle in space", "Forty-eight hours on Halcyon Station",
-                        "/assets/img/articles/demo-clear-stars.jpg", "Destinations", "/theme.css?v=");
-        assertThat(page(SPACE, "/article/2")).as("an article with its blocks")
+                .contains("/site-assets/magazine.css", "/theme.css?v=", "mz-cover",
+                        // The newest article is the cover story, its photograph full width.
+                        "Why the stars do not twinkle in space", "/assets/img/articles/demo-lantern-witch.jpg",
+                        "Forty-eight hours on Halcyon Station", "Latest from the Reach", "Plan your crossing",
+                        "Where our pictures come from", "Destinations")
+                // Written in English alone: the website's languages were narrowed, the switcher is gone.
+                .doesNotContain("lang-menu");
+        String article = page(SPACE, "/article/8");
+        assertThat(article).as("an article")
                 .contains("Veyra: walking among the ice geysers", "class=\"body-lead\"", "class=\"body-pullquote\"",
-                        "class=\"body-facts\"", "Good to know", "Liora");
-        assertThat(page(SPACE, "/de/article/19")).contains("Achtundvierzig Stunden auf der Halcyon-Station");
-        assertThat(page(SPACE, "/es/article/20")).contains("Por qué las estrellas no titilan en el espacio");
-        assertThat(page(SPACE, "/list/3")).contains("Ships &amp; Gear", "How a pressure suit is fitted");
-        assertThat(get(SPACE, "/assets/img/articles/demo-launch-climb.jpg", "image/*").statusCode()).isEqualTo(200);
-        assertThat(page(SPACE, "/social")).contains("Tau Travels", "About this magazine");
+                        "class=\"body-facts\"", "Liora Venn", "min read", "About the author",
+                        // The lead photograph and its credit.
+                        "demo-veyra-plumes.jpg", "Image: NASA/JPL/Space Science Institute.");
+        // The picture placed inside the body is in it once, and not again in the gallery.
+        assertThat(article.split("demo-veyra-fractures.jpg", -1)).hasSize(2);
+        assertThat(page(SPACE, "/list/3")).contains("Journeys", "Mirren: forty days to the edge of the Reach");
+        assertThat(page(SPACE, "/p/about")).contains("About Tau Travels", "The photographs in Tau Travels are real");
+        assertThat(page(SPACE, "/p/aurelian-lines")).contains("Aurelian Lines", "Advertisement.");
+        assertThat(page(SPACE, "/issues")).contains("The outer worlds", "Red world, grey moon");
+        assertThat(get(SPACE, "/assets/img/articles/demo-tessaly-eclipse.jpg", "image/*").statusCode()).isEqualTo(200);
+        assertThat(page(SPACE, "/social")).contains("Tau Travels", "Forty-eight hours on Halcyon Station");
 
         Tenant tau = directory.bySite("tau").orElseThrow();
         TenantContext.runAs(tau, () -> {
             assertThat(settings.findById(io.pacod.cms.core.data.SiteSettings.ID).orElseThrow().getTaglines())
                     .extracting(io.pacod.cms.core.data.TextItem::getText).contains("Travel writing from across the Reach");
             assertThat(themes.findById(io.pacod.cms.core.design.Theme.ID).orElseThrow().getPublished())
-                    .containsEntry("accent", "#1b2d5c").containsEntry("font-display", "plex-sans");
+                    .containsEntry("accent", "#1b2a55").containsEntry("font-display", "fraunces");
+            assertThat(layouts.findById("HOME")).isPresent();
+            assertThat(languages.findAll()).extracting(io.pacod.cms.core.data.Language::getCode).containsExactly("en");
         });
         // The journal's websites got no theme: theirs is the template's own.
         TenantContext.runAs(directory.bySite("omicron").orElseThrow(),

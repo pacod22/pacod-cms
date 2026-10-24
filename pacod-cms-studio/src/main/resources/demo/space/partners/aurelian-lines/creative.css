@@ -1,0 +1,198 @@
+/* Aurelian Lines -- an invented advertiser of the Starward demonstration website.
+   Two creatives share this sheet: index.html, the fluid leaderboard (any width, 90 high), and
+   tall.html, the half page (300 by 600, fluid in width). The faces are the website's own
+   (/site-assets/fonts/fonts.css, same origin); the photographs are copied in by the installer. */
+
+:root {
+    --navy: #0b1530;
+    --deep: #060b1a;
+    --gold: #d9b56a;
+    --gold-soft: #ead6a6;
+    --ivory: #f6f1e4;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--deep); overflow: hidden; }
+body { font-family: 'Inter', system-ui, sans-serif; color: var(--ivory); -webkit-font-smoothing: antialiased; }
+
+.piece {
+    position: relative;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    color: inherit;
+    text-decoration: none;
+    overflow: hidden;
+    background: radial-gradient(120% 140% at 85% 10%, #1b2c5e 0%, var(--navy) 45%, var(--deep) 100%);
+}
+
+.notice {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    z-index: 3;
+    font-size: 8.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: rgba(246, 241, 228, .55);
+}
+
+.mark { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.mark svg { width: 26px; height: 26px; flex: none; }
+.mark b {
+    font: 600 15px/1 'Fraunces', Georgia, serif;
+    letter-spacing: .02em;
+    color: var(--ivory);
+}
+.mark small {
+    display: block;
+    margin-top: 3px;
+    font-size: 8.5px;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--gold);
+}
+
+.go {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: var(--gold);
+    color: var(--deep);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+}
+.go::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .55) 50%, transparent 70%);
+    transform: translateX(-120%);
+    animation: shine 4.5s ease-in-out 2.2s infinite;
+}
+.piece:hover .go { background: var(--gold-soft); }
+
+/* ---------- the leaderboard ---------- */
+
+.wide { align-items: center; gap: 22px; padding-right: 22px; }
+.wide .photo {
+    position: relative;
+    flex: 0 0 auto;
+    width: 32%;
+    max-width: 380px;
+    height: 100%;
+    overflow: hidden;
+}
+.wide .photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 50%;
+    animation: drift 18s ease-in-out infinite alternate;
+}
+.wide .photo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 62%, var(--navy) 100%);
+}
+.wide .mark { flex: none; }
+.wide .words { flex: 1; min-width: 0; }
+.wide .headline {
+    display: block;
+    margin: 0;
+    font: 500 24px/1.1 'Fraunces', Georgia, serif;
+    letter-spacing: -.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    animation: rise .9s ease-out both .2s;
+}
+.wide .headline em { font-style: italic; color: var(--gold-soft); }
+.wide .sub {
+    display: block;
+    margin: 6px 0 0;
+    font-size: 12.5px;
+    color: rgba(246, 241, 228, .72);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    animation: rise .9s ease-out both .45s;
+}
+.wide .go { animation: rise .9s ease-out both .7s; }
+
+@media (max-width: 1000px) {
+    .wide { gap: 16px; padding-right: 16px; }
+    .wide .mark, .wide .sub { display: none; }
+    .wide .photo { width: 24%; }
+    .wide .headline { font-size: 20px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+}
+@media (max-width: 620px) {
+    .wide { gap: 10px; padding-right: 10px; }
+    .wide .headline { font-size: 15px; }
+    .wide .go { padding: 8px 11px; font-size: 9.5px; letter-spacing: .08em; }
+    .wide .go .long { display: none; }
+}
+
+/* ---------- the half page ---------- */
+
+.tall { flex-direction: column; }
+.tall .photo { position: relative; flex: 0 0 50%; overflow: hidden; }
+.tall .photo::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 40%;
+    z-index: 1;
+    background: linear-gradient(180deg, rgba(6, 11, 26, .85), transparent);
+}
+.tall .photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 50%;
+    animation: drift 20s ease-in-out infinite alternate;
+}
+.tall .photo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 55%, var(--navy) 100%);
+}
+.tall .photo .mark { position: absolute; left: 18px; top: 16px; z-index: 2; }
+.tall .words { flex: 1; display: flex; flex-direction: column; padding: 4px 22px 22px; }
+.tall .kicker {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--gold);
+    animation: rise .8s ease-out both .2s;
+}
+.tall .headline {
+    display: block;
+    margin: 10px 0 0;
+    font: 500 28px/1.06 'Fraunces', Georgia, serif;
+    letter-spacing: -.015em;
+    animation: rise .8s ease-out both .4s;
+}
+.tall .headline em { font-style: italic; color: var(--gold-soft); }
+.tall .sub { display: block; margin: 12px 0 0; font-size: 13px; line-height: 1.5; color: rgba(246, 241, 228, .74); animation: rise .8s ease-out both .6s; }
+.tall .price { margin-top: auto; padding-top: 12px; font-size: 12px; color: rgba(246, 241, 228, .74); }
+.tall .price b { display: block; font: 600 26px/1.1 'Fraunces', Georgia, serif; color: var(--ivory); }
+.tall .go { align-self: flex-start; margin-top: 14px; }
+
+@keyframes drift { from { transform: scale(1.04) translateX(-1.5%); } to { transform: scale(1.12) translateX(1.5%); } }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes shine { 0%, 70% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; }
+}

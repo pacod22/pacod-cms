@@ -75,8 +75,9 @@
     <meta property="og:image:secure_url" th:if="${!#strings.isEmpty(shareImage)}"
           th:content="${site != null ? site.url(#uris.escapePath(shareImage)) : #uris.escapePath(shareImage)}"/>
     <meta property="og:image:type" th:if="${!#strings.isEmpty(ogImagePath) and !#strings.isEmpty(ogImageType)}" th:content="${ogImageType}"/>
-    <meta property="og:image:width" th:if="${!#strings.isEmpty(ogImagePath)}" content="600"/>
-    <meta property="og:image:height" th:if="${!#strings.isEmpty(ogImagePath)}" content="400"/>
+    <!--/* No og:image:width/height: the upload rule is a minimum and a shape, not one size (an
+           article picture may be 600x400 or 1500x1000), and a stated size that is wrong is worse
+           than none -- a scraper reads it from the image. */-->
     <meta property="fb:app_id" th:if="${site?.facebookAppId() != null}" th:content="${site.facebookAppId()}"/>
     <meta property="og:locale" th:content="${ogLocale}"/>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
@@ -104,6 +105,10 @@
            system. All three ship Latin, Cyrillic and Greek. */-->
     <link rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"/>
+    <!--/* The theme vocabulary's self-hosted faces (Fraunces, Inter: ThemeToken.FONTS). Every set
+           links it, so a theme naming them survives a switch of sets; a browser fetches only the
+           faces a page renders. */-->
+    <link rel="stylesheet" href="/site-assets/fonts/fonts.css"/>
     <!--/* The template set's stylesheets: fragments/stylesheets, which a set extending this one
            replaces. */-->
     <th:block th:replace="~{fragments/stylesheets :: stylesheets}"></th:block>

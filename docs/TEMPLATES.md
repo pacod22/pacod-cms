@@ -5,8 +5,9 @@ their markup, plus a manifest that tells the studio what the set can render. A w
 set when it is created and can switch in the studio (*Design → Template*); its layouts and theme
 are stored per website, not per set, so they survive a switch.
 
-Two sets ship: **`editorial`** (a magazine front page, a content column beside an aside) and
-**`minimal`** (one centred column), which extends `editorial`. A set is code an operator installs,
+Three sets ship: **`editorial`** (a magazine front page, a content column beside an aside),
+**`minimal`** (one centred column) and **`magazine`** (image-led: a full-width cover story,
+photographs in a mosaic, articles that open on their picture), both of which extend `editorial`. A set is code an operator installs,
 built into the site's jar; there is no upload, because a Thymeleaf template can do anything the
 site can.
 
@@ -57,6 +58,15 @@ then the shared `_base`. A set therefore overrides only what it changes: `minima
 page templates, `sections.html` and `fragments/stylesheets.html`, and takes the article view, the
 navbar, the footer, the social page, the print views, the issue pages' content and the error page
 from `editorial`.
+
+`magazine` overrides more: the home, article, latest and list pages, `sections.html`, and the
+fragments `navbar` (one sticky bar), `footer`, `widgets` (each article-list style, and `cover`) and
+`article-view` (split into `articleHead`, the headline and lead picture across the page, and
+`articleView`, the body, gallery, keywords and author box where the primary section stands). It
+keeps editorial's head, advertising boxes, standing page, search, issues, error, social and print
+views, restyled by `magazine.css`. A set whose `widgets.html` replaces editorial's must still define
+every fragment the inherited templates call (`metaLine`, `authors`). Its home page has a fourth
+region, `top`: a hero placed there renders as the full-width cover story.
 
 The page templates, by view name:
 
@@ -130,11 +140,13 @@ stylesheets. The tokens are shared by every set, so a theme survives a template 
 | Kind | Tokens (CSS custom property) |
 |---|---|
 | Colours, each with a dark value for `.night` | `bg`, `surface`, `line`, `ink`, `muted`, `faint`, `accent`, `highlight`, `tint`, `hover`, `panel` (`--bg` … `--panel`) |
-| Fonts, from an allow-list | `font-display`, `font-text`, `font-label`: `lora`, `plex-sans`, `plex-mono`, `georgia`, `system-serif`, `system-sans`, `system-mono` |
+| Fonts, from an allow-list | `font-display`, `font-text`, `font-label`: `lora`, `plex-sans`, `plex-mono`, `georgia`, `system-serif`, `system-sans`, `system-mono`, `fraunces`, `inter` |
 | Lengths in pixels, bounded | `shell` (720–1600), `gutter` (8–64) |
 
 A set's stylesheet reads the properties (`var(--accent)`); its `themes` in the manifest are presets
-the theme editor offers. Stylesheets are served from the jar under `/site-assets/`; a set names its
+the theme editor offers. Lora and IBM Plex come from Google Fonts; Fraunces and Inter are served from
+the jar (`/site-assets/fonts/`, OFL). Editorial's head links both, so every set can render every font
+a theme names. Stylesheets are served from the jar under `/site-assets/`; a set names its
 own in `fragments/stylesheets.html`.
 
 ## Article body blocks

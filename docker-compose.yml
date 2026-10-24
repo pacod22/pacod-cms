@@ -221,8 +221,9 @@ services:
       PACOD_MAX_ORGS_PER_USER:
       PACOD_MAX_SITES_PER_ORG:
       PACOD_AI_FOR_NEW_ORGS:
-      # A fresh platform gets two demo websites, one per template set, at these hosts, unless
-      # DEMO_WEBSITES=false (production); nothing happens once any website exists.
+      # A fresh platform gets three demo websites -- the journal on editorial and on minimal, the
+      # space travels on magazine -- at these hosts, unless DEMO_WEBSITES=false (production);
+      # nothing happens once any website exists.
       PACOD_BOOTSTRAP_DEMO_ENABLED: ${DEMO_WEBSITES:-true}
       PACOD_BOOTSTRAP_DEMO_HOSTS: ${DEMO_HOSTS:-demo.localhost,localhost}
       PACOD_BOOTSTRAP_DEMO_MINIMAL_HOSTS: ${DEMO_MINIMAL_HOSTS:-minimal.localhost}
@@ -237,7 +238,7 @@ services:
       # servlet container still refuse above 4MB, and the screens state that ceiling instead.
       IMAGE_REQUIRED_WIDTH: ${IMAGE_REQUIRED_WIDTH:-600}
       IMAGE_REQUIRED_HEIGHT: ${IMAGE_REQUIRED_HEIGHT:-400}
-      IMAGE_MAX_BYTES: ${IMAGE_MAX_BYTES:-131072}
+      IMAGE_MAX_BYTES: ${IMAGE_MAX_BYTES:-409600}
       IMAGE_DIMENSION_CHECK: ${IMAGE_DIMENSION_CHECK:-true}
       IMAGE_FILE_SIZE_CHECK: ${IMAGE_FILE_SIZE_CHECK:-true}
     ports:

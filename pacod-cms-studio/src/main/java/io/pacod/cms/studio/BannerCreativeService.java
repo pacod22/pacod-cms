@@ -42,7 +42,7 @@ import java.util.Set;
 public class BannerCreativeService {
 
     /**
-     * Deliberately larger than the article limit ({@code app.image.max-bytes}, 128 KB by default):
+     * Deliberately larger than the article limit ({@code app.image.max-bytes}, 400 KB by default):
      * an animated GIF leaderboard routinely exceeds it. Must stay at or below
      * {@code spring.servlet.multipart.max-file-size}, which rejects an oversize upload before
      * this class ever runs.

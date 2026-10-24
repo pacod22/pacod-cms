@@ -43,6 +43,18 @@ public class LanguageBootstrap implements SiteSeedStep {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * The seed's languages, as read from the classpath. The seed shape IS the document here --
+     * unlike pages, which key their texts by language and need a translation step; a separate Seed
+     * class would be two definitions of one thing. Also what {@code DemoContent} compares a
+     * website's languages with before it removes one.
+     */
+    static List<Language> readSeed(ObjectMapper objectMapper) throws IOException {
+        try (InputStream in = new ClassPathResource(SEED).getInputStream()) {
+            return objectMapper.readerForListOf(Language.class).readValue(in);
+        }
+    }
+
     @Override
     public void seed(Website website) {
         try {
@@ -56,11 +68,8 @@ public class LanguageBootstrap implements SiteSeedStep {
         }
 
         List<Language> seeds;
-        try (InputStream in = new ClassPathResource(SEED).getInputStream()) {
-            // The seed shape IS the document here -- unlike pages, which key their texts by
-            // language and need a translation step. A separate Seed class would be two
-            // definitions of one thing.
-            seeds = objectMapper.readerForListOf(Language.class).readValue(in);
+        try {
+            seeds = readSeed(objectMapper);
         } catch (IOException | RuntimeException e) {
             // RuntimeException as well as IOException: Boot 4.1 ships Jackson 3 (tools.jackson.*),
             // whose parse failures are UNCHECKED -- catching IOException alone compiles and then

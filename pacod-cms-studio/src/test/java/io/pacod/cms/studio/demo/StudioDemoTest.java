@@ -151,6 +151,117 @@ class StudioDemoTest {
     }
 
     @Test
+    @DisplayName("the space demo: each advertiser's folder imported, its bookings at their sizes, every creative linking a page the seed writes")
+    void spaceAdvertisers(@org.junit.jupiter.api.io.TempDir java.nio.file.Path storage) throws Exception {
+        DemoContent.Seed space = new DemoContent(null, null, null, null, null, null, null, null,
+                JsonMapper.builder().build()).seed(DemoContent.Demo.SPACE);
+        when(content.seed(eq(DemoContent.Demo.SPACE))).thenReturn(space);
+        when(content.install(eq(DemoContent.Demo.SPACE), any())).thenReturn(new DemoContent.Result(24, 37, 6, 5, 20, true, true));
+        java.util.Map<String, byte[]> archives = new java.util.LinkedHashMap<>();
+        when(layoutService.importArchive(anyString(), anyString(), any())).thenAnswer(call -> {
+            archives.put(call.getArgument(0), call.<MultipartFile>getArgument(2).getBytes());
+            return new BannerLayout(call.<String>getArgument(0));
+        });
+        var settingsRepository = mock(io.pacod.cms.core.repository.SiteSettingsRepository.class);
+        io.pacod.cms.core.data.SiteSettings site = new io.pacod.cms.core.data.SiteSettings();
+        site.setFavicon(StudioDemo.PLATFORM_FAVICON);
+        when(settingsRepository.findById(io.pacod.cms.core.data.SiteSettings.ID)).thenReturn(Optional.of(site));
+        demo.useBrand(settingsRepository, storage.toString());
+
+        StudioDemo.Outcome outcome = demo.install(DemoContent.Demo.SPACE, website);
+
+        assertThat(outcome.promotionsSkipped()).isNull();
+        assertThat(archives).containsOnlyKeys("aurelian-lines", "lumen-assurance", "rimstone-lodge", "kestrel-vane");
+        java.util.Set<String> slugs = new java.util.HashSet<>();
+        space.getPages().forEach(page -> slugs.add(page.getSlug()));
+        java.util.regex.Pattern address = java.util.regex.Pattern.compile("(?:href|src)=\"([^\"]+)\"");
+        archives.forEach((id, zip) -> {
+            java.util.Map<String, String> files = unzip(zip);
+            assertThat(files).as(id).containsKey("index.html");
+            // Nothing a blocker's generic rules would hide in a name the browser sees.
+            assertThat(files.keySet()).as(id).allSatisfy(name ->
+                    assertThat(name).doesNotContainPattern("\\d+x\\d+|(?i)\\bads?\\b|banner|house|sponsor|promo"));
+            files.forEach((name, text) -> {
+                if (!name.endsWith(".html") && !name.endsWith(".css")) {
+                    return;
+                }
+                assertThat(text).as(id + "/" + name).doesNotContain("http://", "https://");
+                java.util.regex.Matcher links = address.matcher(text);
+                while (links.find()) {
+                    String link = links.group(1);
+                    if (link.startsWith("/p/")) {
+                        assertThat(slugs).as(id + "/" + name).contains(link.substring(3));
+                    } else if (link.startsWith("/")) {
+                        assertThat(link).as(id + "/" + name).isEqualTo("/site-assets/fonts/fonts.css");
+                    } else {
+                        assertThat(files).as(id + "/" + name + " names " + link).containsKey(link);
+                    }
+                }
+            });
+        });
+
+        assertThat(bookings).hasSize(6);
+        assertThat(bookings).filteredOn(b -> b.getType() == BannerType.HTML5).allSatisfy(b -> {
+            assertThat(b.getSize()).as(b.getName()).isNotEqualTo(BannerSize.AUTO);
+            String[] path = b.getSource().split("/");
+            assertThat(unzip(archives.get(path[3]))).as(b.getSource()).containsKey(path[4]);
+        });
+        // One leaderboard per page type: the two never land on the same page.
+        List<BannerForm> tops = bookings.stream().filter(b -> b.getPlacement() == BannerPlacement.TOP).toList();
+        assertThat(tops).hasSize(2);
+        assertThat(tops.get(0).getPages()).doesNotContainAnyElementsOf(tops.get(1).getPages());
+        BannerForm still = bookings.stream().filter(b -> b.getType() == BannerType.IMAGE).findFirst().orElseThrow();
+        assertThat(still.getTargetUrl()).isEqualTo(ORIGIN + "/p/nightglass-tours");
+        ArgumentCaptor<MultipartFile> creative = ArgumentCaptor.forClass(MultipartFile.class);
+        verify(bannerService).uploadCreative(anyInt(), creative.capture());
+        assertThat(creative.getValue().getOriginalFilename()).isEqualTo("still.jpg");
+        BufferedImage image = ImageIO.read(new ByteArrayInputStream(creative.getValue().getBytes()));
+        assertThat(image.getWidth()).isEqualTo(600);
+        assertThat(image.getHeight()).isEqualTo(500);
+
+        // The brand files, in the website's own storage, which the site serves at /assets/.
+        java.nio.file.Path brand = storage.resolve("sites/gamma/assets/brand");
+        assertThat(brand.resolve("favicon.svg")).exists();
+        BufferedImage share = ImageIO.read(brand.resolve("share.jpg").toFile());
+        assertThat(share.getWidth()).isEqualTo(1200);
+        assertThat(share.getHeight()).isEqualTo(630);
+        assertThat(site.getFavicon()).isEqualTo("/assets/brand/favicon.svg");
+        assertThat(site.getOgImage()).isEqualTo("/assets/brand/share.jpg");
+    }
+
+    @Test
+    @DisplayName("a website that chose its favicon and share picture keeps them")
+    void spaceKeepsAnOwnBrand(@org.junit.jupiter.api.io.TempDir java.nio.file.Path storage) throws Exception {
+        DemoContent.Seed space = new DemoContent(null, null, null, null, null, null, null, null,
+                JsonMapper.builder().build()).seed(DemoContent.Demo.SPACE);
+        when(content.seed(eq(DemoContent.Demo.SPACE))).thenReturn(space);
+        when(content.install(eq(DemoContent.Demo.SPACE), any())).thenReturn(new DemoContent.Result(24, 37, 6, 5, 20, true, true));
+        var settingsRepository = mock(io.pacod.cms.core.repository.SiteSettingsRepository.class);
+        io.pacod.cms.core.data.SiteSettings site = new io.pacod.cms.core.data.SiteSettings();
+        site.setFavicon("/assets/own.svg");
+        site.setOgImage("/assets/own.jpg");
+        when(settingsRepository.findById(io.pacod.cms.core.data.SiteSettings.ID)).thenReturn(Optional.of(site));
+        demo.useBrand(settingsRepository, storage.toString());
+
+        demo.install(DemoContent.Demo.SPACE, website);
+
+        verify(settingsRepository, never()).save(any());
+        assertThat(storage.resolve("sites/gamma/assets/brand")).doesNotExist();
+    }
+
+    private static java.util.Map<String, String> unzip(byte[] zip) {
+        java.util.Map<String, String> files = new java.util.LinkedHashMap<>();
+        try (java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(new ByteArrayInputStream(zip))) {
+            for (java.util.zip.ZipEntry entry; (entry = in.getNextEntry()) != null; ) {
+                files.put(entry.getName(), new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            }
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+        return files;
+    }
+
+    @Test
     @DisplayName("a website with bookings, or with no address to link to, gets the content and no promotions")
     void promotionsOnlyWhereTheyFit() {
         when(banners.count()).thenReturn(1L);

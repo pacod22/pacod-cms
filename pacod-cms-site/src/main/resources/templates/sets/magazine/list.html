@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  A category or tag: GET /list/{id}. ${list} is an ArticleListPageable -- a name, an optional
+  numeric id (null for a tag, so every pager link falls back to the name), a Page<ListItem>.
+
+  Cards in a grid, the first page's first one large. Unlike the home page's widgets, an article
+  without a picture is not skipped here -- a listing that silently drops rows would stop matching
+  its own count and pager -- it gets a plain card instead.
+*/-->
+<head th:replace="~{fragments/head :: head(
+        lang=${lang},
+        pageTitle=${list.name + ' | ' + site.name(lang)},
+        pageDesc=${list.name},
+        ogUrl=${site.url('/list/' + (list.id != null ? list.id : list.name))},
+        ogImagePath=null,
+        ogImageType=null)}"></head>
+
+<body class="mz-page mz-page--list">
+<th:block th:replace="~{fragments/scripts :: gtmNoscript}"></th:block>
+<th:block th:replace="~{fragments/navbar :: navbar(${lang})}"></th:block>
+
+<div class="shell">
+    <th:block th:replace="~{fragments/ad-sidebar :: topBanners(${topBanners})}"></th:block>
+</div>
+
+<div class="shell layout mz-layout">
+    <main class="layout__main">
+        <th:block th:each="s : ${regions.get('main')}">
+            <th:block th:if="${s.primary}">
+
+                <div class="page-head mz-list-head">
+                    <div class="page-head__kicker">
+                        <span th:text="${list.page.totalElements}">0</span>
+                        <span th:text="#{list.count}">articles</span>
+                    </div>
+                    <h1 class="page-head__title" th:utext="${list.name}">Section</h1>
+                </div>
+
+                <div class="empty-note" th:if="${list.page.totalElements == 0}"
+                     th:text="#{list.empty}">Nothing here yet.</div>
+
+                <div class="mz-grid mz-grid--list"
+                     th:classappend="${list.pageNumber == 0 and list.page.numberOfElements >= 4} ? 'mz-grid--lead' : ''">
+                    <article class="mz-card" th:each="item : ${list.page.content}">
+                        <a class="mz-card__media" th:if="${!#strings.isEmpty(item.imageFilename)}"
+                           th:href="@{/article/{id}(id=${item.id}, lang=${lang})}">
+                            <img th:src="'/assets/img/articles/' + ${item.imageFilename}" th:alt="${item.imageAlt}" loading="lazy"/>
+                        </a>
+                        <span class="mz-card__media mz-card__media--empty" aria-hidden="true"
+                              th:if="${#strings.isEmpty(item.imageFilename)}"></span>
+                        <div class="mz-card__body">
+                            <th:block th:replace="~{fragments/widgets :: kicker(${item}, ${lang})}"></th:block>
+                            <h2 class="mz-card__title">
+                                <a th:href="@{/article/{id}(id=${item.id}, lang=${lang})}" th:utext="${item.title}">Title</a>
+                            </h2>
+                            <p class="mz-card__dek" th:if="${!#strings.isEmpty(item.description)}"
+                               th:utext="${item.description}">Dek</p>
+                            <p class="mz-meta">
+                                <span th:if="${item.authorCount > 0}"><th:block th:replace="~{fragments/widgets :: authors(${item})}"></th:block></span>
+                                <th:block th:replace="~{fragments/widgets :: metaLine(${item}, ${lang})}"></th:block>
+                            </p>
+                        </div>
+                    </article>
+                </div>
+
+                <nav class="pager" th:if="${list.page.totalPages > 1}" th:aria-label="#{pager.label}">
+                    <a class="pager__item"
+                       th:href="@{/list/{id}(id=${list.id != null ? list.id : list.name}, size=${list.pageSize}, sort=${list.sort}, page=${list.previousPage}, lang=${lang})}"
+                       th:aria-label="#{pager.previous}">«</a>
+                    <!--/* th:classappend with the modifier alone: two BEM __ separators in one
+                           expression are read as Thymeleaf's preprocessing. */-->
+                    <a th:each="i : ${#numbers.sequence(list.startPage, list.lastPage)}"
+                       class="pager__item"
+                       th:classappend="${list.pageNumber == i} ? 'pager__item--current' : ''"
+                       th:href="@{/list/{id}(id=${list.id != null ? list.id : list.name}, size=${list.pageSize}, sort=${list.sort}, page=${i}, lang=${lang})}"
+                       th:text="${i + 1}"></a>
+                    <a class="pager__item"
+                       th:href="@{/list/{id}(id=${list.id != null ? list.id : list.name}, size=${list.pageSize}, sort=${list.sort}, page=${list.nextPage}, lang=${lang})}"
+                       th:aria-label="#{pager.next}">»</a>
+                    <span class="pager__count" id="total-pages">
+                        <span th:text="#{list.pages} + ' '">Pages: </span>
+                        <span th:text="${list.page.totalPages}">1</span>
+                    </span>
+                </nav>
+            </th:block>
+            <th:block th:unless="${s.primary}">
+                <th:block th:replace="~{sections :: ${s.fragment}(s=${s}, lang=${lang})}"></th:block>
+            </th:block>
+        </th:block>
+    </main>
+
+    <aside class="layout__aside">
+        <th:block th:replace="~{fragments/ad-sidebar :: adSidebar(${sidebarBanners})}"></th:block>
+        <th:block th:replace="~{sections :: region(${regions.get('aside')}, ${lang})}"></th:block>
+    </aside>
+</div>
+
+<th:block th:replace="~{fragments/footer :: footer(${lang})}"></th:block>
+<th:block th:replace="~{fragments/scripts :: siteScripts}"></th:block>
+</body>
+</html>

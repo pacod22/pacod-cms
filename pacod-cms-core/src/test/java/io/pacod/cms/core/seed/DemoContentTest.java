@@ -301,28 +301,182 @@ class DemoContentTest {
     }
 
     @Test
-    @DisplayName("the space travels: its own articles and pictures, and its taglines and theme only where the website has none")
+    @DisplayName("the space travels: its own articles and photographs, and its taglines and theme only where the website has none")
     void spaceTravels() {
         var settingsRepository = mock(io.pacod.cms.core.repository.SiteSettingsRepository.class);
         var themeRepository = mock(io.pacod.cms.core.repository.ThemeRepository.class);
         io.pacod.cms.core.data.SiteSettings site = new io.pacod.cms.core.data.SiteSettings();
         site.setDescriptions(new ArrayList<>(List.of(new TextItem("The operator's own description", "en"))));
+        // What SiteBootstrap wrote for a website of this name: the demo's own note replaces it.
+        site.setFooterNotes(new ArrayList<>(List.of(new TextItem("© Demo Journal", "en"))));
         when(settingsRepository.findById(io.pacod.cms.core.data.SiteSettings.ID)).thenReturn(Optional.of(site));
         demo.useSiteAndTheme(settingsRepository, themeRepository);
 
+        // The shipped default limit; fitting a photograph to a stricter one is spacePhotographsFitTheRules.
+        when(imageService.getMaxImageBytes()).thenReturn(400L * 1024);
+        when(imageService.isDimensionCheckEnabled()).thenReturn(true);
         DemoContent.Result result = demo.install(DemoContent.Demo.SPACE, TEST);
 
-        assertThat(result.articles()).isEqualTo(20);
-        assertThat(savedArticles()).extracting(Article::getTitle).contains("Why the stars do not twinkle in space");
-        assertThat(storedImages).containsKey("demo-launch-climb.jpg");
+        assertThat(result.articles()).isEqualTo(24);
+        List<Article> saved = savedArticles();
+        assertThat(saved).extracting(Article::getTitle).contains("Why the stars do not twinkle in space");
+        // A photograph, stored as an upload is, its caption ending with its credit.
+        assertThat(storedImages).containsKey("demo-tessaly-eclipse.jpg");
+        assertThat(storedImages.get("demo-tessaly-eclipse.jpg").getCaption())
+                .endsWith("Image: NASA/JPL-Caltech/Space Science Institute.");
+        // Every one fits the website's byte limit, whatever size it was shipped at.
+        assertThat(drawn).hasSize(37).allSatisfy(jpeg -> assertThat(jpeg.length).isLessThanOrEqualTo(400 * 1024));
+        // A picture placed inside a body is attached, and hidden from the gallery.
+        Article trail = saved.stream().filter(a -> a.getId() == 6).findFirst().orElseThrow();
+        assertThat(trail.getHiddenImageIds()).containsExactly(storedImages.get("demo-orrin-mount.jpg").getId());
+        assertThat(trail.getText()).contains("src=\"/assets/img/articles/demo-orrin-mount.jpg\"");
+
         ArgumentCaptor<io.pacod.cms.core.data.SiteSettings> settings = ArgumentCaptor.forClass(io.pacod.cms.core.data.SiteSettings.class);
         verify(settingsRepository).save(settings.capture());
         assertThat(settings.getValue().getTaglines()).extracting(TextItem::getText).contains("Travel writing from across the Reach");
         // The operator's description stays.
         assertThat(settings.getValue().getDescriptions()).extracting(TextItem::getText).containsExactly("The operator's own description");
+        assertThat(settings.getValue().getFooterNotes()).extracting(TextItem::getText).singleElement()
+                .asString().startsWith("© Demo Journal. A pacod-cms demonstration");
+        assertThat(settings.getValue().getContactEmail()).isEqualTo("editors@example.com");
+        assertThat(settings.getValue().getSocialProfiles()).isNotEmpty()
+                .allSatisfy(profile -> assertThat(profile.getUrl()).startsWith("https://example.com/"));
         ArgumentCaptor<io.pacod.cms.core.design.Theme> theme = ArgumentCaptor.forClass(io.pacod.cms.core.design.Theme.class);
         verify(themeRepository).save(theme.capture());
-        assertThat(theme.getValue().getPublished()).isEqualTo(theme.getValue().getDraft()).containsEntry("panel", "#0b1020");
+        assertThat(theme.getValue().getPublished()).isEqualTo(theme.getValue().getDraft())
+                .containsEntry("panel", "#0a0e1a").containsEntry("font-display", "fraunces");
+    }
+
+    @Test
+    @DisplayName("a photograph is fitted to a stricter website: larger minimum, small byte limit")
+    void spacePhotographsFitTheRules() {
+        when(imageService.getRequiredWidth()).thenReturn(900);
+        when(imageService.getRequiredHeight()).thenReturn(600);
+        when(imageService.isDimensionCheckEnabled()).thenReturn(true);
+        when(imageService.getMaxImageBytes()).thenReturn(90L * 1024);
+
+        demo.install(DemoContent.Demo.SPACE, TEST);
+
+        assertThat(drawn).hasSize(37).allSatisfy(jpeg -> {
+            assertThat(jpeg.length).isLessThanOrEqualTo(90 * 1024);
+            BufferedImage image = read(jpeg);
+            assertThat(io.pacod.cms.core.services.ImageService.fitsDimensions(image.getWidth(), image.getHeight(), 900, 600))
+                    .as("%dx%d", image.getWidth(), image.getHeight()).isTrue();
+        });
+    }
+
+    private static BufferedImage read(byte[] jpeg) {
+        try {
+            return ImageIO.read(new ByteArrayInputStream(jpeg));
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
+    /** The repositories of a website's standing content, in memory. */
+    private final class Standing {
+        final Map<String, io.pacod.cms.core.data.Page> pages = new LinkedHashMap<>();
+        final Map<String, io.pacod.cms.core.data.Language> languages = new LinkedHashMap<>();
+        final Map<String, io.pacod.cms.core.design.Layout> layouts = new LinkedHashMap<>();
+        final List<io.pacod.cms.core.data.JournalIssue> issues = new ArrayList<>();
+        final Map<String, Menu> menusByKey = new LinkedHashMap<>();
+
+        Standing() throws Exception {
+            // These installs are about what is written, not about fitting photographs: the default limit.
+            when(imageService.getMaxImageBytes()).thenReturn(400L * 1024);
+            when(imageService.isDimensionCheckEnabled()).thenReturn(true);
+            var pageRepository = mock(io.pacod.cms.core.repository.PageRepository.class);
+            when(pageRepository.findById(anyString())).thenAnswer(c -> Optional.ofNullable(pages.get(c.<String>getArgument(0))));
+            when(pageRepository.findAll()).thenAnswer(c -> new ArrayList<>(pages.values()));
+            when(pageRepository.save(any(io.pacod.cms.core.data.Page.class))).thenAnswer(c -> {
+                io.pacod.cms.core.data.Page page = c.getArgument(0);
+                pages.put(page.getSlug(), page);
+                return page;
+            });
+            var languageRepository = mock(io.pacod.cms.core.repository.LanguageRepository.class);
+            when(languageRepository.findAll()).thenAnswer(c -> new ArrayList<>(languages.values()));
+            org.mockito.Mockito.doAnswer(c -> languages.remove(c.<String>getArgument(0)))
+                    .when(languageRepository).deleteById(anyString());
+            var layoutRepository = mock(io.pacod.cms.core.repository.LayoutRepository.class);
+            when(layoutRepository.existsById(anyString())).thenAnswer(c -> layouts.containsKey(c.<String>getArgument(0)));
+            when(layoutRepository.save(any(io.pacod.cms.core.design.Layout.class))).thenAnswer(c -> {
+                io.pacod.cms.core.design.Layout layout = c.getArgument(0);
+                layouts.put(layout.getId(), layout);
+                return layout;
+            });
+            var issueRepository = mock(io.pacod.cms.core.repository.JournalIssueRepository.class);
+            when(issueRepository.count()).thenAnswer(c -> (long) issues.size());
+            when(issueRepository.insert(any(io.pacod.cms.core.data.JournalIssue.class))).thenAnswer(c -> {
+                issues.add(c.getArgument(0));
+                return c.getArgument(0);
+            });
+            when(menus.findById(anyString())).thenAnswer(c -> Optional.ofNullable(menusByKey.get(c.<String>getArgument(0))));
+            when(menus.save(any(Menu.class))).thenAnswer(c -> {
+                Menu menu = c.getArgument(0);
+                menusByKey.put(menu.getKey(), menu);
+                return menu;
+            });
+            demo.useStandingContent(pageRepository, languageRepository, layoutRepository, issueRepository,
+                    new io.pacod.cms.core.design.TemplateSetCatalog());
+
+            // What a new website holds: the seed steps' pages, languages and menus, untouched.
+            var mapper = JsonMapper.builder().build();
+            PageBootstrap.readSeed(mapper).forEach(seed -> pages.put(seed.getSlug(), PageBootstrap.toPage(seed)));
+            LanguageBootstrap.readSeed(mapper).forEach(language -> languages.put(language.getCode(), language));
+            SiteBootstrap.readSeed(mapper).getMenus().forEach(menu -> menusByKey.put(menu.getKey(), SiteBootstrap.toMenu(menu)));
+        }
+    }
+
+    private static io.pacod.cms.core.tenant.Tenant tenant(String templateSet) {
+        return new io.pacod.cms.core.tenant.Tenant("test", "org", "site_test", "en", java.time.ZoneOffset.UTC, templateSet);
+    }
+
+    @Test
+    @DisplayName("the standing pages, menus and languages are replaced only while they are still the seed steps' own")
+    void spaceStandingContentOnlyWhereUntouched() throws Exception {
+        Standing standing = new Standing();
+        // An operator has written their own contact page and footer menu, and German text on a page.
+        standing.pages.get("contact").putBody("en", "<p>Our own contact page.</p>");
+        standing.menusByKey.get(Menu.FOOTER).getItems().remove(0);
+        standing.pages.get("terms").putBody("de", "<p>Unsere Bedingungen.</p>");
+
+        io.pacod.cms.core.tenant.TenantContext.runAs(tenant("magazine"), () -> demo.install(DemoContent.Demo.SPACE, TEST));
+
+        assertThat(standing.pages.get("about").rawTitle("en")).isEqualTo("About Demo Journal");
+        assertThat(standing.pages.get("about").rawBody("de")).as("the generic German text goes with it").isNull();
+        assertThat(standing.pages.get("contact").rawBody("en")).isEqualTo("<p>Our own contact page.</p>");
+        assertThat(standing.pages).containsKeys("aurelian-lines", "kestrel-vane", "rimstone-lodge",
+                "lumen-assurance", "nightglass-tours");
+        // The main menu was untouched and is the magazine's sections now; the edited footer stays.
+        assertThat(standing.menusByKey.get(Menu.MAIN).getItems()).extracting(MenuItem::getKind)
+                .contains(MenuLinkKind.CATEGORY).doesNotContain(MenuLinkKind.HOME);
+        assertThat(standing.menusByKey.get(Menu.FOOTER).getItems()).noneMatch(item -> item.getKind() == MenuLinkKind.SOCIAL);
+        // English stays, German stays because a page holds German, the others go.
+        assertThat(standing.languages).containsOnlyKeys("en", "de");
+        // On the magazine set, a published layout for every page type the seed names.
+        assertThat(standing.layouts).containsKeys("HOME", "ARTICLE", "CATEGORY", "LATEST", "PAGE", "SEARCH");
+        assertThat(standing.layouts.get("HOME").getPublished()).containsKeys("top", "main", "aside", "wide")
+                .isEqualTo(standing.layouts.get("HOME").getDraft());
+        assertThat(standing.issues).hasSize(2).allSatisfy(issue -> {
+            assertThat(issue.published()).isTrue();
+            assertThat(issue.getCoverImageId()).isNotNull();
+        });
+    }
+
+    @Test
+    @DisplayName("on another set the layouts are not written, and a layout of the website's own is kept")
+    void spaceLayoutsOnlyOnTheirSet() throws Exception {
+        Standing standing = new Standing();
+        io.pacod.cms.core.tenant.TenantContext.runAs(tenant("editorial"), () -> demo.install(DemoContent.Demo.SPACE, TEST));
+        assertThat(standing.layouts).isEmpty();
+
+        Standing again = new Standing();
+        io.pacod.cms.core.design.Layout own = new io.pacod.cms.core.design.Layout(io.pacod.cms.core.design.PageType.HOME);
+        again.layouts.put("HOME", own);
+        when(articles.count()).thenReturn(0L);
+        io.pacod.cms.core.tenant.TenantContext.runAs(tenant("magazine"), () -> demo.install(DemoContent.Demo.SPACE, TEST));
+        assertThat(again.layouts.get("HOME")).isSameAs(own);
+        assertThat(again.layouts).containsKey("ARTICLE");
     }
 
     @Test
@@ -331,6 +485,8 @@ class DemoContentTest {
         var themeRepository = mock(io.pacod.cms.core.repository.ThemeRepository.class);
         when(themeRepository.existsById(io.pacod.cms.core.design.Theme.ID)).thenReturn(true);
         demo.useSiteAndTheme(mock(io.pacod.cms.core.repository.SiteSettingsRepository.class), themeRepository);
+        when(imageService.getMaxImageBytes()).thenReturn(400L * 1024);
+        when(imageService.isDimensionCheckEnabled()).thenReturn(true);
         demo.install(DemoContent.Demo.SPACE, TEST);
         verify(themeRepository, never()).save(any());
     }

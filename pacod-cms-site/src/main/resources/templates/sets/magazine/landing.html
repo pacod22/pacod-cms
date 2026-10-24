@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang != null ? lang : #locale.language}">
+<!--/*
+  The home page: GET /. All of it is the layout's sections (PageComposer, from the website's
+  published HOME layout or this set's default in design/sets/magazine.yaml): `top` full width at
+  the head of the page -- a hero there is the cover story -- then main beside the aside (the
+  advertising column first), then `wide`, full width below.
+
+  The leaderboard row sits under the cover, not over it: the cover is what a reader came for.
+  Rendered on the server; no script re-fetches any of it.
+*/-->
+<head th:replace="~{fragments/head :: head(
+        lang=${lang},
+        pageTitle=${site.name(lang)},
+        pageDesc=${site.description(lang) ?: site.tagline(lang)},
+        ogUrl=${site.url('/')},
+        ogImagePath=null,
+        ogImageType=null)}"></head>
+
+<body class="mz-page mz-page--home">
+<th:block th:replace="~{fragments/scripts :: gtmNoscript}"></th:block>
+<th:block th:replace="~{fragments/scripts :: facebookSdk(${lang})}"></th:block>
+<th:block th:replace="~{fragments/navbar :: navbar(${lang})}"></th:block>
+
+<div class="mz-top" th:unless="${regions.isEmpty('top')}">
+    <th:block th:replace="~{sections :: topRegion(${regions.get('top')}, ${lang})}"></th:block>
+</div>
+
+<div class="shell">
+    <th:block th:replace="~{fragments/ad-sidebar :: topBanners(${topBanners})}"></th:block>
+</div>
+
+<div class="shell layout mz-layout">
+    <main class="layout__main">
+        <th:block th:replace="~{sections :: region(${regions.get('main')}, ${lang})}"></th:block>
+    </main>
+    <aside class="layout__aside">
+        <th:block th:replace="~{fragments/ad-sidebar :: adSidebar(${sidebarBanners})}"></th:block>
+        <th:block th:replace="~{sections :: region(${regions.get('aside')}, ${lang})}"></th:block>
+    </aside>
+</div>
+
+<div class="mz-wide" th:unless="${regions.isEmpty('wide')}">
+    <div class="shell">
+        <th:block th:replace="~{sections :: region(${regions.get('wide')}, ${lang})}"></th:block>
+    </div>
+</div>
+
+<th:block th:replace="~{fragments/footer :: footer(${lang})}"></th:block>
+<th:block th:replace="~{fragments/scripts :: siteScripts}"></th:block>
+</body>
+</html>

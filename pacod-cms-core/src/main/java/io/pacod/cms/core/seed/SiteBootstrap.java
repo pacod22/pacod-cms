@@ -58,8 +58,8 @@ public class SiteBootstrap implements SiteSeedStep {
     @Override
     public void seed(Website website) {
         Seed seed;
-        try (InputStream in = new ClassPathResource(SEED).getInputStream()) {
-            seed = objectMapper.readValue(in, Seed.class);
+        try {
+            seed = readSeed(objectMapper);
         } catch (IOException | RuntimeException e) {
             log.error("Could not read {}; the site starts without settings or menus: {}", SEED, e.getMessage());
             return;
@@ -78,6 +78,16 @@ public class SiteBootstrap implements SiteSeedStep {
             }
         } catch (DataAccessException e) {
             log.error("Could not seed the site settings or menus: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * The seed, as read from the classpath. Also what {@code DemoContent} compares a website's
+     * menus with: a menu still equal to its seed is one nobody has edited.
+     */
+    static Seed readSeed(ObjectMapper objectMapper) throws IOException {
+        try (InputStream in = new ClassPathResource(SEED).getInputStream()) {
+            return objectMapper.readValue(in, Seed.class);
         }
     }
 

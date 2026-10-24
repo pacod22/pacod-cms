@@ -104,6 +104,8 @@ class PlatformBootstrapTest {
         assertThat(third.siteId()).isEqualTo("space");
         assertThat(third.organisationId()).isEqualTo("org_x");
         assertThat(third.hosts()).containsExactly("space.localhost");
+        // On the set its layouts were designed for.
+        assertThat(third.templateSet()).isEqualTo("magazine");
         verify(demo).install(io.pacod.cms.core.seed.DemoContent.Demo.SPACE, space);
     }
 

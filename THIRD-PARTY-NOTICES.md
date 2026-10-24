@@ -25,6 +25,9 @@ restricts the licence of this project. Regenerate the list with:
 | Prism, prism-themes | 1.25.0, 1.9.0 | inside TinyMCE's `codesample` plugin | MIT |
 | Simple Icons | 15.0.0 | brand glyph paths in `pacod-cms-site/src/main/resources/templates/sets/editorial/social.html` | CC0-1.0 |
 | Maven Wrapper | 3.3.4 | `mvnw`, `mvnw.cmd`, `.mvn/wrapper/` | Apache-2.0 |
+| Fraunces (variable, weight axis; Latin, Latin Extended) | 5.3.0 of `@fontsource-variable/fraunces` | `pacod-cms-site/src/main/resources/static/site-assets/fonts/` | SIL OFL 1.1 (`OFL-Fraunces.txt` beside it) |
+| Inter (variable, weight axis; Latin, Latin Extended, Cyrillic) | 5.3.0 of `@fontsource-variable/inter` | `pacod-cms-site/src/main/resources/static/site-assets/fonts/` | SIL OFL 1.1 (`OFL-Inter.txt` beside it) |
+| NASA photographs and artist's impressions (37) | as listed | `pacod-cms-core/src/main/resources/demo/space/photos/` | NASA and JPL releases, each credited; see that folder's `VENDORED.md` for the source of every picture and the rule they were chosen by |
 
 TinyMCE's own licence and its list of bundled libraries are kept beside it, in
 [`license.md`](pacod-cms-studio/src/main/resources/static/mgmt-assets/tinymce/license.md) and

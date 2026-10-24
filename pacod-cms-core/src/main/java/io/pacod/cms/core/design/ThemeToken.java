@@ -39,7 +39,12 @@ public enum ThemeToken {
 
     private static final Pattern COLOR = Pattern.compile("#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})");
 
-    /** The fonts a theme may name, and the stacks they stand for. The first three are the editorial set's. */
+    /**
+     * The fonts a theme may name, and the stacks they stand for. The first three are the editorial
+     * set's (Google Fonts, linked by its head); {@code fraunces} and {@code inter} are served from
+     * the site's own jar ({@code /site-assets/fonts/fonts.css}, linked by the same head), so every
+     * set renders every id here.
+     */
     public static final Map<String, String> FONTS;
 
     static {
@@ -51,6 +56,8 @@ public enum ThemeToken {
         fonts.put("system-serif", "ui-serif, Georgia, 'Times New Roman', serif");
         fonts.put("system-sans", "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif");
         fonts.put("system-mono", "ui-monospace, 'SF Mono', Menlo, Consolas, monospace");
+        fonts.put("fraunces", "'Fraunces', 'Iowan Old Style', Georgia, 'Times New Roman', serif");
+        fonts.put("inter", "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif");
         FONTS = Map.copyOf(fonts);
     }
 
