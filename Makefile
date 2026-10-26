@@ -242,8 +242,13 @@ clean: ## Remove Maven's build output
 
 ##@ Helpers (run by init and up; by hand rarely)
 .PHONY: network images id-provisioner dev-cert keystore wait urls restart-studio
-network: ## Create the shared Docker network pacod-net, if missing
+# pacod-admin-net carries the listeners only servers reach (pacod-id's internal one) and must be
+# internal, with no route out; compose never checks that, so this does.
+network: ## Create the shared Docker networks pacod-net and pacod-admin-net, if missing
 	@docker network inspect pacod-net >/dev/null 2>&1 || docker network create pacod-net >/dev/null
+	@docker network inspect pacod-admin-net >/dev/null 2>&1 || docker network create --internal pacod-admin-net >/dev/null
+	@test "$$(docker network inspect -f '{{.Internal}}' pacod-admin-net)" = true || \
+		{ echo "pacod-admin-net is not internal: remove it (docker network rm pacod-admin-net) and run make network" >&2; exit 1; }
 
 images: ## Build pacod-id's image (and the mock gateway's, dev/stage) from their sources, if missing
 	@docker image inspect "$(PACOD_ID_IMAGE)" >/dev/null 2>&1 || { \

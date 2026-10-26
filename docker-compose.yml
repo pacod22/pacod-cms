@@ -4,7 +4,8 @@
 # pacod-postgres, the development gateway pacod-gw, pacod-mailpit) come from
 # docker-compose.standalone.yml, which `make up` loads with this file, or from the full stack
 # (pacod-demo), which loads only this file and provides them once. The naming convention is
-# pacod-demo/docs/NETWORK.md.
+# pacod-demo/docs/NETWORK.md. The studio also joins pacod-admin-net, the internal network on
+# which pacod-id's internal listener (pacod-id-internal:8071) listens, and nothing else does.
 #
 # One stack hosts every website. Caddy sends the studio's host (STUDIO_HOST, studio.localhost by
 # default) to the studio, pacod-id's (ID_HOST) to pacod-id, and every other host to the public site,
@@ -197,7 +198,7 @@ services:
       # listener for everything server-to-server. Not a dependency of this container's health:
       # with pacod-id down the studio's screens answer 503 and /mgmt-health stays up.
       PACOD_ID_ISSUER: ${ID_ISSUER:-http://id.localhost:${HTTP_PORT:-8000}}
-      PACOD_ID_INTERNAL_URL: ${PACOD_ID_INTERNAL_URL:-http://pacod-id:8071}
+      PACOD_ID_INTERNAL_URL: ${PACOD_ID_INTERNAL_URL:-http://pacod-id-internal:8071}
       PACOD_ID_STUDIO_SECRET: ${CMS_ID_STUDIO_SECRET:?run make init}
       PACOD_ID_SERVICE_SECRET: ${CMS_ID_SERVICE_SECRET:?run make init}
       STUDIO_ORIGIN: ${STUDIO_ORIGIN:-http://studio.localhost:${HTTP_PORT:-8000}}
@@ -251,6 +252,8 @@ services:
       # - ./config:/app/config:ro   # uncomment to supply a TLS keystore
     networks:
       - pacod-net
+      # pacod-id's internal listener is there alone.
+      - pacod-admin-net
     healthcheck:
       # /mgmt-health, outside the authenticated /mgmt/** matcher -- a healthcheck that has to log
       # in is not a healthcheck. Liveness only: it cannot tell you pacod-id is unreachable and
@@ -289,6 +292,10 @@ networks:
   pacod-net:
     # Shared by every pacod repo, so external: compose never creates it. `make network` (run by
     # `make up`) does, idempotently.
+    external: true
+  # Internal (no route out): the listeners only servers reach, here pacod-id's internal one.
+  # Created by `make network` as well.
+  pacod-admin-net:
     external: true
 
 volumes:

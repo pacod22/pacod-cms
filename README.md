@@ -109,6 +109,12 @@ network`, run by `make up`, creates it), and follows their naming convention,
 [`pacod-demo/docs/NETWORK.md`](../pacod-demo/docs/NETWORK.md): a container's name is its service's
 and its address on the network.
 
+Listeners that only servers reach are on a second shared network, **`pacod-admin-net`**, which is
+internal (no route out); `make network` creates it too. Here that is pacod-id's internal listener,
+bound to `pacod-id-internal:8071`, an alias pacod-id has on that network alone, so the rest of
+`pacod-net` cannot reach it. The studio, its one caller, joins `pacod-admin-net` and calls that
+address; `http://pacod-id:8071` no longer answers.
+
 - **`docker-compose.yml`, the app file**: cms's own services — `cms-site`, `cms-studio`,
   `cms-mongo` and `cms-gotenberg`.
 - **`docker-compose.standalone.yml`**: cms's copies of the shared components it uses — `pacod-caddy`,

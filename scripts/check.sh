@@ -179,6 +179,9 @@ for pair in "PID_SMTP_HOST:mailpit" "PACOD_GW_URL:http://gw:" "PACOD_PDF_GOTENBE
   key=${pair%%:*} old=${pair#*:}
   case "$(get "$key")" in "$old"*) bad "$key names '$old', renamed with the move to pacod-net (cms-mongo-data, pacod-mailpit, http://pacod-gw:8080, http://cms-gotenberg:3000)" ;; esac
 done
+# pacod-id's internal listener moved to pacod-admin-net, under its alias there; the old name
+# no longer answers on 8071.
+case "$(get PACOD_ID_INTERNAL_URL)" in http://pacod-id:8071*) bad "PACOD_ID_INTERNAL_URL names http://pacod-id:8071, which no longer answers: use http://pacod-id-internal:8071 (pacod-admin-net)" ;; esac
 if docker info >/dev/null 2>&1; then
   project=${COMPOSE_PROJECT_NAME:-$(basename "$PWD" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_-')}
   pairs="id-pg-data:pacod-postgres-data caddy-data:pacod-caddy-data"

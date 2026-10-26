@@ -13,7 +13,7 @@ import java.time.Duration;
  *                       run; sign-in itself is always through pacod-id.
  * @param issuer         the public issuer, as browsers reach it: {@code http://id.localhost:8000}
  * @param internalUrl    pacod-id's internal listener, as this container reaches it:
- *                       {@code http://pacod-id:8071} -- token, keys, {@code /internal/v1}, {@code /admin/v1}
+ *                       {@code http://pacod-id-internal:8071} -- token, keys, {@code /internal/v1}, {@code /admin/v1}
  * @param studioOrigin   this studio's own origin as browsers reach it, for the absolute redirect
  *                       URIs pacod-id has registered
  * @param maxStaleness   how old the feed's last contact may be before the studio's screens answer

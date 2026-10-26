@@ -12,7 +12,7 @@ stack hosts every website. Both applications are built from the root `Dockerfile
 | `cms-site` | app | `pacod-cms-site` | 8443 | `${WEB_PORT:-8080}` | `cms-site.log` |
 | `cms-studio` | app | `pacod-cms-studio` | 7443 | `${MGMT_PORT:-7070}` | `cms-studio.log` |
 | `cms-gotenberg` | app | `gotenberg/gotenberg:8.38.1` | 3000 | — (the studio's PDF export only) | — |
-| `pacod-id` | standalone | `${PACOD_ID_IMAGE:-pacod-id:dev}` | 8070 (public), 8071 (internal) | — (through Caddy) | — (`make logs-pacod-id`) |
+| `pacod-id` | standalone | `${PACOD_ID_IMAGE:-pacod-id:dev}` | 8070 (public), 8071 (internal, `pacod-id-internal` on `pacod-admin-net`) | — (through Caddy) | — (`make logs-pacod-id`) |
 | `pacod-postgres` | standalone | `postgres:18.6-alpine3.24` | 5432 | — | — |
 | `pacod-db-init` | standalone | `postgres:18.6-alpine3.24` | — (runs once per start) | — | — |
 | `pacod-mailpit` | standalone | `axllent/mailpit:v1.27` | 8025 | `${MAILPIT_PORT:-8125}`, loopback only | — |
@@ -89,7 +89,10 @@ make up           # make check first; builds pacod-id's image if missing; starts
   join; compose never creates it. `make network` does, idempotently, and `make up` runs it first. A
   bare `docker compose up` on a fresh machine aborts with "declared as external, but could not be
   found". The `pacod-*` names are shared too: one stack running them per machine (README, *Shared
-  network*).
+  network*). `make network` also creates **`pacod-admin-net`**, external and internal (no route
+  out): pacod-id binds its internal listener to `pacod-id-internal`, its alias there, and the
+  studio joins it to call that address. On a fresh machine without `make`:
+  `docker network create pacod-net && docker network create --internal pacod-admin-net`.
 - **Stage and production publish Caddy on 80 and 443** (the presets). Caddy obtains its
   certificates over them, so both must be reachable from the internet, and DNS for the studio's and
   pacod-id's hosts must point at the server before the first start (*TLS*). The applications' and
@@ -307,7 +310,7 @@ certificates on. The full stack imports the same fragment behind its own HTTP-on
 | Host | Goes to |
 |---|---|
 | `STUDIO_HOST` | the studio (`cms-studio:7443`); `/` answers 302 to `/mgmt/sites` |
-| `ID_HOST` | pacod-id's public listener (`pacod-id:8070`), Host and `Origin` passed unchanged; its internal listener (`pacod-id:8071`) is reached only by the studio, inside the network |
+| `ID_HOST` | pacod-id's public listener (`pacod-id:8070`), Host and `Origin` passed unchanged; its internal listener (`pacod-id-internal:8071`, on `pacod-admin-net` only) is reached only by the studio |
 | every other host | the public site (`cms-site:8443`), which picks the website by host and answers 404 for a host no website claims |
 
 - **No list of websites is kept in Caddy**, so a domain added to a website needs no Caddy change —

@@ -160,13 +160,18 @@ services:
       PID_EMAIL_FROM_ADDRESS: ${ID_MAIL_FROM:-id@pacod-cms.test}
       PID_EMAIL_FROM_NAME: pacod-cms
       PID_LOG_FORMAT: ${PID_LOG_FORMAT:-text}
+      # Its address on pacod-admin-net alone: on 0.0.0.0 all of pacod-net would reach it.
+      PID_INTERNAL_LISTEN: pacod-id-internal:8071
     volumes:
       - ./docker/pacod-id/pacod-id.toml:/etc/pacod-id/pacod-id.toml:ro
     read_only: true
     tmpfs:
       - /tmp:size=16m
+    # The studio calls the internal listener at its alias on pacod-admin-net.
     networks:
-      - pacod-net
+      pacod-net:
+      pacod-admin-net:
+        aliases: [pacod-id-internal]
     healthcheck:
       test: ["CMD", "/usr/local/bin/healthcheck", "http://127.0.0.1:9170/readyz"]
       interval: 5s
@@ -260,6 +265,8 @@ services:
 
 networks:
   pacod-net:
+    external: true
+  pacod-admin-net:
     external: true
 
 volumes:

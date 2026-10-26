@@ -532,7 +532,7 @@ only place a permission is decided — evaluates that with the rules engine agai
   demands it of confidential clients too) through a **hand-built `ClientRegistration`, no
   discovery**: pacod-id answers its browser endpoints only on the issuer's own Host, which the
   compose network is not. Authorize and end-session are on the public issuer (`pacod.id.issuer`),
-  token and JWKS on the internal listener (`pacod.id.internal-url`, `http://pacod-id:8071`), `issuerUri`
+  token and JWKS on the internal listener (`pacod.id.internal-url`, `http://pacod-id-internal:8071`), `issuerUri`
   set for the `iss` check; scopes `openid email profile`, no user-info call.
   - **Every OAuth endpoint sits under `/mgmt/oauth2/`** (`authorization/pacod-id`, `code/pacod-id`):
     Spring's `/oauth2/**` and `/login/oauth2/**` fall outside the chain's matcher, into the
@@ -1768,7 +1768,7 @@ once per language the article is written in: `original()` and `translatedIn()`. 
   - `--chromium-allow-list=^http://cms-site:8443(/|$$)` with private and public addresses otherwise
     denied;
   - JavaScript off, `downloadFrom` off, and no published port.
-  - A body framing `http://cms-studio:7443/…` or `http://pacod-id:8071/…` renders a blocked frame; that was
+  - A body framing `http://cms-studio:7443/…` or `http://pacod-id-internal:8071/…` renders a blocked frame; that was
     checked on the stack. The print view's web fonts never load there.
 - **The print view is `/article-print/{id}`**, renamed from `/article-clean/{id}`. It links the
   website's published theme. **A token is minted for every render** (`PdfRenderer`): it lasts five
@@ -2204,7 +2204,7 @@ application's account without one.
   `MGMT_SESSION_TIMEOUT`, `IMAGE_*` (compose defaults equal the code's), `PACOD_PDF_GOTENBERG_URL`,
   `PACOD_JOBS_WORKERS`/`PACOD_JOBS_PER_ORGANISATION`, `PACOD_GW_URL`/`PACOD_GW_API_KEY`/`PACOD_AI_MODEL` (*AI*;
   the URL defaults to `http://pacod-gw:8080`, the key has none, `make init` writes the dev gateway's), `SITE_PUBLIC_SCHEME`/`SITE_PUBLIC_PORT`, `PACOD_BOOTSTRAP_DEMO_HOSTS` (from
-  `DEMO_HOSTS`) and `PACOD_BOOTSTRAP_DEMO_MINIMAL_HOSTS` (from `DEMO_MINIMAL_HOSTS`), `PACOD_ID_ISSUER` (from `ID_ISSUER`), `PACOD_ID_INTERNAL_URL` (default `http://pacod-id:8071`),
+  `DEMO_HOSTS`) and `PACOD_BOOTSTRAP_DEMO_MINIMAL_HOSTS` (from `DEMO_MINIMAL_HOSTS`), `PACOD_ID_ISSUER` (from `ID_ISSUER`), `PACOD_ID_INTERNAL_URL` (default `http://pacod-id-internal:8071`),
   `PACOD_ID_{STUDIO,SERVICE}_SECRET` (from `CMS_ID_*_SECRET`), `STUDIO_ORIGIN`,
   `PACOD_ID_PROVISIONER_TOKEN` (empty default: no provisioner, platform admins create
   organisations), `PACOD_SITE_DOMAIN` (default `localhost` when unset; a blank value stays blank,
@@ -2270,16 +2270,18 @@ healthcheck `/mgmt-health`) and `cms-gotenberg` (PDF export, no published port, 
 front door, `${HTTP_PORT:-8000}`, `${HTTPS_PORT:-8443}` tcp and udp; volumes
 `pacod-caddy-data`/`pacod-caddy-config` hold its certificates, its local CA and its CA account —
 keep them, a CA rate-limits re-issuing), for sign-in `pacod-id` (`${PACOD_ID_IMAGE:-pacod-id:dev}`,
-public listener 8070, internal 8071), `pacod-postgres` (volume `pacod-postgres-data`),
+public listener 8070, internal 8071 bound to `pacod-id-internal` on `pacod-admin-net`), `pacod-postgres` (volume `pacod-postgres-data`),
 `pacod-db-init` (a one-shot that runs every `platform/postgres/*-db.sh` at every start — here
 pacod-id's `id-db.sh`, a verbatim copy of pacod-id's: role and database `pacod_id`, password set
 each time) and `pacod-mailpit` (every mail pacod-id sends; published on loopback only,
 `${MAILPIT_PORT:-8125}`), and under the profile `dev-gateway` `pacod-gw`/`gw-mock` (the
 development AI gateway, *AI*). **The Makefile's `COMPOSE` loads both**; the full stack (pacod-demo)
 loads only the app file and provides the shared components once, which is why the app file names
-them only by address (`http://pacod-id:8071`, `http://pacod-gw:8080`) and never in a `depends_on`
+them only by address (`http://pacod-id-internal:8071`, `http://pacod-gw:8080`) and never in a `depends_on`
 (one would need `required: false`). The network `pacod-net` is **external** and shared by every
-pacod repo; `make network` creates it. **Only one stack running `pacod-*` containers fits on a
+pacod repo; `make network` creates it, and also **`pacod-admin-net`**, external and internal (no
+route out), on which pacod-id's internal listener alone listens, bound to its alias
+`pacod-id-internal`; `cms-studio` joins it to call that address. **Only one stack running `pacod-*` containers fits on a
 machine** (the container names collide). **`make up`, `make restart` and `make down` pass
 `--remove-orphans`**:
 the containers of services the files no longer define — `mongo`, `site`, `studio`, `caddy`, `id`,

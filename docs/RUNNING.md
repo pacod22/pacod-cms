@@ -280,7 +280,7 @@ website between installations; the dumps above remain the way to back up the who
 `make up` runs these steps in order, each safe to repeat:
 
 1. **`make check`**: is `.env` complete for this environment (above)?
-2. **The Docker network and the images**: `pacod-net`, if missing; pacod-id's image, and the mock
+2. **The Docker networks and the images**: `pacod-net` and `pacod-admin-net` (internal), if missing; pacod-id's image, and the mock
    gateway's on dev and stage. Each is built from its sources only if missing. Then `cms-site` and
    `cms-studio` are built from this checkout.
 3. **The containers start.** MongoDB creates its two accounts on its first start. `pacod-db-init`
