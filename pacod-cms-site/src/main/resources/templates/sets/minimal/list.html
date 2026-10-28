@@ -41,8 +41,8 @@
 
                 <div class="page-head">
                     <div class="page-head__kicker">
-                        <span th:text="${list.page.totalElements}">0</span>
-                        <span th:text="#{list.count}">articles</span>
+                        <!--/* A label and the number: no plural to agree with it, in any language. */-->
+                        <span th:text="#{list.count(${list.page.totalElements})}">Articles · 0</span>
                     </div>
                     <h1 class="page-head__title" th:utext="${list.name}"></h1>
                 </div>

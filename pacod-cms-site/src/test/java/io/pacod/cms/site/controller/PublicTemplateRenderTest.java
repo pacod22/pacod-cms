@@ -925,6 +925,14 @@ class PublicTemplateRenderTest {
     }
 
     @Test
+    @DisplayName("A list counts its articles as a label and a number, which no language's plural can break")
+    void listCount() {
+        assertThat(render("list", Map.of("list", list(1), "lang", "en"))).contains("Articles · 1").doesNotContain("1 articles");
+        assertThat(render("list", Map.of("list", list(45), "lang", "ru"))).contains("Материалы · 45");
+        assertThat(render("list", Map.of("list", list(3), "lang", "bg"))).contains("Материали · 3");
+    }
+
+    @Test
     @DisplayName("Search results name no canonical and no alternates, only the feed")
     void searchHead() {
         io.pacod.cms.site.data.SiteChrome site = multilingual();
