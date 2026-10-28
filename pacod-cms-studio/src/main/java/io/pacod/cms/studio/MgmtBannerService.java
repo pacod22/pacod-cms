@@ -50,6 +50,17 @@ public class MgmtBannerService {
     private final BannerRepository bannerRepository;
     private final BannerCreativeService creativeService;
 
+    private io.pacod.cms.core.repository.CategoryRepository categoryRepository;
+
+    /**
+     * Where a booking's sections are checked to exist; optional, so the hand-built instances of the
+     * tests that book no section need none.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void useCategories(io.pacod.cms.core.repository.CategoryRepository categoryRepository) {
+        this.categoryRepository = categoryRepository;
+    }
+
     public MgmtBannerService(BannerRepository bannerRepository, BannerCreativeService creativeService) {
         this.bannerRepository = bannerRepository;
         this.creativeService = creativeService;
@@ -169,6 +180,8 @@ public class MgmtBannerService {
         banner.setSize(form.getSize());
         banner.setSortOrder(form.getSortOrder());
         banner.setPages(form.getPages() == null ? new ArrayList<>() : new ArrayList<>(form.getPages()));
+        banner.setCategories(form.getCategories() == null ? new ArrayList<>()
+                : new ArrayList<>(new java.util.LinkedHashSet<>(form.getCategories())));
         banner.setActive(form.isActive());
         banner.setActiveFrom(form.getActiveFrom());
         banner.setActiveTo(form.getActiveTo());
@@ -227,6 +240,13 @@ public class MgmtBannerService {
                 if (!candidate.isBookable() && candidate.name().equals(page)) {
                     throw new MgmtOperationException("banners.error.pageNotBookable", labelOf(candidate));
                 }
+            }
+        }
+
+        // The same for sections: one that does not exist would book the banner nowhere at all.
+        for (Integer category : form.getCategories() == null ? List.<Integer>of() : form.getCategories()) {
+            if (category == null || categoryRepository != null && !categoryRepository.existsById(category)) {
+                throw new MgmtOperationException("banners.error.noCategory", category);
             }
         }
     }

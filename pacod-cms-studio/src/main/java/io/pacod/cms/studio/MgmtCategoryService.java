@@ -242,6 +242,13 @@ public class MgmtCategoryService {
         Category category = require(id);
         log.info("Deleting category {} ({})", category.getId(), category.getName());
         categoryRepository.deleteById(category.getId());
+        // A booking for it alone would run nowhere, without a word: it goes back to every section
+        // only when it named no other. $pull, not a save, so no counter is written back stale.
+        mongoTemplate.updateMulti(
+                org.springframework.data.mongodb.core.query.Query.query(
+                        org.springframework.data.mongodb.core.query.Criteria.where("categories").is(category.getId())),
+                new org.springframework.data.mongodb.core.query.Update().pull("categories", category.getId()),
+                io.pacod.cms.core.data.Banner.class);
     }
 
     /** Leaves the per-language {@code names} list alone. */

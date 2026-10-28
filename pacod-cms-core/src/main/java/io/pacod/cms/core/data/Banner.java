@@ -80,6 +80,13 @@ public class Banner {
     /** {@link BannerPage} names. Empty or null runs the banner on every page. */
     private List<String> pages;
 
+    /**
+     * The sections ({@code Category} ids) it is booked for: an article in one of them, or one of
+     * their lists. Empty or null books it regardless of section. Where a booking for the page's
+     * section runs, the general ones of that placement step aside -- see {@code BannerService}.
+     */
+    private List<Integer> categories;
+
     private boolean active;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
@@ -100,6 +107,7 @@ public class Banner {
 
     public Banner() {
         this.pages = new ArrayList<>();
+        this.categories = new ArrayList<>();
         this.active = true;
         this.type = BannerType.IMAGE;
         this.placement = BannerPlacement.SIDEBAR;
@@ -139,6 +147,23 @@ public class Banner {
             return true;
         }
         return page != null && pages.contains(page.name());
+    }
+
+    /** Whether it is booked for some sections only. */
+    public boolean isTargeted() {
+        return categories != null && !categories.isEmpty();
+    }
+
+    /**
+     * Whether it runs on a page of these sections: always when it names none; when it does, only
+     * where the page has one of them -- never on a page with no section (the home page, search, a
+     * standing page, a tag's list).
+     */
+    public boolean coversCategories(java.util.Collection<Integer> pageCategories) {
+        if (!isTargeted()) {
+            return true;
+        }
+        return pageCategories != null && pageCategories.stream().anyMatch(categories::contains);
     }
 
     /**

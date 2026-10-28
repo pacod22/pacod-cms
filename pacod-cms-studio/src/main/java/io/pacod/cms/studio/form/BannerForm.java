@@ -71,6 +71,9 @@ public class BannerForm {
     /** {@code BannerPage} names. Empty means every page -- see {@code Banner.coversPage}. */
     private List<String> pages = new ArrayList<>();
 
+    /** Section ids. Empty means regardless of section -- see {@code Banner.coversCategories}. */
+    private List<Integer> categories = new ArrayList<>();
+
     private boolean active = true;
 
     @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm")
@@ -92,6 +95,7 @@ public class BannerForm {
         form.setSize(banner.getSize());
         form.setSortOrder(banner.getSortOrder());
         form.setPages(banner.getPages() == null ? new ArrayList<>() : new ArrayList<>(banner.getPages()));
+        form.setCategories(banner.getCategories() == null ? new ArrayList<>() : new ArrayList<>(banner.getCategories()));
         form.setActive(banner.isActive());
         form.setActiveFrom(banner.getActiveFrom());
         form.setActiveTo(banner.getActiveTo());

@@ -1162,6 +1162,16 @@ from the `topBanners`/`sidebarBanners` lists each controller puts in the model. 
   own folder, served on its own host — which keeps HTML5 frames same-origin with the page.
 - **`pages` empty means *every* page.** `BannerPage.SOCIAL` exists for the monitoring table and is
   **not bookable** (`BannerPage.bookable()`; `MgmtBannerService` refuses a crafted POST).
+- **`categories` (section ids) books a banner for sections**: their articles, `/latest` when it
+  shows one of theirs, and their lists (`ArticleTemplateController.pageRendered` passes the page's
+  sections). Empty means regardless of section. **Specific beats general, per placement**
+  (`BannerService.running(placement, page, categories)`): where a booking for one of the page's
+  sections runs, only those render; otherwise only the untargeted ones -- a section's own
+  advertiser takes the column on its articles, the general bookings fill it elsewhere, never both.
+  A targeted booking never runs on a page without a section (home, search, standing pages, tag
+  lists, issues). Unknown ids are refused on save; deleting a section `$pull`s its id from every
+  booking (`MgmtCategoryService.delete`), so a booking for it alone goes back to every section
+  rather than running nowhere.
 - **`BannerReader` caches the whole collection; `BannerService` filters per request**, or
   `activeFrom`/`activeTo` would lag the TTL.
 - **Impressions are buffered**: `BannerImpressionCounter` accumulates `LongAdder`s per website

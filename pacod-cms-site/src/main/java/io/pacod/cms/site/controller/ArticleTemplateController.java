@@ -75,13 +75,25 @@ public class ArticleTemplateController {
      * and does not call this -- which is why counting from here needs no exclusion list.
      */
     private void pageRendered(Model model, HttpServletRequest request, BannerPage page) {
-        addBanners(model, page);
+        pageRendered(model, request, page, List.of());
+    }
+
+    /** {@link #pageRendered(Model, HttpServletRequest, BannerPage)} on a page of these sections. */
+    private void pageRendered(Model model, HttpServletRequest request, BannerPage page, List<Integer> categories) {
+        addBanners(model, page, categories);
         metrics.recordPageView(page, request);
     }
 
-    private void addBanners(Model model, BannerPage page) {
-        model.addAttribute("topBanners", bannerService.forPage(BannerPlacement.TOP, page));
-        model.addAttribute("sidebarBanners", bannerService.forPage(BannerPlacement.SIDEBAR, page));
+    private void addBanners(Model model, BannerPage page, List<Integer> categories) {
+        model.addAttribute("topBanners", bannerService.forPage(BannerPlacement.TOP, page, categories));
+        model.addAttribute("sidebarBanners", bannerService.forPage(BannerPlacement.SIDEBAR, page, categories));
+    }
+
+    /** An article's section ids: what a booking for a section matches on its page. */
+    private static List<Integer> categoryIds(Article article) {
+        return article.getCategories() == null ? List.of() : article.getCategories().stream()
+                .filter(java.util.Objects::nonNull).map(io.pacod.cms.core.data.Category::getId)
+                .filter(java.util.Objects::nonNull).toList();
     }
 
     /**
@@ -189,7 +201,8 @@ public class ArticleTemplateController {
         //
         // This page therefore shows the latest article; the template expects exactly one.
         final String resolvedLang = lang;
-        ArticleModel articleModel = articleService.getLatestArticle()
+        java.util.Optional<Article> latest = articleService.getLatestArticle();
+        ArticleModel articleModel = latest
                 .map(a -> new ArticleModel(a, resolvedLang, tags))
                 // An empty database must not turn this page into a 500.
                 .orElseGet(() -> new ArticleModel(new Article(), resolvedLang, tags));
@@ -199,7 +212,7 @@ public class ArticleTemplateController {
         model.addAttribute("tags", tags);
         model.addAttribute("pdf", pdfs.article(articleModel.getId(), lang).orElse(null));
         model.addAttribute("regions", composer.compose(PageType.LATEST, lang));
-        pageRendered(model, request, BannerPage.INDEX);
+        pageRendered(model, request, BannerPage.INDEX, latest.map(ArticleTemplateController::categoryIds).orElse(List.of()));
 
         return "index";
     }
@@ -272,7 +285,7 @@ public class ArticleTemplateController {
         model.addAttribute("lang", lang);
         model.addAttribute("pdf", pdfs.article(articleModel.getId(), lang).orElse(null));
         model.addAttribute("regions", composer.compose(PageType.ARTICLE, lang));
-        pageRendered(model, request, BannerPage.ARTICLE);
+        pageRendered(model, request, BannerPage.ARTICLE, categoryIds(article));
         return "article";
     }
 
@@ -361,7 +374,7 @@ public class ArticleTemplateController {
         model.addAttribute("list", list);
         model.addAttribute("lang", lang);
         model.addAttribute("regions", composer.compose(PageType.CATEGORY, lang));
-        pageRendered(model, request, BannerPage.LIST);
+        pageRendered(model, request, BannerPage.LIST, listId == null ? List.of() : List.of(listId));
 
         return "list";
     }

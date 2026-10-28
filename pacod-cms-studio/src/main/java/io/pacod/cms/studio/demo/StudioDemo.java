@@ -273,6 +273,7 @@ public class StudioDemo {
                 form.setSize(BannerSize.valueOf(booking.getSize()));
                 form.setSortOrder(booking.getSortOrder());
                 form.setPages(new ArrayList<>(booking.getPages()));
+                form.setCategories(new ArrayList<>(booking.getCategories()));
                 form.setActive(true);
                 if (form.getType() == BannerType.HTML5) {
                     form.setSource("/resources/banners/" + partner.getId() + "/" + booking.getFile());

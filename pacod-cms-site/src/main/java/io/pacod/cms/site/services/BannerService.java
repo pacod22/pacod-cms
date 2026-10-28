@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -41,7 +42,15 @@ public class BannerService {
      * @param page      which public view is being rendered
      */
     public List<Banner> forPage(BannerPlacement placement, BannerPage page) {
-        List<Banner> running = running(placement, page);
+        return forPage(placement, page, List.of());
+    }
+
+    /**
+     * {@link #forPage(BannerPlacement, BannerPage)} on a page of these sections -- an article's, or
+     * a section's list; see {@link #running(BannerPlacement, BannerPage, Collection)}.
+     */
+    public List<Banner> forPage(BannerPlacement placement, BannerPage page, Collection<Integer> categories) {
+        List<Banner> running = running(placement, page, categories);
         for (Banner banner : running) {
             impressionCounter.recordImpression(banner.getId());
         }
@@ -53,6 +62,16 @@ public class BannerService {
      * a page view -- the studio's preview, and the tests.
      */
     public List<Banner> running(BannerPlacement placement, BannerPage page) {
+        return running(placement, page, List.of());
+    }
+
+    /**
+     * The selection on a page of these sections: <b>specific beats general</b>, per placement.
+     * When a booking for one of the page's sections runs here, only those render; otherwise only
+     * the bookings that name no section. A section's own advertiser takes the column on its
+     * articles, and the general bookings fill it everywhere else -- the two never stack.
+     */
+    public List<Banner> running(BannerPlacement placement, BannerPage page, Collection<Integer> categories) {
         LocalDateTime now = LocalDateTime.now();
         List<Banner> selected = new ArrayList<>();
 
@@ -68,6 +87,8 @@ public class BannerService {
             return List.of();
         }
 
-        return selected;
+        List<Banner> targeted = selected.stream()
+                .filter(banner -> banner.isTargeted() && banner.coversCategories(categories)).toList();
+        return !targeted.isEmpty() ? targeted : selected.stream().filter(banner -> !banner.isTargeted()).toList();
     }
 }

@@ -28,6 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Banner administration.
@@ -49,6 +50,14 @@ public class MgmtBannerController {
     private final MgmtBannerService bannerService;
     private final MgmtBannerLayoutService layoutService;
     private final MgmtText text;
+
+    private io.pacod.cms.core.repository.CategoryRepository categories;
+
+    /** The sections a booking may name; optional, so the screen's tests that book none need none. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void useCategories(io.pacod.cms.core.repository.CategoryRepository categories) {
+        this.categories = categories;
+    }
 
     public MgmtBannerController(MgmtBannerService bannerService,
                                 MgmtBannerLayoutService layoutService,
@@ -220,6 +229,17 @@ public class MgmtBannerController {
         // Bookable pages only: /social renders no ad columns, so a booking naming it would run
         // nowhere. See BannerPage.SOCIAL.
         model.addAttribute("pages", BannerPage.bookable());
+        // The website's sections, for booking a banner on their articles and lists only. A read
+        // that fails costs the choice, not the screen: the booking keeps the sections it has.
+        List<io.pacod.cms.core.data.Category> sections = List.of();
+        if (categories != null) {
+            try {
+                sections = categories.findAll(org.springframework.data.domain.Sort.by("id"));
+            } catch (org.springframework.dao.DataAccessException e) {
+                log.warn("Could not read the sections; the banner form offers none: {}", e.getMessage());
+            }
+        }
+        model.addAttribute("categories", sections);
     }
 
     private Banner require(Integer id) {

@@ -72,9 +72,14 @@
                             <td class="muted" th:text="${mgmtText.label(b.placement)}">Sidebar</td>
                             <td class="num muted" th:text="${b.sortOrder}">10</td>
                             <!--/* An empty page list means every page -- see Banner.coversPage. */-->
-                            <td class="muted" th:text="${b.pages == null or b.pages.isEmpty()}
-                                                       ? #{banners.list.everywhere}
-                                                       : ${#strings.listJoin(b.pages, ', ')}">Everywhere</td>
+                            <td class="muted">
+                                <th:block th:text="${b.pages == null or b.pages.isEmpty()}
+                                                   ? #{banners.list.everywhere}
+                                                   : ${#strings.listJoin(b.pages, ', ')}">Everywhere</th:block>
+                                <!--/* A booking for sections says which; their ids, as the article list shows them. */-->
+                                <span class="help" th:if="${b.targeted}"
+                                      th:text="#{banners.list.categories(${#strings.listJoin(b.categories, ', ')})}">sections 1, 3</span>
+                            </td>
                             <td class="muted">
                                 <span th:if="${b.activeFrom == null and b.activeTo == null}" th:text="#{banners.list.unlimited}">open-ended</span>
                                 <span th:unless="${b.activeFrom == null and b.activeTo == null}"

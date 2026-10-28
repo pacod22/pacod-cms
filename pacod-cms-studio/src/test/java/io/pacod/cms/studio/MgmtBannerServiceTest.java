@@ -149,6 +149,27 @@ class MgmtBannerServiceTest {
         assertThat(saved().coversPage(BannerPage.ARTICLE)).isFalse();
     }
 
+    @Test
+    @DisplayName("The section filter round-trips without repeats; a section that does not exist is refused")
+    void savesTheSectionFilter() {
+        when(repository.findById(5)).thenReturn(Optional.of(stored(5, BannerType.IMAGE)));
+        var categories = mock(io.pacod.cms.core.repository.CategoryRepository.class);
+        when(categories.existsById(3)).thenReturn(true);
+        when(categories.existsById(4)).thenReturn(true);
+        service.useCategories(categories);
+
+        BannerForm form = imageForm();
+        form.setCategories(List.of(3, 4, 3));
+        service.save(5, form);
+        assertThat(saved().getCategories()).containsExactly(3, 4);
+        assertThat(BannerForm.of(saved()).getCategories()).containsExactly(3, 4);
+
+        BannerForm unknown = imageForm();
+        unknown.setCategories(List.of(9));
+        assertThatThrownBy(() -> service.save(5, unknown)).isInstanceOf(MgmtOperationException.class)
+                .hasMessageContaining("9");
+    }
+
     /**
      * The value goes straight into a {@code Location} header at {@code /b/{id}}, so refusing it
      * here is what keeps a {@code javascript:} URL from ever being stored.

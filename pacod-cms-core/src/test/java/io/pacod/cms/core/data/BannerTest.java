@@ -3,6 +3,8 @@ package io.pacod.cms.core.data;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class BannerTest {
@@ -47,5 +49,22 @@ class BannerTest {
         banner.setType(BannerType.HTML5);
         banner.setSource(source);
         return banner;
+    }
+
+    @Test
+    @DisplayName("a booking for sections covers a page of one of them only; one for none covers every page")
+    void coversCategories() {
+        Banner general = new Banner(1);
+        assertThat(general.isTargeted()).isFalse();
+        assertThat(general.coversCategories(List.of())).isTrue();
+        assertThat(general.coversCategories(null)).isTrue();
+
+        Banner gateway = new Banner(2);
+        gateway.setCategories(List.of(1, 7));
+        assertThat(gateway.isTargeted()).isTrue();
+        assertThat(gateway.coversCategories(List.of(3, 7))).isTrue();
+        assertThat(gateway.coversCategories(List.of(3))).isFalse();
+        assertThat(gateway.coversCategories(List.of())).as("a page with no section").isFalse();
+        assertThat(gateway.coversCategories(null)).isFalse();
     }
 }

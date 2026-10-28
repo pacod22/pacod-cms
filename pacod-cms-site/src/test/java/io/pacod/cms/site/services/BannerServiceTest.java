@@ -179,4 +179,50 @@ class BannerServiceTest {
 
         assertThat(service.running(BannerPlacement.SIDEBAR, BannerPage.ARTICLE)).isEmpty();
     }
+
+    private static Banner forSections(int id, BannerPlacement placement, Integer... categories) {
+        Banner banner = banner(id, placement);
+        banner.setCategories(List.of(categories));
+        return banner;
+    }
+
+    @Test
+    @DisplayName("specific beats general: on a section's article its own banner takes the placement, the general ones step aside")
+    void aSectionsBannerTakesThePlacement() {
+        when(reader.findAll()).thenReturn(List.of(
+                banner(1, BannerPlacement.SIDEBAR),
+                forSections(2, BannerPlacement.SIDEBAR, 4),
+                forSections(3, BannerPlacement.SIDEBAR, 5, 6),
+                banner(4, BannerPlacement.TOP)));
+
+        assertThat(service.running(BannerPlacement.SIDEBAR, BannerPage.ARTICLE, List.of(4)))
+                .extracting(Banner::getId).containsExactly(2);
+        assertThat(service.running(BannerPlacement.SIDEBAR, BannerPage.LIST, List.of(6, 4)))
+                .extracting(Banner::getId).containsExactly(2, 3);
+        // Per placement: the leaderboard has no section's banner, so the general one stays.
+        assertThat(service.running(BannerPlacement.TOP, BannerPage.ARTICLE, List.of(4)))
+                .extracting(Banner::getId).containsExactly(4);
+        // A section with no banner of its own, and a page with no section, get the general ones.
+        assertThat(service.running(BannerPlacement.SIDEBAR, BannerPage.ARTICLE, List.of(9)))
+                .extracting(Banner::getId).containsExactly(1);
+        assertThat(service.running(BannerPlacement.SIDEBAR, BannerPage.LANDING))
+                .extracting(Banner::getId).containsExactly(1);
+    }
+
+    @Test
+    @DisplayName("a section's banner still keeps its pages, its run window and its active flag")
+    void aSectionsBannerKeepsItsOtherRules() {
+        Banner articlesOnly = forSections(2, BannerPlacement.SIDEBAR, 4);
+        articlesOnly.setPages(List.of(BannerPage.ARTICLE.name()));
+        Banner off = forSections(3, BannerPlacement.SIDEBAR, 4);
+        off.setActive(false);
+        when(reader.findAll()).thenReturn(List.of(banner(1, BannerPlacement.SIDEBAR), articlesOnly, off));
+
+        assertThat(service.running(BannerPlacement.SIDEBAR, BannerPage.LIST, List.of(4)))
+                .extracting(Banner::getId).containsExactly(1);
+        assertThat(service.forPage(BannerPlacement.SIDEBAR, BannerPage.ARTICLE, List.of(4)))
+                .extracting(Banner::getId).containsExactly(2);
+        verify(counter, times(1)).recordImpression(2);
+        verify(counter, never()).recordImpression(1);
+    }
 }

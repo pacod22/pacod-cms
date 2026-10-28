@@ -186,6 +186,26 @@
                                 <div><label th:for="'page-' + ${p}" th:text="${mgmtText.label(p)}">Article</label></div>
                             </div>
                         </div>
+
+                        <!--/*
+                          Nothing checked means regardless of section. A booking for sections runs on
+                          their articles and lists, and there the general bookings of its placement
+                          step aside -- see Banner.coversCategories and the site's BannerService.
+                        */-->
+                        <div class="field" th:unless="${#lists.isEmpty(categories)}">
+                            <label>
+                                <th:block th:text="#{banners.edit.categories}">Sections</th:block>
+                                <span class="help" th:text="#{banners.edit.categories.help}">none ticked means every section</span>
+                            </label>
+                            <div th:each="c : ${categories}" class="checkline">
+                                <input type="checkbox" th:id="'category-' + ${c.id}" th:field="*{categories}" th:value="${c.id}">
+                                <div><label th:for="'category-' + ${c.id}" th:text="${c.name}">Technology</label></div>
+                            </div>
+                        </div>
+                        <!--/* No sections to offer (none read): the booking's own are kept, never cleared by a save. */-->
+                        <th:block th:if="${#lists.isEmpty(categories)}">
+                            <input type="hidden" name="categories" th:each="c : *{categories}" th:value="${c}">
+                        </th:block>
                     </div>
 
                     <div class="card-foot">

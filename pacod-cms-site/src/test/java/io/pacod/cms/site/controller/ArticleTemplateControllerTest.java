@@ -205,6 +205,25 @@ class ArticleTemplateControllerTest {
                 .andExpect(model().attributeExists("lang"));
     }
 
+    @Test
+    @DisplayName("an article's sections, and a section's list, are what its banners are chosen by")
+    void bannersAreChosenByTheSections() throws Exception {
+        when(tagService.getAllTags()).thenReturn(List.of());
+        Article article = article(1);
+        article.setCategories(List.of(new io.pacod.cms.core.data.Category(4), new io.pacod.cms.core.data.Category(6)));
+        when(articleService.getArticleById(1)).thenReturn(Optional.of(article));
+
+        mockMvc.perform(get("/article/1")).andExpect(status().isOk());
+        verify(bannerService).forPage(io.pacod.cms.core.data.BannerPlacement.SIDEBAR,
+                io.pacod.cms.core.data.BannerPage.ARTICLE, List.of(4, 6));
+
+        when(articleService.getAllArticlesByCategoryPageable(eq(4), any(), anyString()))
+                .thenReturn(io.pacod.cms.site.data.ArticleListPageable.builder().id(4).name("Gateway").build());
+        mockMvc.perform(get("/list/4")).andExpect(status().isOk());
+        verify(bannerService).forPage(io.pacod.cms.core.data.BannerPlacement.TOP,
+                io.pacod.cms.core.data.BannerPage.LIST, List.of(4));
+    }
+
     /**
      * The bare route normalises its {@code ?lang} too, and always has to: everything downstream
      * compares bare codes exactly -- {@code ListItem.getLocalizedText} against {@code TextItem.lang}

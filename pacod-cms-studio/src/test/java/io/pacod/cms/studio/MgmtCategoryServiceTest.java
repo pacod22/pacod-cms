@@ -257,4 +257,21 @@ class MgmtCategoryServiceTest {
         assertThat(idsSorted("bg", "id", "desc", Map.of())).containsExactly(18, 17);
         assertThat(idsSorted("bg", "id", "asc", Map.of())).containsExactly(17, 18);
     }
+
+    @Test
+    @DisplayName("deleting a section takes it out of every booking for it, by $pull: no counter is saved back")
+    void deleteTakesTheSectionOutOfBookings() {
+        when(categoryRepository.findById(17)).thenReturn(java.util.Optional.of(category(17, "Двор", "bg")));
+
+        service.delete(17);
+
+        verify(categoryRepository).deleteById(17);
+        org.mockito.ArgumentCaptor<org.springframework.data.mongodb.core.query.Query> query =
+                org.mockito.ArgumentCaptor.forClass(org.springframework.data.mongodb.core.query.Query.class);
+        org.mockito.ArgumentCaptor<org.springframework.data.mongodb.core.query.Update> update =
+                org.mockito.ArgumentCaptor.forClass(org.springframework.data.mongodb.core.query.Update.class);
+        verify(mongoTemplate).updateMulti(query.capture(), update.capture(), eq(io.pacod.cms.core.data.Banner.class));
+        assertThat(query.getValue().getQueryObject()).containsEntry("categories", 17);
+        assertThat(update.getValue().getUpdateObject().get("$pull", Document.class)).containsEntry("categories", 17);
+    }
 }
