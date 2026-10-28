@@ -1,0 +1,24 @@
+# PROXY_MODE=external: pacod-cms behind a Caddy that already runs on this host, signing people in
+# through a pacod-id that already runs. Loaded over the app file (docker-compose.yml) instead of
+# docker-compose.standalone.yml, so none of cms's copies of the shared components -- pacod-caddy,
+# pacod-id, pacod-postgres -- is started: on a host that has them already, their names are taken.
+#
+# The site and the studio join the existing Caddy's network (CADDY_NETWORK) under their own names,
+# cms-site and cms-studio, which that Caddy proxies to (make caddy-config writes its sites). The
+# studio reaches pacod-id at ID_ISSUER (the browser's address) and PACOD_ID_INTERNAL_URL (its
+# internal listener), both from .env, on that network or another it is given here.
+# docs/DEPLOYMENT.md, "Behind an existing Caddy".
+
+services:
+  cms-site:
+    networks:
+      - edge
+
+  cms-studio:
+    networks:
+      - edge
+
+networks:
+  edge:
+    external: true
+    name: ${CADDY_NETWORK:?PROXY_MODE=external needs CADDY_NETWORK, the existing Caddy's network}

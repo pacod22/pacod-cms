@@ -77,10 +77,28 @@ unexport ENV MONGO_ROOT_PASSWORD MONGO_PASSWORD PID_PG_SUPERUSER_PASSWORD PID_DB
 # The helpers below are make functions: exported, they would be expanded -- and fire -- on every recipe.
 unexport confirm need STUDIO_CLI MONGO_ROOT MVN comma RESTART_STUDIO
 PACOD_ENV := $(ENV)
-# Both files: cms's own services (docker-compose.yml, the app file) and its copies of the shared
-# components (docker-compose.standalone.yml), on the shared network pacod-net.
+# PROXY_MODE=bundled (the default): cms's own services (docker-compose.yml, the app file) and its
+# copies of the shared components (docker-compose.standalone.yml) -- its Caddy, pacod-id and
+# PostgreSQL -- on the shared network pacod-net. PROXY_MODE=external: the app file only, joined to
+# a Caddy that already runs on this host (docker-compose.external.yml, CADDY_NETWORK), signing in
+# through a pacod-id that already runs (ID_ISSUER, PACOD_ID_INTERNAL_URL); make caddy-config writes
+# that Caddy's sites. docs/DEPLOYMENT.md, "Behind an existing Caddy".
+PROXY_MODE ?= bundled
+ifeq ($(PROXY_MODE),bundled)
+COMPOSE_FILES := -f docker-compose.yml -f docker-compose.standalone.yml
+else ifeq ($(PROXY_MODE),external)
+COMPOSE_FILES := -f docker-compose.yml -f docker-compose.external.yml
+else
+$(error PROXY_MODE is "$(PROXY_MODE)"; set it to bundled or external)
+endif
+EXTERNAL := $(filter external,$(PROXY_MODE))
+# The existing Caddy, for PROXY_MODE=external: its container, its Caddyfile inside it, and the host
+# folder it imports sites from (make caddy-config prints the file when that is unset).
+CADDY_CONTAINER ?= caddy
+CADDY_CONFIG ?= /etc/caddy/Caddyfile
+CADDY_SITES_DIR ?=
 COMPOSE := docker compose --env-file env/$(ENV).env --env-file .env $(if $(wildcard .env-local),--env-file .env-local) \
-	-f docker-compose.yml -f docker-compose.standalone.yml
+	$(COMPOSE_FILES)
 
 # $(call confirm,what): refuses outside dev unless CONFIRM=<ENV> is on the command line.
 confirm = $(if $(filter dev,$(ENV)),,$(if $(filter $(ENV),$(CONFIRM)),,$(error $(1) on $(ENV): repeat with CONFIRM=$(ENV))))
@@ -112,15 +130,21 @@ help:
 init: ## Write .env, or add the secrets it lacks. Stage/prod: ENV=… STUDIO_HOST=… ID_HOST=… SITE_DOMAIN=… EMAIL=…
 	@./scripts/init-env.sh $(ENV) $(foreach v,STUDIO_HOST ID_HOST SITE_DOMAIN EMAIL,$(if $(filter command line,$(origin $(v))),$(v)=$($(v))))
 
-up: check network images ## Check, build and start the stack, wait until it answers, print its addresses
-	@echo "Starting ENV=$(ENV)"
+up: check network $(if $(EXTERNAL),,images) ## Check, build and start the stack, wait until it answers, print its addresses
+	@echo "Starting ENV=$(ENV)$(if $(EXTERNAL), behind the Caddy on $(CADDY_NETWORK))"
 	@# --remove-orphans: a renamed or removed service's old container would keep holding its
 	@# published ports. Caddy needs no restart when the applications are recreated.
-	$(COMPOSE) up -d --build --remove-orphans
+	$(COMPOSE) up -d --build --remove-orphans $(if $(EXTERNAL),--wait)
+ifeq ($(PROXY_MODE),external)
+	@# The existing Caddy serves cms only once it has cms's sites: make caddy-config caddy-reload.
+	@# The pacod-id is someone else's too, so no provisioner is made in it (PACOD_ORG_CREATION).
+	@echo "up. The existing Caddy needs cms's sites once: make caddy-config caddy-reload"
+else
 	@$(MAKE) --no-print-directory wait
 	@# Self-service organisations need the studio's provisioner in pacod-id, which can only be made
 	@# once pacod-id answers. Made once; afterwards this only checks it still exists.
 	@$(MAKE) --no-print-directory id-provisioner
+endif
 	@$(MAKE) --no-print-directory urls
 
 down: ## Stop the stack; the data stays
@@ -208,7 +232,7 @@ e2e-allowed:
 	@test -z "$(PID_SMTP_HOST)" -o "$(PID_SMTP_HOST)" = pacod-mailpit || { echo "PID_SMTP_HOST=$(PID_SMTP_HOST): mail goes to a relay, not pacod-mailpit"; exit 1; }
 
 ##@ Operate
-.PHONY: restart logs caddy-reload destroy
+.PHONY: restart logs caddy-reload caddy-config destroy
 restart: ## Rebuild and recreate cms-site and cms-studio; MongoDB, pacod-id and Caddy keep running
 	$(COMPOSE) up -d --build --remove-orphans --no-deps cms-site cms-studio
 	@$(MAKE) --no-print-directory wait
@@ -223,10 +247,22 @@ shell-%:
 	$(COMPOSE) exec $* sh
 
 caddy-reload: ## Check the Caddyfile, then recreate Caddy: after a host, Caddyfile or certificate-pair change
+ifeq ($(PROXY_MODE),external)
+	@# Someone else's Caddy: validated where it runs, then reloaded -- or, where its admin API is off
+	@# and with RESTART=1, restarted, which interrupts every site it serves for a moment.
+	docker exec $(CADDY_CONTAINER) caddy validate --config $(CADDY_CONFIG) --adapter caddyfile
+	$(if $(RESTART),docker restart $(CADDY_CONTAINER),docker exec $(CADDY_CONTAINER) caddy reload --config $(CADDY_CONFIG) --adapter caddyfile \
+		|| { echo "caddy reload failed (is its admin API off?): make caddy-reload RESTART=1 restarts $(CADDY_CONTAINER)"; exit 1; })
+else
 	@# Validated in a one-off container first, so a broken file never takes the front door down;
 	@# then recreated, because Caddy reads {$$VAR}s when it parses the file.
 	$(COMPOSE) run --rm --no-deps -T pacod-caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 	$(COMPOSE) up -d --force-recreate --no-deps pacod-caddy
+endif
+
+caddy-config: ## PROXY_MODE=external: cms's sites for the existing Caddy, into CADDY_SITES_DIR (printed when unset)
+	$(if $(EXTERNAL),,$(error caddy-config is for PROXY_MODE=external; cms's own Caddy reads platform/caddy/cms.caddy))
+	@./scripts/caddy-config.sh $(if $(CADDY_SITES_DIR),"$(CADDY_SITES_DIR)/pacod-cms.caddy")
 
 destroy: ## Stop and DELETE every volume: content, accounts, certificates. Outside dev: CONFIRM=<ENV>
 	$(call confirm,deleting every volume)

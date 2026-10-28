@@ -336,6 +336,62 @@ certificates on. The full stack imports the same fragment behind its own HTTP-on
   `flow`, `id_token_hint`, `login_hint` and `key` (the sign-in round trips carry `code` and
   `state`), the `Referer`, `X-Api-Key` and `X-Goog-Api-Key` headers and the response's `Location`.
 
+### Behind an existing Caddy
+
+A host that already runs a Caddy (and a pacod-id) for other services cannot also run cms's own:
+`pacod-caddy`, `pacod-id` and `pacod-postgres` are container names, unique on a Docker host, and
+compose adds a service's name as an alias on every network it joins. `PROXY_MODE=external` runs the
+app file alone with `docker-compose.external.yml`. The cms services keep their own names,
+`cms-site`, `cms-studio`, `cms-mongo` and `cms-gotenberg`. The site and the studio join the
+existing Caddy's network (`CADDY_NETWORK`). The studio signs people in through the pacod-id that
+runs there.
+
+```bash
+# .env, besides make init's: the hosts, the existing Caddy and the existing pacod-id
+PROXY_MODE=external
+STUDIO_HOST=studio.example.com
+ID_HOST=id.example.com                    # the existing pacod-id's
+CADDY_NETWORK=caddy                       # docker inspect <its container> lists its networks
+CADDY_CONTAINER=caddy
+CADDY_SITES_DIR=/srv/caddy/sites          # the host folder it imports *.caddy from
+CMS_PUBLIC_SITE=https://www.example.com   # the websites' hosts: never a catch-all here
+CMS_STUDIO_TLS=tls /etc/caddy/certs/example.full /etc/caddy/certs/example.key
+CMS_PUBLIC_TLS=tls /etc/caddy/certs/example.full /etc/caddy/certs/example.key
+PACOD_ID_INTERNAL_URL=http://pacod-id:8071
+PACOD_ORG_CREATION=platform-admins
+
+make up              # checks the network is there, starts cms, waits for the health checks
+make caddy-config    # writes CADDY_SITES_DIR/pacod-cms.caddy (prints it when that is unset)
+make caddy-reload    # caddy validate, then caddy reload, in CADDY_CONTAINER
+```
+
+Before `make up`, register the studio's two clients in that pacod-id: `pacod-cms-studio` (sign-in,
+redirect `https://<STUDIO_HOST>/mgmt/oauth2/code/pacod-id`) and `pacod-cms-service` (the
+catalogue and the authorisation feed), with the secrets `CMS_ID_STUDIO_SECRET` and
+`CMS_ID_SERVICE_SECRET` from `.env`. They are cms's own pacod-id's, in `docker/pacod-id/pacod-id.toml`;
+copy both `[[client]]` blocks into that pacod-id's configuration, in the realm its other products use. That pacod-id
+must be a build the studio can use: the catalogue push, the feed and the scopes. `make up` creates
+no provisioner there, so only platform admins create organisations.
+
+`make caddy-config` writes `platform/caddy/cms.caddy` itself, with every placeholder filled from
+`.env` (`scripts/caddy-config.sh`). The existing Caddy has none of cms's variables, and an
+unset one would fall back to its default; for `CMS_PUBLIC_SITE` that default is a catch-all, which
+would take every other site that Caddy serves. So the script refuses a catch-all. `CMS_STUDIO_TLS`
+and `CMS_PUBLIC_TLS` carry the `tls` lines that Caddy needs. Where it obtains certificates itself,
+leave them unset. `CMS_PUBLIC_EXTRA_FILE` names a file of directives for the websites' site, which
+the script copies in before the proxy. Use it for the redirects of a website's old addresses. Name
+it anything but `*.caddy` if it lies in the sites folder.
+
+The existing Caddyfile needs `import sites/*.caddy` (or `import /etc/caddy/sites/*.caddy`) once,
+with the folder mounted. Without it, paste the file in. Where that Caddy's admin API is off,
+`caddy reload` fails; `make caddy-reload RESTART=1` restarts the container instead, which
+interrupts every site it serves for a moment.
+
+When the studio and the websites share a registrable domain (`studio.example.com`,
+`www.example.com`), set `PACOD_SITE_DOMAIN_SHARED=true`, and serve both over HTTPS
+([The studio's and pacod-id's domains](#the-studios-and-pacod-ids-domains)); `make check` says
+so.
+
 ## TLS
 
 **Caddy terminates TLS.** The applications stay on plain HTTP behind it (`SSL_ENABLED=false`) and

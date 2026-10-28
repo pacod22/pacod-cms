@@ -52,7 +52,7 @@ SECRET_KEYS="MONGO_ROOT_PASSWORD MONGO_PASSWORD PID_PG_SUPERUSER_PASSWORD PID_DB
 CMS_ID_STUDIO_SECRET CMS_ID_SERVICE_SECRET ID_ADMIN_PASSWORD PACOD_PREVIEW_SECRET METRICS_VISITOR_SALT PACOD_GW_API_KEY
 PACOD_ID_PROVISIONER_TOKEN PID_SMTP_USERNAME PID_SMTP_PASSWORD"
 SECRET_KEYS=$(printf '%s' "$SECRET_KEYS" | tr '\n' ' ')
-known=" $(cat docker-compose.yml docker-compose.standalone.yml Makefile env/*.env .env.example 2>/dev/null | grep -oE '[A-Z][A-Z0-9_]{2,}' | sort -u | tr '\n' ' ') "
+known=" $(cat docker-compose.yml docker-compose.standalone.yml docker-compose.external.yml Makefile env/*.env .env.example 2>/dev/null | grep -oE '[A-Z][A-Z0-9_]{2,}' | sort -u | tr '\n' ' ') "
 unused=()
 for file in .env .env-local; do
   [ -f "$file" ] || continue
@@ -67,16 +67,27 @@ for file in .env .env-local; do
     case " $SECRET_KEYS " in *" $key "*) continue ;; esac
     case "$value" in *\#*) bad "$file: $key contains # -- make cuts the value there. Choose another value." ;; esac
     case "$key" in
-      CADDY_GLOBAL_OPTIONS|CMS_STUDIO_SITE|CMS_PUBLIC_SITE|ID_ADMIN_EMAIL|ID_MAIL_FROM) ;;
+      CADDY_GLOBAL_OPTIONS|CMS_STUDIO_SITE|CMS_PUBLIC_SITE|CMS_STUDIO_TLS|CMS_PUBLIC_TLS|ID_ADMIN_EMAIL|ID_MAIL_FROM) ;;
       *) case "$value" in *[[:space:]]*) bad "$file: $key contains a space." ;; esac ;;
     esac
   done < <(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$file")
 done
 [ ${#unused[@]} -eq 0 ] || warn "read by nothing in this release (remove them when convenient): $(printf '%s\n' "${unused[@]}" | sort -u | paste -sd' ' -)"
 
+# PROXY_MODE=external: behind a Caddy and beside a pacod-id that already run (docker-compose.external.yml).
+external=
+[ "$(get PROXY_MODE)" = external ] && external=1
+
 # ---- secrets -------------------------------------------------------------------------------------
 missing=()
-for key in MONGO_ROOT_PASSWORD MONGO_PASSWORD PID_PG_SUPERUSER_PASSWORD PID_DB_PASSWORD PID_KEK PID_TOKEN_PEPPER CMS_ID_STUDIO_SECRET CMS_ID_SERVICE_SECRET ID_ADMIN_PASSWORD; do
+# Behind an existing pacod-id, cms runs none of its own: only the studio's two client secrets,
+# registered there, are cms's.
+if [ -n "$external" ]; then
+  secret_keys="MONGO_ROOT_PASSWORD MONGO_PASSWORD CMS_ID_STUDIO_SECRET CMS_ID_SERVICE_SECRET"
+else
+  secret_keys="MONGO_ROOT_PASSWORD MONGO_PASSWORD PID_PG_SUPERUSER_PASSWORD PID_DB_PASSWORD PID_KEK PID_TOKEN_PEPPER CMS_ID_STUDIO_SECRET CMS_ID_SERVICE_SECRET ID_ADMIN_PASSWORD"
+fi
+for key in $secret_keys; do
   [ -n "$(lastval "$key" "${FILES[@]}")" ] || missing+=("$key")
 done
 if [ ${#missing[@]} -gt 0 ]; then
@@ -110,14 +121,16 @@ if [ "$ENV_NAME" != dev ]; then
     fi
   done
   [ -z "$hosts_ok" ] || ok "hosts: studio $studio, pacod-id $id"
-  [ "$(get HTTP_PORT)" = 80 ] && [ "$(get HTTPS_PORT)" = 443 ] \
-    || bad "HTTP_PORT/HTTPS_PORT are $(get HTTP_PORT)/$(get HTTPS_PORT): Caddy obtains certificates on 80 and 443, and the prod profile writes addresses without a port"
+  if [ -z "$external" ]; then
+    [ "$(get HTTP_PORT)" = 80 ] && [ "$(get HTTPS_PORT)" = 443 ] \
+      || bad "HTTP_PORT/HTTPS_PORT are $(get HTTP_PORT)/$(get HTTPS_PORT): Caddy obtains certificates on 80 and 443, and the prod profile writes addresses without a port"
+  fi
   [ "$(get STUDIO_ORIGIN)" = "https://$studio" ] || bad "STUDIO_ORIGIN is $(get STUDIO_ORIGIN), not https://$studio: pacod-id registers it exactly"
   [ "$(get ID_ISSUER)" = "https://$id" ] || bad "ID_ISSUER is $(get ID_ISSUER), not https://$id"
-  [ "$(get CADDYFILE)" = ./docker/caddy/Caddyfile ] || warn "CADDYFILE is $(get CADDYFILE), not production's ./docker/caddy/Caddyfile"
+  [ -n "$external" ] || [ "$(get CADDYFILE)" = ./docker/caddy/Caddyfile ] || warn "CADDYFILE is $(get CADDYFILE), not production's ./docker/caddy/Caddyfile"
   [ "$(get SPRING_PROFILE)" = prod ] || warn "SPRING_PROFILE is $(get SPRING_PROFILE), not prod"
   [ "$(get PUBLISH_IP)" = 127.0.0.1 ] || warn "PUBLISH_IP is '$(get PUBLISH_IP)': the applications' and MongoDB's ports are reachable from outside"
-  case "$(get CADDY_GLOBAL_OPTIONS)" in *email*) ;; *) warn "no CADDY_GLOBAL_OPTIONS=email …: the certificate authority cannot warn you about expiring certificates" ;; esac
+  [ -n "$external" ] || case "$(get CADDY_GLOBAL_OPTIONS)" in *email*) ;; *) warn "no CADDY_GLOBAL_OPTIONS=email …: the certificate authority cannot warn you about expiring certificates" ;; esac
   if [ -n "$sites" ]; then
     if local_host "$sites"; then
       bad "PACOD_SITE_DOMAIN=$sites is not a public domain"
@@ -153,18 +166,48 @@ if [ "$ENV_NAME" = stage ]; then
 fi
 
 if [ "$ENV_NAME" = prod ]; then
-  if [ -z "$smtp" ] || [ "$smtp" = pacod-mailpit ]; then
-    bad "PID_SMTP_HOST is not set: pacod-id sends confirmations, invitations and password resets through it"
-  else
-    ok "mail through $smtp"
+  # Behind an existing pacod-id, its mail and its first account are its own, not cms's.
+  if [ -z "$external" ]; then
+    if [ -z "$smtp" ] || [ "$smtp" = pacod-mailpit ]; then
+      bad "PID_SMTP_HOST is not set: pacod-id sends confirmations, invitations and password resets through it"
+    else
+      ok "mail through $smtp"
+    fi
+    from=$(lastval ID_MAIL_FROM "${FILES[@]}")
+    case "$from" in
+      ''|*.test) bad "ID_MAIL_FROM is '${from}': the sender must be on a domain your relay sends for" ;;
+    esac
+    case "$(lastval ID_ADMIN_EMAIL "${FILES[@]}")" in ''|*.test) warn "ID_ADMIN_EMAIL is a .test address: the first account's password resets go nowhere" ;; esac
   fi
-  from=$(lastval ID_MAIL_FROM "${FILES[@]}")
-  case "$from" in
-    ''|*.test) bad "ID_MAIL_FROM is '${from}': the sender must be on a domain your relay sends for" ;;
-  esac
-  case "$(lastval ID_ADMIN_EMAIL "${FILES[@]}")" in ''|*.test) warn "ID_ADMIN_EMAIL is a .test address: the first account's password resets go nowhere" ;; esac
   [ "$(get DEMO_WEBSITES)" != true ] || warn "DEMO_WEBSITES=true: an empty production platform gets the two demo websites"
   case ",$profiles," in *,dev-gateway,*|*,mailpit,*) warn "COMPOSE_PROFILES=$profiles runs the mock gateway or the mail catcher in production" ;; esac
+fi
+
+# ---- behind an existing Caddy -----------------------------------------------------------------------
+if [ -n "$external" ]; then
+  network=$(get CADDY_NETWORK) container=$(get CADDY_CONTAINER) public=$(get CMS_PUBLIC_SITE)
+  if [ -z "$network" ]; then
+    bad "PROXY_MODE=external needs CADDY_NETWORK, the existing Caddy's Docker network (docker inspect <its container>)"
+  elif docker network inspect "$network" >/dev/null 2>&1; then
+    ok "the existing Caddy's network $network is there"
+  else
+    bad "CADDY_NETWORK=$network: no such Docker network"
+  fi
+  if [ -n "$container" ] && [ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null)" != true ]; then
+    warn "CADDY_CONTAINER=$container is not running here: make caddy-reload reloads that container"
+  fi
+  case "$public" in
+    ''|http://|https://|'http://, https://'|:*) bad "CMS_PUBLIC_SITE is '$public': behind a Caddy that serves other sites, name the websites' hosts (https://www.example.com, …)" ;;
+  esac
+  case "$(get PACOD_ID_INTERNAL_URL)" in
+    ''|http://pacod-id-internal:8071*) warn "PACOD_ID_INTERNAL_URL is the bundled pacod-id's: name the internal listener of the pacod-id that runs here" ;;
+  esac
+  [ "$(get PACOD_ORG_CREATION)" = platform-admins ] || warn "PACOD_ORG_CREATION is not platform-admins: self-service organisations need a provisioner in that pacod-id, which make up does not create"
+  sites_reg=$(reg "$(printf '%s' "$public" | sed -E 's#^https?://##; s#[,: ].*##')")
+  if [ -n "$sites_reg" ] && { [ "$sites_reg" = "$(reg "$(get STUDIO_HOST)")" ] || [ "$sites_reg" = "$(reg "$(get ID_HOST)")" ]; } \
+     && [ "$(get PACOD_SITE_DOMAIN_SHARED)" != true ]; then
+    bad "the websites ($public) share the studio's or pacod-id's registrable domain: set PACOD_SITE_DOMAIN_SHARED=true, or the studio refuses them"
+  fi
 fi
 
 # ---- a certificate pair of this machine's own --------------------------------------------------
@@ -181,7 +224,8 @@ for pair in "PID_SMTP_HOST:mailpit" "PACOD_GW_URL:http://gw:" "PACOD_PDF_GOTENBE
 done
 # pacod-id's internal listener moved to pacod-admin-net, under its alias there; the old name
 # no longer answers on 8071.
-case "$(get PACOD_ID_INTERNAL_URL)" in http://pacod-id:8071*) bad "PACOD_ID_INTERNAL_URL names http://pacod-id:8071, which no longer answers: use http://pacod-id-internal:8071 (pacod-admin-net)" ;; esac
+# Not behind an existing pacod-id: there the name is that pacod-id's own.
+[ -n "$external" ] || case "$(get PACOD_ID_INTERNAL_URL)" in http://pacod-id:8071*) bad "PACOD_ID_INTERNAL_URL names http://pacod-id:8071, which no longer answers: use http://pacod-id-internal:8071 (pacod-admin-net)" ;; esac
 if docker info >/dev/null 2>&1; then
   project=${COMPOSE_PROJECT_NAME:-$(basename "$PWD" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_-')}
   pairs="id-pg-data:pacod-postgres-data caddy-data:pacod-caddy-data"
@@ -196,7 +240,9 @@ fi
 
 # ---- what compose makes of it all ----------------------------------------------------------------
 if command -v docker >/dev/null 2>&1; then
-  compose=${COMPOSE:-docker compose --env-file env/$ENV_NAME.env --env-file .env $([ -f .env-local ] && printf -- '--env-file .env-local') -f docker-compose.yml -f docker-compose.standalone.yml}
+  overlay=docker-compose.standalone.yml
+  [ -z "$external" ] || overlay=docker-compose.external.yml
+  compose=${COMPOSE:-docker compose --env-file env/$ENV_NAME.env --env-file .env $([ -f .env-local ] && printf -- '--env-file .env-local') -f docker-compose.yml -f $overlay}
   if out=$($compose config -q 2>&1); then ok "the compose files resolve"; else bad "docker compose config: $out"; fi
 else
   bad "docker is not installed"

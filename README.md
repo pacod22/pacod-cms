@@ -123,6 +123,10 @@ address; `http://pacod-id:8071` no longer answers.
   `pacod-gw` and `gw-mock` (profile `dev-gateway`) and `pacod-mailpit` (profile `mailpit`). `make`
   loads both files; the full stack (`pacod-demo`) loads only the app file and runs one of each shared
   component for every product.
+- **`docker-compose.external.yml`** (`PROXY_MODE=external`): in place of the standalone file on a
+  host whose Caddy and pacod-id already run — the site and the studio join that Caddy's network,
+  and `make caddy-config` writes cms's sites for it. See
+  [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md), *Behind an existing Caddy*.
 - **`platform/caddy/cms.caddy`**: cms's two Caddy sites, the studio (`CMS_STUDIO_SITE`) and every
   other host, the websites (`CMS_PUBLIC_SITE`). cms's Caddyfiles import it, and so does the full
   stack's.

@@ -2320,6 +2320,14 @@ service key = `container_name` = DNS name; shared components `pacod-*`, cms's ow
 keys likewise). **`docker-compose.yml`, the app file**, holds cms's own services: `cms-mongo`,
 `cms-site` (8443 inside, `${WEB_PORT:-8080}`), `cms-studio` (7443, `${MGMT_PORT:-7070}`,
 healthcheck `/mgmt-health`) and `cms-gotenberg` (PDF export, no published port, *PDF export*).
+**`docker-compose.external.yml`** replaces it under `PROXY_MODE=external` (a host whose Caddy and
+pacod-id already run, so their names are taken): no shared component of cms's own; `cms-site` and
+`cms-studio` join `${CADDY_NETWORK}`; `make caddy-config` (`scripts/caddy-config.sh`) writes
+`cms.caddy` with its placeholders filled from `.env` for that Caddy, refusing a catch-all
+`CMS_PUBLIC_SITE`, with `CMS_STUDIO_TLS`, `CMS_PUBLIC_TLS` and `CMS_PUBLIC_EXTRA_FILE` (directives
+before the websites' proxy, e.g. a site's old-address redirects); `make check` skips cms's own
+pacod-id secrets, mail and internal-listener rules there.
+
 **`docker-compose.standalone.yml`** holds cms's copies of the shared components: `pacod-caddy` (the
 front door, `${HTTP_PORT:-8000}`, `${HTTPS_PORT:-8443}` tcp and udp; volumes
 `pacod-caddy-data`/`pacod-caddy-config` hold its certificates, its local CA and its CA account —
