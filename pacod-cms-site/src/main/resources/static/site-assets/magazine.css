@@ -565,6 +565,8 @@ a.mz-kicker:hover { color: var(--ink); }
 }
 .mz-body.article-body { margin-top: 0; max-width: 70ch; }
 .mz-section--page > .article-body { margin-top: 0; }
+/* Across the home page's full-width band, the page's reading column sits in the middle. */
+.mz-wide .mz-section--page > .article-body { margin-inline: auto; }
 .article-body p { margin-bottom: 24px; }
 .article-body h2 {
     margin: 48px 0 16px;
