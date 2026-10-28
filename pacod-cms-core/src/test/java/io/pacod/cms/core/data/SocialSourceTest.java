@@ -15,6 +15,8 @@ class SocialSourceTest {
         assertThat(SocialSource.of(" fb ")).isEqualTo(SocialSource.FACEBOOK);
         assertThat(SocialSource.of("twitter")).isEqualTo(SocialSource.X);
         assertThat(SocialSource.of("qr")).isEqualTo(SocialSource.QR);
+        assertThat(SocialSource.of("GitHub")).isEqualTo(SocialSource.GITHUB);
+        assertThat(SocialSource.of("gh")).isEqualTo(SocialSource.GITHUB);
         assertThat(SocialSource.of("direct")).isEqualTo(SocialSource.DIRECT);
     }
 

@@ -214,8 +214,8 @@ only the fallback for code that runs with no website bound.
 
 **The public chrome** (navigation labels, buttons, notices) is translated on the server from
 `pacod-cms-site/src/main/resources/messages*.properties`: English base, plus Bulgarian, German,
-French, Spanish and Italian. A language with no bundle gets the English chrome around its own
-content.
+French, Spanish, Italian and Russian. A language with no bundle gets the English chrome around
+its own content.
 
 ## Designing a website
 

@@ -35,6 +35,7 @@ public enum SocialSource {
     TELEGRAM("Telegram", "tg"),
     VIBER("Viber", "vb"),
     WHATSAPP("WhatsApp", "wa"),
+    GITHUB("GitHub", "gh"),
     EMAIL("Email", "e-mail", "mail", "newsletter"),
     /** Only ever explicit: a QR code printed on paper or on a stand, tagged {@code ?src=qr}. */
     QR("QR code"),

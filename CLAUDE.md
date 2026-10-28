@@ -346,7 +346,7 @@ installs — there is no upload, because Thymeleaf is code.
   site.css's non-token colours (`--greenText`, `--ink2`, `--ph1` …) to tokens, so a theme reaches
   links and body text; its own classes start `mz-`. View-model helpers it uses are methods, not
   getters (`ArticleModel.readingMinutes()`, `authorNames()`; `ListItem.kickerName()`), so `/web/v1`
-  JSON does not change. Its chrome strings are `magazine.*` in all six bundles.
+  JSON does not change. Its chrome strings are `magazine.*` in every bundle.
 - **`TemplateSetViewResolver` is the bean `thymeleafViewResolver`**, so Boot's backs off, and
   **implements `ViewResolver` directly and caches nothing itself**: a caching resolver keys its cache
   by view name and would hand the first website's `article` to every website. Each set's own
@@ -2525,7 +2525,7 @@ toggled by `site.js`. `article-print.html`, the print view, omits it so it alway
 ### The chrome is translated on the server
 
 Every word of public chrome is a `#{key}` from the site's `messages*.properties` — **English base,
-`_bg`, `_de`, `_fr`, `_es`, `_it`**. Menu labels and the website's name are data, not keys.
+`_bg`, `_de`, `_fr`, `_es`, `_it`, `_ru`**. Menu labels and the website's name are data, not keys.
 
 - **`ThymeleafConfig.messageSource` calls `setFallbackToSystemLocale(false)`**: a language without a
   bundle gets English, never the JVM locale's bundle.

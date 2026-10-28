@@ -30,7 +30,8 @@ public enum SocialIcon {
     EMAIL("Email"),
     SHOP("Shop"),
     PODCAST("Podcast"),
-    CALENDAR("Event");
+    CALENDAR("Event"),
+    GITHUB("GitHub");
 
     private final String label;
 

@@ -84,8 +84,8 @@ Testcontainers).
 - **Only published articles reach a reader**, on every route, list, feed, sitemap and PDF.
   `/robots.txt` and `/sitemap.xml` are answered per website, from its own database.
 - **Languages**: the public chrome is translated on the server (English, Bulgarian, German, French,
-  Spanish, Italian) with a server-rendered language switcher; the studio's interface is English,
-  Bulgarian, German or Russian.
+  Spanish, Italian, Russian) with a server-rendered language switcher; the studio's interface is
+  English, Bulgarian, German or Russian.
 
 ### Template sets, layouts and themes
 - **Template sets**: `editorial` and `minimal` (one column, extending `editorial`), each a folder of

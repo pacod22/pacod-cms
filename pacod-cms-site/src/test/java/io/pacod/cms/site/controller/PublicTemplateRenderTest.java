@@ -305,7 +305,7 @@ class PublicTemplateRenderTest {
      * which no other assertion here would notice.
      */
     @org.junit.jupiter.params.ParameterizedTest(name = "{0}")
-    @org.junit.jupiter.params.provider.ValueSource(strings = {"en", "bg", "de", "fr", "es", "it", "pt"})
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"en", "bg", "de", "fr", "es", "it", "ru", "pt"})
     @DisplayName("Every template renders its chrome in every bundled language, with no missing key")
     void everyTemplateRendersInEveryLanguage(String lang) {
         Map<String, String> chrome = Map.of(

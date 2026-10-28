@@ -176,8 +176,8 @@ the Fanboy lists, as with `partner-`.
 Thymeleaf runs in **restricted mode**: no `new`, no static calls, no bean references in
 expressions. Compute anything a template would construct in Java. And:
 
-- Every word of chrome is a message key (`#{…}`) from the site's `messages*.properties`, in all six
-  bundles; a missing one fails `MessageBundleTest`.
+- Every word of chrome is a message key (`#{…}`) from the site's `messages*.properties`, in every
+  bundle; a missing one fails `MessageBundleTest`.
 - A backslash does not escape a quote in SpEL; double it (`'The site''s'`).
 - Fragment inclusion runs before `th:each`, `th:if` and `th:case` on the same element: wrap the
   `th:replace` in a block of its own.

@@ -57,7 +57,8 @@ class MessageBundleTest {
         List<String> translations = translations();
 
         assertThat(translations).contains("messages_bg.properties", "messages_de.properties",
-                "messages_fr.properties", "messages_es.properties", "messages_it.properties");
+                "messages_fr.properties", "messages_es.properties", "messages_it.properties",
+                "messages_ru.properties");
         for (String name : translations) {
             assertThat(load(name).stringPropertyNames()).as(name).isEqualTo(base);
         }

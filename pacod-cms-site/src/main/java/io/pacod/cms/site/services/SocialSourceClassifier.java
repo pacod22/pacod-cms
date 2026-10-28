@@ -88,6 +88,8 @@ public final class SocialSourceClassifier {
             Map.entry(SocialSource.TELEGRAM, List.of("t.me", "telegram.me", "telegram.org")),
             Map.entry(SocialSource.VIBER, List.of("viber.com")),
             Map.entry(SocialSource.WHATSAPP, List.of("whatsapp.com", "wa.me")),
+            // A link in a repository's README, an issue or a gist (gist.github.com).
+            Map.entry(SocialSource.GITHUB, List.of("github.com")),
             // Webmail: a link in a newsletter opened in the browser. abv.bg and mail.bg are
             // regional providers, listed beside the international ones.
             Map.entry(SocialSource.EMAIL, List.of("mail.google.com", "outlook.live.com",
