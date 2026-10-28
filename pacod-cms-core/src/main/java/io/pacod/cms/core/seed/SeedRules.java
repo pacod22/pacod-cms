@@ -567,6 +567,11 @@ public final class SeedRules {
             if (site != null && site.getBaseUrl() != null && !site.getBaseUrl().isBlank() && !HttpUrls.isHttpUrl(site.getBaseUrl())) {
                 problem("site: baseUrl %s is not an http(s) address", site.getBaseUrl());
             }
+            // The shape the site renders: any other id would be written, and then never load.
+            if (site != null && site.getGtmId() != null && !site.getGtmId().isBlank()
+                    && !io.pacod.cms.core.data.SiteSettings.GTM_ID.matcher(site.getGtmId()).matches()) {
+                problem("site: gtmId %s is not a Tag Manager container id, GTM- and capitals or digits", site.getGtmId());
+            }
         }
     }
 }

@@ -11,6 +11,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Who the website is: its name, its look on a share card, how to reach it, and the third-party
@@ -36,6 +37,13 @@ public class SiteSettings {
 
     /** The single document's id. */
     public static final String ID = "site";
+
+    /**
+     * The shape of a Tag Manager container id: {@code GTM-} and four to twelve capitals or digits.
+     * One pattern for what the site renders ({@code SiteChrome}) and what a seed may carry
+     * ({@code SeedRules}), so a seed cannot pass with an id the site then silently drops.
+     */
+    public static final Pattern GTM_ID = Pattern.compile("GTM-[A-Z0-9]{4,12}");
 
     @Id
     private String id = ID;
@@ -73,7 +81,11 @@ public class SiteSettings {
     /** The website's own profiles, linked from the footer. */
     private List<SocialProfile> socialProfiles = new ArrayList<>();
 
-    /** Google Tag Manager container, {@code GTM-XXXXXXX}. */
+    /**
+     * Google Tag Manager container, {@code GTM-XXXXXXX}. Never in the server's HTML as a script:
+     * the page carries it as data, and the reader's browser loads the container only after the
+     * reader consents ({@code fragments/consent}, {@code site.js}).
+     */
     private String gtmId;
 
     /** Google Programmable Search engine id; blank hides the Google search screen. */

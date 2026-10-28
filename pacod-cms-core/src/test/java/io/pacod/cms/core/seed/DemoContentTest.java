@@ -543,6 +543,28 @@ class DemoContentTest {
         ArgumentCaptor<io.pacod.cms.core.data.SiteSettings> site = ArgumentCaptor.forClass(io.pacod.cms.core.data.SiteSettings.class);
         verify(siteSettings).save(site.capture());
         assertThat(site.getValue().getBaseUrl()).isEqualTo("https://ai.pacod.io");
+        assertThat(site.getValue().getGtmId()).isEqualTo("GTM-AB12CD3");
+    }
+
+    @Test
+    @DisplayName("a folder's seed gives the address and the tag manager only while blank: a website's own are kept")
+    void folderSeedKeepsTheWebsitesOwnIds(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        new Standing();
+        var siteSettings = mock(io.pacod.cms.core.repository.SiteSettingsRepository.class);
+        io.pacod.cms.core.data.SiteSettings own = new io.pacod.cms.core.data.SiteSettings();
+        own.setBaseUrl("https://www.example.com");
+        own.setGtmId("GTM-OWN0001");
+        when(siteSettings.findById(io.pacod.cms.core.data.SiteSettings.ID)).thenReturn(Optional.of(own));
+        demo.useSiteAndTheme(siteSettings, mock(io.pacod.cms.core.repository.ThemeRepository.class));
+
+        demo.install(FolderSeed.write(dir), TEST);
+
+        ArgumentCaptor<io.pacod.cms.core.data.SiteSettings> site = ArgumentCaptor.forClass(io.pacod.cms.core.data.SiteSettings.class);
+        verify(siteSettings).save(site.capture());
+        // Saved for the tagline, which the website lacked; the two ids it has are its own still.
+        assertThat(site.getValue().getTaglines()).extracting(TextItem::getText).containsExactly("Open-source building blocks");
+        assertThat(site.getValue().getBaseUrl()).isEqualTo("https://www.example.com");
+        assertThat(site.getValue().getGtmId()).isEqualTo("GTM-OWN0001");
     }
 
     @Test

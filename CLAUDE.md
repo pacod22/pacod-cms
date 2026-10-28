@@ -1715,7 +1715,8 @@ outside, no third-party embed. The photographs are real and say whose they are.
   plus fields a real website needs: `ArticleSeed.date`/`modified` (absolute, the website's time;
   wins over `daysAgo`) and `status`, `Seed.imagePrefix` (default `demo-`), `Seed.languages` (Language
   rows written while absent -- the way to Bulgarian or Russian -- and kept by `narrowLanguages`),
-  `SiteSeed.baseUrl` and the search consoles' ids (written while blank: no screen has them),
+  `SiteSeed.baseUrl`, the search consoles' ids and `gtmId` (written while blank: no screen has them;
+  `SeedRules` refuses a `gtmId` not of `SiteSettings.GTM_ID`'s shape, the one `SiteChrome` renders),
   `ImageSeed.fit: pad` (`DemoPhotos.pad`: a screenshot shown whole on `background` in the rule's
   shape, never cut), `BrandSeed.shareFile` and logos actually written (only for `logoName`'s website
   when it is set), `BookingSeed.categories`. **Checked whole before anything is written**

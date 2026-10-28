@@ -51,7 +51,7 @@ final class FolderSeed {
                                  {"labels": {"en": "GitHub"}, "kind": "URL", "target": "https://github.com/pacod22"}]},
               "social": {"bios": {"en": "The PACOD projects."}, "latestHeadings": {"en": "Latest"},
                          "links": [{"titles": {"en": "The gateway"}, "url": "/p/pacod-gw"}]},
-              "site": {"taglines": {"en": "Open-source building blocks"}, "baseUrl": "https://ai.pacod.io"},
+              "site": {"taglines": {"en": "Open-source building blocks"}, "baseUrl": "https://ai.pacod.io", "gtmId": "GTM-AB12CD3"},
               "partners": [{"id": "pacod-gw", "name": "pacod-gw", "page": "pacod-gw", "folder": "banners/pacod-gw",
                             "bookings": [{"name": "pacod-gw (tall)", "file": "tall.html", "size": "TALL", "placement": "SIDEBAR",
                                           "pages": ["ARTICLE"], "categories": [1]}]}],

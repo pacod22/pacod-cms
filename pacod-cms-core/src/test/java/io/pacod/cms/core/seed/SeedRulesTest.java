@@ -65,6 +65,9 @@ class SeedRulesTest {
             "\"fit\": \"pad\"|\"fit\": \"stretch\"|fit is crop or pad",
             "\"shareFile\": \"photos/screen.png\"|\"shareFile\": \"../screen.png\"|may not",
             "\"baseUrl\": \"https://ai.pacod.io\"|\"baseUrl\": \"ai.pacod.io\"|baseUrl ai.pacod.io is not an http(s) address",
+            "\"gtmId\": \"GTM-AB12CD3\"|\"gtmId\": \"UA-12345-1\"|gtmId UA-12345-1 is not a Tag Manager container id",
+            "\"gtmId\": \"GTM-AB12CD3\"|\"gtmId\": \"GTM-ab12cd3\"|gtmId GTM-ab12cd3 is not a Tag Manager container id",
+            "\"gtmId\": \"GTM-AB12CD3\"|\"gtmId\": \"GTM-AB12;x()\"|gtmId GTM-AB12;x() is not a Tag Manager container id",
             "\"code\": \"bg\"|\"code\": \"Bulgarian\"|a code is two or three lowercase letters",
     })
     @DisplayName("each thing broken is named")

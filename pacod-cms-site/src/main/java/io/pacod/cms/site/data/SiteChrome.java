@@ -30,7 +30,6 @@ import java.util.regex.Pattern;
  */
 public final class SiteChrome {
 
-    private static final Pattern GTM_ID = Pattern.compile("GTM-[A-Z0-9]{4,12}");
     private static final Pattern CSE_CX = Pattern.compile("[A-Za-z0-9:_-]{6,64}");
     private static final Pattern FB_APP_ID = Pattern.compile("\\d{5,20}");
     private static final Pattern VERIFICATION = Pattern.compile("[A-Za-z0-9_-]{8,128}");
@@ -225,7 +224,7 @@ public final class SiteChrome {
     /* ------------------------------------------------------------------ third parties */
 
     public String gtmId() {
-        return tracking ? valid(settings.getGtmId(), GTM_ID) : null;
+        return tracking ? valid(settings.getGtmId(), SiteSettings.GTM_ID) : null;
     }
 
     public String googleCseCx() {

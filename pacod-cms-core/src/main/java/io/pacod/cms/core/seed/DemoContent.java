@@ -615,6 +615,10 @@ public class DemoContent {
             site.setBingSiteVerification(texts.getBingSiteVerification());
             changed = true;
         }
+        if (isBlank(site.getGtmId()) && !isBlank(texts.getGtmId())) {
+            site.setGtmId(texts.getGtmId());
+            changed = true;
+        }
         if (changed) {
             site.setLastModifiedOn(LocalDateTime.now());
             siteSettings.save(site);
@@ -1029,10 +1033,14 @@ public class DemoContent {
         private String contactPhone;
         private String contactEmail;
         private List<io.pacod.cms.core.data.SiteSettings.SocialProfile> socialProfiles = new ArrayList<>();
-        /** The website's public address, and its search consoles' ids: each written while blank. */
+        /**
+         * The website's public address, its search consoles' ids and its Tag Manager container
+         * ({@code GTM-…}, {@link io.pacod.cms.core.data.SiteSettings#GTM_ID}): each written while blank.
+         */
         private String baseUrl;
         private String googleSiteVerification;
         private String bingSiteVerification;
+        private String gtmId;
     }
 
     @Data
