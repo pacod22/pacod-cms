@@ -274,9 +274,9 @@ its id.
 - **`SiteChrome` builds every menu address** from kind and target — `/list/{id}` only for a numeric
   id, `/p/{slug}` only for a slug, a `URL` only if `SocialTargets.isValidTarget` — and adds
   `?lang=`. An item whose label resolves to nothing or whose address is refused is dropped. Absolute
-  URLs (canonical, `og:url`, `og:image`, JSON-LD, sitemap) come from `baseUrl`, or the request's
-  origin while it is blank — one rule, **`SiteOrigin`** (site), which `SiteChrome` and
-  `SitemapController` share. **`SiteSettings.ownHosts()`** is `baseUrl`'s host with and without
+  URLs (canonical, `og:url`, `og:image`, JSON-LD, sitemap, feed) come from `baseUrl`, or the
+  request's origin while it is blank — one rule, **`SiteOrigin`** (site), which `SiteChrome`,
+  `SitemapController` and `FeedController` share. **`SiteSettings.ownHosts()`** is `baseUrl`'s host with and without
   `www.` — what an absolute link must name to count as the website's own.
 - **`SiteBootstrap` seeds both from `seed/site.json`**, which describes the demo: **a website whose
   name is not one of the seed's names gets its own name and a "© name" footer note** (in its default
@@ -2665,6 +2665,19 @@ renders `message`.
   - Absolute addresses come from `baseUrl`, else the request's origin (`SiteOrigin`), like `og:url`.
     A database that cannot be read is a **503** with `Retry-After`, never an empty sitemap a crawler
     would believe. Both cache an hour; `make smoke` probes both.
+- **`/feed.xml` and `/list/{id}/feed.xml` are Atom 1.0** (`FeedController`, `XMLStreamWriter`), per
+  website like the sitemap: the newest 20 through the lists' own public queries (`findPublished`;
+  `findArticleByCategoriesAndStatus`, in the category list's order), a non-public status dropped
+  again. `?lang=` another language than the original lists only articles translated into it
+  (`ArticleModel.languages()`, as the head's alternates), translated, reading at most five pages of
+  20. Entry id and link are the canonical address in the feed's language (`HeadMeta.articlePath`);
+  root-relative `src`/`href`/`poster`/`srcset` in a body are made absolute, `xml:base` too;
+  characters XML 1.0 cannot carry are dropped. The feed's author is the website's name (its host
+  without one). An unknown category, the most-read list (100001) and a tag are 404; `{id}` is
+  `\d{1,9}`, two segments below `/list`, so `/list/{tag}` never sees it. **503** + `Retry-After`
+  on an unreadable database, cached an hour, **no `lang` cookie**: `LocaleConfig` keeps
+  `LocaleChangeInterceptor` off `FeedController.PATHS`. Linked from every head with a `${head}`
+  (the page's language; a category list also its own); not in robots.txt; `make smoke` probes it.
 
 ### Search
 
