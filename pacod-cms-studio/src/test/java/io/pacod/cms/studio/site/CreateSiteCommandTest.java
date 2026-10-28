@@ -19,10 +19,10 @@ class CreateSiteCommandTest {
     @Test
     @DisplayName("--demo=space alone makes a magazine website; a named set, or another demo, keeps its own")
     void demoNamesItsSetWhenNoneIsGiven() {
-        assertThat(CreateSiteCommand.forDemo(request(null), DemoContent.Demo.SPACE).templateSet()).isEqualTo("magazine");
-        assertThat(CreateSiteCommand.forDemo(request(null), DemoContent.Demo.JOURNAL).templateSet()).isNull();
-        assertThat(CreateSiteCommand.forDemo(request(null), null).templateSet()).isNull();
-        assertThat(CreateSiteCommand.forDemo(request("minimal"), DemoContent.Demo.SPACE).templateSet()).isEqualTo("minimal");
-        assertThat(CreateSiteCommand.forDemo(request(null), DemoContent.Demo.SPACE).hosts()).containsExactly("acme.localhost");
+        assertThat(CreateSiteCommand.forSet(request(null), DemoContent.Demo.SPACE.templateSet()).templateSet()).isEqualTo("magazine");
+        assertThat(CreateSiteCommand.forSet(request(null), DemoContent.Demo.JOURNAL.templateSet()).templateSet()).isNull();
+        assertThat(CreateSiteCommand.forSet(request(null), null).templateSet()).isNull();
+        assertThat(CreateSiteCommand.forSet(request("minimal"), DemoContent.Demo.SPACE.templateSet()).templateSet()).isEqualTo("minimal");
+        assertThat(CreateSiteCommand.forSet(request(null), DemoContent.Demo.SPACE.templateSet()).hosts()).containsExactly("acme.localhost");
     }
 }

@@ -28,12 +28,10 @@ import io.pacod.cms.core.services.ImageService;
 import io.pacod.cms.core.tenant.TenantContext;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -84,8 +82,11 @@ public class DemoContent {
 
     public static final String SEED = "demo/demo-journal.json";
 
-    /** The demos there are: an id the forms and commands name, and the seed it reads. */
-    public enum Demo {
+    /**
+     * The demos there are: an id the forms and commands name, and the seed it reads -- with every
+     * file it names -- from the classpath.
+     */
+    public enum Demo implements SeedSource {
         JOURNAL("journal", SEED, null),
         SPACE("space", "demo/demo-space.json", "magazine");
 
@@ -99,6 +100,7 @@ public class DemoContent {
             this.templateSet = templateSet;
         }
 
+        @Override
         public String id() {
             return id;
         }
@@ -107,13 +109,34 @@ public class DemoContent {
             return resource;
         }
 
+        @Override
+        public String seedFile() {
+            return resource;
+        }
+
         /**
          * The template set the demo is designed for -- its layouts are written only into a website
          * on that set -- or null for whichever the website has. What a website created FOR the
          * demo is given when nobody names a set ({@code --create-site --demo}, the bootstrap).
          */
+        @Override
         public String templateSet() {
             return templateSet;
+        }
+
+        @Override
+        public boolean external() {
+            return false;
+        }
+
+        @Override
+        public byte[] read(String path) {
+            return SeedSource.classpath(path);
+        }
+
+        @Override
+        public List<String> files(String folder) {
+            return SeedSource.classpathFiles(folder);
         }
 
         /** The demo named {@code id}, case ignored; blank, {@code true} or {@code 1} mean the journal. */
@@ -134,7 +157,7 @@ public class DemoContent {
     /** In a promotion's text, the website's name. */
     public static final String NAME = "{name}";
 
-    /** Every demo picture's file name starts with this. */
+    /** Every demo picture's file name starts with this, unless the seed names its own prefix. */
     public static final String IMAGE_PREFIX = "demo-";
 
     /** Why demo content was not written. */
@@ -142,7 +165,9 @@ public class DemoContent {
         /** The seed has no complete text in the website's content language. */
         LANGUAGE,
         /** The website already has articles: demo content goes only into an empty one. */
-        HAS_ARTICLES
+        HAS_ARTICLES,
+        /** A seed from outside the jar breaks one of {@link SeedRules}: the message lists them. */
+        INVALID
     }
 
     /** Thrown before anything is written. */
@@ -212,7 +237,8 @@ public class DemoContent {
     private final ImageService imageService;
     private final ObjectMapper objectMapper;
 
-    private final Map<Demo, Seed> seeds = new java.util.concurrent.ConcurrentHashMap<>();
+    /** By source: a demo's for the life of the process, a folder's for the one command that names it. */
+    private final Map<SeedSource, Seed> seeds = new java.util.concurrent.ConcurrentHashMap<>();
 
     public DemoContent(ArticleRepository articles, CategoryRepository categories, AuthorRepository authors,
                        ImageMediaRepository images, TagRepository tags, MenuRepository menus,
@@ -233,15 +259,23 @@ public class DemoContent {
         return seed(Demo.JOURNAL);
     }
 
-    /** A demo's seed, read once. */
-    public Seed seed(Demo demo) {
-        return seeds.computeIfAbsent(demo, d -> {
-            try (InputStream in = new ClassPathResource(d.resource()).getInputStream()) {
-                return objectMapper.readValue(in, Seed.class);
-            } catch (IOException | RuntimeException e) {
+    /**
+     * A seed, read once. A folder's is read strictly: a key the seed shape does not have -- a
+     * misspelt {@code categries} -- is refused rather than dropped without a word.
+     */
+    public Seed seed(SeedSource source) {
+        return seeds.computeIfAbsent(source, s -> {
+            try {
+                byte[] json = s.read(s.seedFile());
+                return s.external()
+                        ? objectMapper.readerFor(Seed.class)
+                                .with(tools.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                                .readValue(json)
+                        : objectMapper.readValue(json, Seed.class);
+            } catch (RuntimeException e) {
                 // Jackson 3's parse failures are unchecked: catching IOException alone would let a
                 // malformed seed escape as something nobody reads as "the seed is broken".
-                throw new IllegalStateException("Could not read " + d.resource() + ": " + e.getMessage(), e);
+                throw new IllegalStateException("Could not read " + s.seedFile() + " of " + s.id() + ": " + e.getMessage(), e);
             }
         });
     }
@@ -251,16 +285,41 @@ public class DemoContent {
         return languages(Demo.JOURNAL);
     }
 
-    public Set<String> languages(Demo demo) {
-        return completeLanguages(seed(demo));
+    public Set<String> languages(SeedSource source) {
+        return completeLanguages(seed(source));
     }
 
     public boolean supports(String language) {
         return supports(Demo.JOURNAL, language);
     }
 
-    public boolean supports(Demo demo, String language) {
-        return language != null && languages(demo).contains(LanguageChain.normalise(language));
+    public boolean supports(SeedSource source, String language) {
+        return language != null && languages(source).contains(LanguageChain.normalise(language));
+    }
+
+    /**
+     * What keeps the seed out of a website whose content language is {@code language}: every
+     * {@link SeedRules} problem, or why it could not be read; empty when it may be written. Reads
+     * nothing of any website.
+     */
+    public List<String> check(SeedSource source, String language) {
+        Seed seed;
+        try {
+            seed = seed(source);
+        } catch (IllegalStateException e) {
+            return List.of(e.getMessage());
+        }
+        Set<String> standing = new LinkedHashSet<>();
+        try {
+            PageBootstrap.readSeed(objectMapper).forEach(p -> standing.add(p.getSlug()));
+        } catch (IOException | RuntimeException e) {
+            log.warn("Could not read the standing pages; a menu naming one is reported: {}", e.getMessage());
+        }
+        io.pacod.cms.core.design.TemplateSetManifest set = seed.getLayoutSet() == null ? null
+                : (templateSets != null ? templateSets : new io.pacod.cms.core.design.TemplateSetCatalog())
+                        .find(seed.getLayoutSet()).orElse(null);
+        return SeedRules.check(seed, source, language == null ? LanguageChain.original() : LanguageChain.normalise(language),
+                set, standing, LocalDateTime.now());
     }
 
     /**
@@ -275,18 +334,29 @@ public class DemoContent {
         return install(Demo.JOURNAL, website);
     }
 
-    /** {@link #install(SiteSeedStep.Website)}, of the demo named. */
-    public Result install(Demo demo, SiteSeedStep.Website website) {
+    /**
+     * {@link #install(SiteSeedStep.Website)}, of the seed named: a demo, or a folder's -- which is
+     * first checked whole ({@link #check}) and refused ({@link Refusal#INVALID}) with every problem
+     * it has, before anything is written.
+     */
+    public Result install(SeedSource source, SiteSeedStep.Website website) {
         String bound = TenantContext.current().siteId();
         if (!bound.equals(website.id())) {
             throw new IllegalStateException("Demo content for " + website.id() + " while " + bound + " is bound");
         }
-        Seed seed = seed(demo);
+        Seed seed = seed(source);
         String lang = website.defaultLanguage() == null || website.defaultLanguage().isBlank()
                 ? LanguageChain.original() : LanguageChain.normalise(website.defaultLanguage());
         if (!completeLanguages(seed).contains(lang)) {
             throw new Refused(Refusal.LANGUAGE, "Demo content is written in " + completeLanguages(seed)
                     + ", not in " + lang);
+        }
+        if (source.external()) {
+            List<String> problems = check(source, lang);
+            if (!problems.isEmpty()) {
+                throw new Refused(Refusal.INVALID, "The seed of " + source.id() + " has " + problems.size()
+                        + " problem(s): " + String.join("; ", problems));
+            }
         }
         if (articles.count() > 0) {
             throw new Refused(Refusal.HAS_ARTICLES, "Website " + website.id() + " already has articles");
@@ -295,10 +365,10 @@ public class DemoContent {
         Map<String, ImageMedia> pictures = new LinkedHashMap<>();
         int newImages = 0;
         for (ImageSeed image : seed.getImages()) {
-            String filename = IMAGE_PREFIX + image.getKey() + ".jpg";
+            String filename = seed.getImagePrefix() + image.getKey() + ".jpg";
             ImageMedia existing = images.findImageMediaByFilename(filename).orElse(null);
             if (existing == null) {
-                existing = storePicture(image, filename, lang);
+                existing = storePicture(source, image, filename, lang);
                 newImages++;
             }
             pictures.put(image.getKey(), existing);
@@ -342,6 +412,7 @@ public class DemoContent {
         addSiteTexts(seed, website, lang);
         addTheme(seed);
         addPages(seed, website, lang);
+        addLanguages(seed);
         if (seed.isNarrowLanguages()) {
             narrowLanguages(seed);
         }
@@ -360,18 +431,26 @@ public class DemoContent {
         articles.saveAll(written);
 
         Result result = new Result(written.size(), newImages, newCategories, newAuthors, newTags, menuGroup, socialPage);
-        log.info("Demo content ({}) in website {}: {}", demo.id(), website.id(), result);
+        log.info("Demo content ({}) in website {}: {}", source.id(), website.id(), result);
         return result;
     }
 
-    private ImageMedia storePicture(ImageSeed image, String filename, String lang) {
+    private ImageMedia storePicture(SeedSource source, ImageSeed image, String filename, String lang) {
         long limit = imageService.isFileSizeCheckEnabled() ? imageService.getMaxImageBytes() : 0;
-        byte[] jpeg = image.getPhoto() != null
-                ? DemoPhotos.fit(DemoPhotos.read(image.getPhoto()), imageService.getRequiredWidth(),
-                        imageService.getRequiredHeight(), imageService.isDimensionCheckEnabled(), limit,
-                        image.getFocusX(), image.getFocusY())
-                : DemoImages.jpeg(DemoImages.draw(image.getKey(), DemoImages.Motif.of(image.getMotif()),
-                        image.getColours(), imageService.getRequiredWidth(), imageService.getRequiredHeight()), limit);
+        int width = imageService.getRequiredWidth();
+        int height = imageService.getRequiredHeight();
+        boolean check = imageService.isDimensionCheckEnabled();
+        byte[] jpeg;
+        if (image.getPhoto() == null) {
+            jpeg = DemoImages.jpeg(DemoImages.draw(image.getKey(), DemoImages.Motif.of(image.getMotif()),
+                    image.getColours(), width, height), limit);
+        } else if (ImageSeed.PAD.equals(image.getFit())) {
+            jpeg = DemoPhotos.pad(source.read(image.getPhoto()), width, height, check, limit,
+                    DemoPhotos.colour(image.getBackground()));
+        } else {
+            jpeg = DemoPhotos.fit(source.read(image.getPhoto()), width, height, check, limit,
+                    image.getFocusX(), image.getFocusY());
+        }
         ImageMedia stored;
         try {
             stored = imageService.save(filename, "image/jpeg", jpeg, caption(image, lang));
@@ -404,12 +483,8 @@ public class DemoContent {
         article.setText(seed.getBodies().get(lang));
         article.setTexts(translations(seed.getBodies(), lang));
         article.setLang(lang);
-        article.setStatus(ArticleStatus.PUBLISHED);
-        LocalDateTime date = now.minusDays(seed.getDaysAgo()).withHour(seed.getHour()).withMinute(0);
-        if (date.isAfter(now)) {
-            // Today's article whose hour has not come yet: yesterday, never in the future.
-            date = date.minusDays(1);
-        }
+        article.setStatus(seed.getStatus() == null ? ArticleStatus.PUBLISHED : seed.getStatus());
+        LocalDateTime date = dated(seed, now);
         article.setDate(date);
         article.setCreatedOn(date);
         article.setCounter(seed.getCounter());
@@ -423,8 +498,24 @@ public class DemoContent {
         }
         article.setTags(seed.getTags());
         // Last: the setters above stamp lastModifiedOn with the clock.
-        article.setLastModifiedOn(date);
+        article.setLastModifiedOn(seed.getModified() != null ? seed.getModified() : date);
         return article;
+    }
+
+    /**
+     * An article's date: the one the seed gives, or {@code daysAgo} at {@code hour} before
+     * {@code now} -- a demo's articles are always recent.
+     */
+    static LocalDateTime dated(ArticleSeed seed, LocalDateTime now) {
+        if (seed.getDate() != null) {
+            return seed.getDate();
+        }
+        LocalDateTime date = now.minusDays(seed.getDaysAgo()).withHour(seed.getHour()).withMinute(0);
+        if (date.isAfter(now)) {
+            // Today's article whose hour has not come yet: yesterday, never in the future.
+            date = date.minusDays(1);
+        }
+        return date;
     }
 
     /**
@@ -509,6 +600,19 @@ public class DemoContent {
         }
         if ((site.getSocialProfiles() == null || site.getSocialProfiles().isEmpty()) && !texts.getSocialProfiles().isEmpty()) {
             site.setSocialProfiles(new ArrayList<>(texts.getSocialProfiles()));
+            changed = true;
+        }
+        // Settings with no studio screen: a seed is the one place a website's own can give them.
+        if (isBlank(site.getBaseUrl()) && !isBlank(texts.getBaseUrl())) {
+            site.setBaseUrl(texts.getBaseUrl());
+            changed = true;
+        }
+        if (isBlank(site.getGoogleSiteVerification()) && !isBlank(texts.getGoogleSiteVerification())) {
+            site.setGoogleSiteVerification(texts.getGoogleSiteVerification());
+            changed = true;
+        }
+        if (isBlank(site.getBingSiteVerification()) && !isBlank(texts.getBingSiteVerification())) {
+            site.setBingSiteVerification(texts.getBingSiteVerification());
             changed = true;
         }
         if (changed) {
@@ -619,11 +723,26 @@ public class DemoContent {
     }
 
     /**
-     * The website's languages narrowed to the seed's: a demo written in one language would
-     * otherwise offer a switcher of five that all show the same text. A language goes only while it
-     * is exactly as {@code LanguageBootstrap} wrote it, is neither the original nor
-     * {@link LanguageChain#FALLBACK}, and no page holds text in it -- the studio's own rules for
-     * deleting one.
+     * The seed's own languages, each only while the website has no language of its code: what
+     * gives a website one {@code seed/languages.json} does not have (Bulgarian, Russian).
+     */
+    private void addLanguages(Seed seed) {
+        if (seed.getLanguages().isEmpty() || languageRepository == null) {
+            return;
+        }
+        for (io.pacod.cms.core.data.Language language : seed.getLanguages()) {
+            if (!languageRepository.existsById(language.getCode())) {
+                languageRepository.save(language);
+            }
+        }
+    }
+
+    /**
+     * The website's languages narrowed to the seed's -- those it is complete in, and those it
+     * names ({@link Seed#getLanguages()}): a demo written in one language would otherwise offer a
+     * switcher of five that all show the same text. A language goes only while it is exactly as
+     * {@code LanguageBootstrap} wrote it, is neither the original nor {@link LanguageChain#FALLBACK},
+     * and no page holds text in it -- the studio's own rules for deleting one.
      */
     private void narrowLanguages(Seed seed) {
         if (languageRepository == null || pageRepository == null) {
@@ -636,7 +755,8 @@ public class DemoContent {
             log.warn("Could not read the seeded languages to compare with; none is removed: {}", e.getMessage());
             return;
         }
-        Set<String> keep = completeLanguages(seed);
+        Set<String> keep = new java.util.HashSet<>(completeLanguages(seed));
+        seed.getLanguages().forEach(language -> keep.add(language.getCode()));
         List<io.pacod.cms.core.data.Page> pages = pageRepository.findAll();
         for (io.pacod.cms.core.data.Language language : languageRepository.findAll()) {
             String code = language.getCode();
@@ -891,6 +1011,13 @@ public class DemoContent {
         private List<PartnerSeed> partners = new ArrayList<>();
         /** The website's favicon, logos and share picture: the studio writes them. */
         private BrandSeed brand;
+        /** What every stored picture's file name starts with; a demo's are {@value DemoContent#IMAGE_PREFIX}. */
+        private String imagePrefix = IMAGE_PREFIX;
+        /**
+         * Languages the website is given while it has none of that code, in the shape
+         * {@code seed/languages.json} has; optional. {@link #narrowLanguages} keeps them.
+         */
+        private List<io.pacod.cms.core.data.Language> languages = new ArrayList<>();
     }
 
     @Data
@@ -902,6 +1029,10 @@ public class DemoContent {
         private String contactPhone;
         private String contactEmail;
         private List<io.pacod.cms.core.data.SiteSettings.SocialProfile> socialProfiles = new ArrayList<>();
+        /** The website's public address, and its search consoles' ids: each written while blank. */
+        private String baseUrl;
+        private String googleSiteVerification;
+        private String bingSiteVerification;
     }
 
     @Data
@@ -962,12 +1093,14 @@ public class DemoContent {
         private String size;
         private String placement;
         private List<String> pages = new ArrayList<>();
+        /** The sections whose articles and lists it runs on; empty for every page it books. */
+        private List<Integer> categories = new ArrayList<>();
         private int sortOrder;
     }
 
     @Data
     public static class BrandSeed {
-        /** Classpath SVGs. */
+        /** An SVG (or PNG) of the source. */
         private String favicon;
         private String logoLight;
         private String logoDark;
@@ -975,6 +1108,8 @@ public class DemoContent {
         private String logoName;
         /** The image key the share picture is cut from. */
         private String share;
+        /** Or a picture of the source, cut to the share picture's 1200x630. */
+        private String shareFile;
     }
 
     @Data
@@ -994,11 +1129,16 @@ public class DemoContent {
 
     @Data
     public static class ImageSeed {
+        /** {@link #fit}: cropped to the website's shape around the focus. */
+        public static final String CROP = "crop";
+        /** {@link #fit}: shown whole, on {@link #background} -- a screenshot loses nothing. */
+        public static final String PAD = "pad";
+
         private String key;
         /** Drawn: one of {@link DemoImages.Motif}, with {@link #colours}. */
         private String motif;
         private List<String> colours = new ArrayList<>();
-        /** Or a photograph: its classpath path, its credit line, where it came from. */
+        /** Or a photograph: its path in the seed's source, its credit line, where it came from. */
         private String photo;
         private String credit;
         private String source;
@@ -1006,6 +1146,10 @@ public class DemoContent {
         /** The crop's centre in the photograph, 0..1. */
         private double focusX = 0.5;
         private double focusY = 0.5;
+        /** How a photograph is fitted to the website's shape: {@value #CROP} or {@value #PAD}. */
+        private String fit = CROP;
+        /** What a padded photograph sits on, {@code #rrggbb}. */
+        private String background = "#ffffff";
         private Map<String, String> captions = new LinkedHashMap<>();
         private Map<String, String> alts = new LinkedHashMap<>();
     }
@@ -1015,6 +1159,12 @@ public class DemoContent {
         private Integer id;
         private int daysAgo;
         private int hour = 9;
+        /** Or the date itself, in the website's time: {@code 2026-10-20T09:00}. Wins over {@link #daysAgo}. */
+        private LocalDateTime date;
+        /** When it was last changed; its date when absent. */
+        private LocalDateTime modified;
+        /** {@code PUBLISHED} when absent: the public site shows nothing else. */
+        private ArticleStatus status;
         private int counter;
         private List<Integer> categories = new ArrayList<>();
         private List<Integer> authors = new ArrayList<>();

@@ -395,6 +395,12 @@ class DemoContentTest {
             });
             var languageRepository = mock(io.pacod.cms.core.repository.LanguageRepository.class);
             when(languageRepository.findAll()).thenAnswer(c -> new ArrayList<>(languages.values()));
+            when(languageRepository.existsById(anyString())).thenAnswer(c -> languages.containsKey(c.<String>getArgument(0)));
+            when(languageRepository.save(any(io.pacod.cms.core.data.Language.class))).thenAnswer(c -> {
+                io.pacod.cms.core.data.Language language = c.getArgument(0);
+                languages.put(language.getCode(), language);
+                return language;
+            });
             org.mockito.Mockito.doAnswer(c -> languages.remove(c.<String>getArgument(0)))
                     .when(languageRepository).deleteById(anyString());
             var layoutRepository = mock(io.pacod.cms.core.repository.LayoutRepository.class);
@@ -499,6 +505,78 @@ class DemoContentTest {
         assertThat(DemoContent.Demo.of(null)).contains(DemoContent.Demo.JOURNAL);
         assertThat(DemoContent.Demo.of("1")).contains(DemoContent.Demo.JOURNAL);
         assertThat(DemoContent.Demo.of("moon")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a folder's seed: its own dates, status, picture names, languages and address; a screenshot padded, not cut")
+    void folderSeed(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        Standing standing = new Standing();
+        var siteSettings = mock(io.pacod.cms.core.repository.SiteSettingsRepository.class);
+        when(siteSettings.findById(io.pacod.cms.core.data.SiteSettings.ID)).thenReturn(Optional.empty());
+        demo.useSiteAndTheme(siteSettings, mock(io.pacod.cms.core.repository.ThemeRepository.class));
+        DirectorySeed source = FolderSeed.write(dir);
+
+        DemoContent.Result result = demo.install(source, TEST);
+
+        assertThat(result.articles()).isEqualTo(2);
+        List<Article> written = savedArticles();
+        Article gateway = written.stream().filter(a -> a.getId() == 2).findFirst().orElseThrow();
+        assertThat(gateway.getDate()).isEqualTo(LocalDateTime.of(2025, 2, 3, 10, 30));
+        assertThat(gateway.getLastModifiedOn()).isEqualTo(LocalDateTime.of(2025, 2, 4, 8, 0));
+        assertThat(gateway.getStatus()).isEqualTo(ArticleStatus.PUBLISHED);
+        assertThat(gateway.getTexts()).extracting(TextItem::getLang).containsExactly("bg");
+        assertThat(gateway.getText()).contains("<pre class=\"language-sh\"><code>make up</code></pre>");
+        assertThat(storedImages).containsOnlyKeys("pacod-screen.jpg", "pacod-mark.jpg");
+
+        // Padded to the rule's 3:2 on its background: the red frame is all there, the sides are green.
+        BufferedImage screen = read(drawn.get(0));
+        assertThat(screen.getWidth()).isEqualTo(FolderSeed.SHOT_HEIGHT * 3 / 2);
+        assertThat(screen.getHeight()).isEqualTo(FolderSeed.SHOT_HEIGHT);
+        java.awt.Color side = new java.awt.Color(screen.getRGB(10, screen.getHeight() / 2));
+        assertThat(side.getGreen()).isGreaterThan(side.getRed());
+        java.awt.Color frame = new java.awt.Color(screen.getRGB(screen.getWidth() / 2, 3));
+        assertThat(frame.getRed()).isGreaterThan(200);
+
+        // Bulgarian added, the seed's; German kept, the untouched standing pages hold German; the rest removed.
+        assertThat(standing.languages).containsOnlyKeys("en", "bg", "de");
+        assertThat(standing.pages).containsKey("pacod-gw");
+        ArgumentCaptor<io.pacod.cms.core.data.SiteSettings> site = ArgumentCaptor.forClass(io.pacod.cms.core.data.SiteSettings.class);
+        verify(siteSettings).save(site.capture());
+        assertThat(site.getValue().getBaseUrl()).isEqualTo("https://ai.pacod.io");
+    }
+
+    @Test
+    @DisplayName("a folder's seed with a problem is refused whole, every problem named, and nothing is written")
+    void folderSeedWithProblems(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        new Standing();
+        DirectorySeed source = FolderSeed.write(dir, FolderSeed.JSON
+                .replace("\"categories\": [2], \"authors\"", "\"categories\": [9], \"authors\"")
+                .replace("\"file\": \"tall.html\"", "\"file\": \"wide.html\""));
+
+        assertThatThrownBy(() -> demo.install(source, TEST))
+                .isInstanceOfSatisfying(DemoContent.Refused.class, e -> assertThat(e.reason()).isEqualTo(DemoContent.Refusal.INVALID))
+                .hasMessageContaining("2 problem(s)").hasMessageContaining("[9]").hasMessageContaining("wide.html");
+        nothingWritten();
+        assertThat(demo.check(source, "en")).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("a folder's seed is read strictly: a key the seed does not have is refused, not dropped")
+    void folderSeedIsReadStrictly(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        DirectorySeed source = FolderSeed.write(dir, FolderSeed.JSON.replace("\"categories\": [{", "\"categries\": [{"));
+        assertThat(demo.check(source, "en")).singleElement().asString().contains("categries");
+        assertThatThrownBy(() -> demo.install(source, TEST)).isInstanceOf(IllegalStateException.class);
+        nothingWritten();
+    }
+
+    @Test
+    @DisplayName("the shipped demos keep their own, lenient reading and pass the rules every seed keeps")
+    void shippedSeedsAreNotExternal() {
+        for (DemoContent.Demo shipped : DemoContent.Demo.values()) {
+            assertThat(shipped.external()).isFalse();
+            assertThat(shipped.seedFile()).isEqualTo(shipped.resource());
+        }
+        assertThat(DemoContent.Demo.SPACE.files("demo/space/photos")).contains("lantern-reef.jpg", "VENDORED.md");
     }
 
     private void nothingWritten() {

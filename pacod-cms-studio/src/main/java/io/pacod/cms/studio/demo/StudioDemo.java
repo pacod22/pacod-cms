@@ -12,6 +12,7 @@ import io.pacod.cms.core.repository.BannerRepository;
 import io.pacod.cms.core.seed.DemoContent;
 import io.pacod.cms.core.seed.DemoImages;
 import io.pacod.cms.core.seed.DemoPhotos;
+import io.pacod.cms.core.seed.SeedSource;
 import io.pacod.cms.core.seed.SiteSeedStep;
 import io.pacod.cms.core.tenant.TenantContext;
 import io.pacod.cms.core.tenant.TenantDirectory;
@@ -98,16 +99,26 @@ public class StudioDemo {
         return content.languages();
     }
 
-    public Set<String> languages(DemoContent.Demo demo) {
-        return content.languages(demo);
+    public Set<String> languages(SeedSource source) {
+        return content.languages(source);
     }
 
     public boolean supports(String language) {
         return content.supports(language);
     }
 
-    public boolean supports(DemoContent.Demo demo, String language) {
-        return content.supports(demo, language);
+    public boolean supports(SeedSource source, String language) {
+        return content.supports(source, language);
+    }
+
+    /** {@link DemoContent#check}: what keeps the seed out of a website in {@code language}. */
+    public List<String> check(SeedSource source, String language) {
+        return content.check(source, language);
+    }
+
+    /** The seed itself, as {@link DemoContent} reads it. */
+    public DemoContent.Seed seed(SeedSource source) {
+        return content.seed(source);
     }
 
     /** The languages demo content is written in, named in {@code locale}: "English", «английски». */
@@ -115,8 +126,8 @@ public class StudioDemo {
         return languageNames(DemoContent.Demo.JOURNAL, locale);
     }
 
-    public String languageNames(DemoContent.Demo demo, Locale locale) {
-        return languages(demo).stream().sorted()
+    public String languageNames(SeedSource source, Locale locale) {
+        return languages(source).stream().sorted()
                 .map(code -> Locale.forLanguageTag(code).getDisplayLanguage(locale))
                 .collect(Collectors.joining(", "));
     }
@@ -130,8 +141,8 @@ public class StudioDemo {
         return install(DemoContent.Demo.JOURNAL, website);
     }
 
-    /** {@link #install(Website)}, of the demo named. */
-    public Outcome install(DemoContent.Demo demo, Website website) {
+    /** {@link #install(Website)}, of the seed named: a demo, or a folder's ({@code --seed-dir}). */
+    public Outcome install(SeedSource demo, Website website) {
         return TenantContext.callAs(TenantDirectory.tenantOf(website), () -> {
             SiteSeedStep.Website about = new SiteSeedStep.Website(website.getId(), website.getName(),
                     website.getDefaultLanguage());
@@ -144,7 +155,7 @@ public class StudioDemo {
                 outcome = new Outcome(result, 0, e.getMessage());
             }
             try {
-                brand(content.seed(demo));
+                brand(demo, content.seed(demo), website.getName());
             } catch (java.io.IOException | DataAccessException | IllegalStateException e) {
                 // The articles and the bookings stand without a favicon of their own.
                 log.error("Demo brand files for website {} were not written: {}", website.getId(), e.getMessage());
@@ -156,7 +167,7 @@ public class StudioDemo {
         });
     }
 
-    private Outcome promotions(DemoContent.Demo demo, DemoContent.Result result, Website website) throws MediaException {
+    private Outcome promotions(SeedSource demo, DemoContent.Result result, Website website) throws MediaException {
         DemoContent.Seed full = content.seed(demo);
         DemoContent.Promotions seed = full.getPromotions();
         if (seed == null && full.getPartners().isEmpty()) {
@@ -175,7 +186,7 @@ public class StudioDemo {
         int written = 0;
 
         if (seed == null) {
-            return new Outcome(result, partners(full, origin), null);
+            return new Outcome(result, partners(demo, full, origin), null);
         }
         DemoContent.PromotionSeed image = seed.getImage();
         if (image != null) {
@@ -242,7 +253,7 @@ public class StudioDemo {
      * <p>A creative links the advertiser's page on the website itself ({@code /p/<slug>}); an image
      * booking's target is that page's absolute address, as a target must be.
      */
-    private int partners(DemoContent.Seed seed, String origin) throws MediaException {
+    private int partners(SeedSource source, DemoContent.Seed seed, String origin) throws MediaException {
         int written = 0;
         for (DemoContent.PartnerSeed partner : seed.getPartners()) {
             boolean html5 = partner.getBookings().stream().anyMatch(b -> BannerType.HTML5.name().equals(b.getType()));
@@ -252,7 +263,7 @@ public class StudioDemo {
             }
             if (html5) {
                 layoutService.importArchive(partner.getId(), partner.getName(),
-                        new GeneratedFile(partner.getId() + ".zip", "application/zip", archive(seed, partner)));
+                        new GeneratedFile(partner.getId() + ".zip", "application/zip", archive(source, seed, partner)));
             }
             for (DemoContent.BookingSeed booking : partner.getBookings()) {
                 BannerForm form = new BannerForm();
@@ -271,7 +282,7 @@ public class StudioDemo {
                     form.setAltText(booking.getAlt());
                     Integer id = bannerService.create(form).getId();
                     String name = booking.getImage().substring(booking.getImage().lastIndexOf('/') + 1);
-                    bannerService.uploadCreative(id, new GeneratedFile(name, "image/jpeg", DemoPhotos.read(booking.getImage())));
+                    bannerService.uploadCreative(id, new GeneratedFile(name, pictureType(name), source.read(booking.getImage())));
                 }
                 written++;
             }
@@ -280,32 +291,23 @@ public class StudioDemo {
     }
 
     /**
-     * An advertiser's folder as a ZIP, built in memory: its files from the classpath, and the demo
-     * photographs it names, cut to 1200x800 -- the creatives are at most a leaderboard's width.
+     * An advertiser's folder as a ZIP, built in memory: its files from the seed's source, and the
+     * seed's photographs it names, cut to 1200x800 -- the creatives are at most a leaderboard's width.
      */
-    static byte[] archive(DemoContent.Seed seed, DemoContent.PartnerSeed partner) {
+    static byte[] archive(SeedSource source, DemoContent.Seed seed, DemoContent.PartnerSeed partner) {
         String base = partner.getFolder().endsWith("/") ? partner.getFolder() : partner.getFolder() + "/";
         java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
         try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(out)) {
-            for (org.springframework.core.io.Resource resource : new org.springframework.core.io.support
-                    .PathMatchingResourcePatternResolver().getResources("classpath*:" + base + "**")) {
-                String url = resource.getURL().toString();
-                int at = url.lastIndexOf(base);
-                String name = at < 0 ? "" : url.substring(at + base.length());
-                if (name.isEmpty() || name.endsWith("/") || !resource.isReadable()) {
-                    continue;
-                }
+            for (String name : source.files(base)) {
                 zip.putNextEntry(new java.util.zip.ZipEntry(name));
-                try (java.io.InputStream in = resource.getInputStream()) {
-                    in.transferTo(zip);
-                }
+                zip.write(source.read(base + name));
                 zip.closeEntry();
             }
             for (java.util.Map.Entry<String, String> photo : partner.getPhotos().entrySet()) {
                 DemoContent.ImageSeed image = seed.getImages().stream().filter(i -> i.getKey().equals(photo.getValue()))
                         .findFirst().orElseThrow(() -> new IllegalStateException("No demo picture " + photo.getValue()));
                 zip.putNextEntry(new java.util.zip.ZipEntry(photo.getKey()));
-                zip.write(DemoImages.jpeg(DemoPhotos.frame(DemoPhotos.read(image.getPhoto()), 1200, 800,
+                zip.write(DemoImages.jpeg(DemoPhotos.frame(source.read(image.getPhoto()), 1200, 800,
                         image.getFocusX(), image.getFocusY()), 300 * 1024));
                 zip.closeEntry();
             }
@@ -315,13 +317,29 @@ public class StudioDemo {
         return out.toByteArray();
     }
 
+    /** A picture file's type, by its extension: what an upload of it would say. */
+    static String pictureType(String name) {
+        String lower = name.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".png")) {
+            return "image/png";
+        }
+        if (lower.endsWith(".webp")) {
+            return "image/webp";
+        }
+        if (lower.endsWith(".gif")) {
+            return "image/gif";
+        }
+        return "image/jpeg";
+    }
+
     /**
-     * The website's favicon and share picture, into its own storage ({@code /assets/brand/}, which
-     * the site serves): the favicon only while the website still shows the platform's, the share
-     * picture only while it has none. A website's settings have no studio screen, so these are the
-     * demo's to fill.
+     * The website's favicon, logos and share picture, into its own storage ({@code /assets/brand/},
+     * which the site serves): the favicon only while the website still shows the platform's, a
+     * logo and the share picture only while it has none -- and the logos only for a website of
+     * the name they spell ({@code logoName}), when the seed says one. A website's settings have no
+     * studio screen, so these are the seed's to fill.
      */
-    void brand(DemoContent.Seed seed) throws java.io.IOException {
+    void brand(SeedSource source, DemoContent.Seed seed, String websiteName) throws java.io.IOException {
         DemoContent.BrandSeed brand = seed.getBrand();
         if (brand == null || siteSettings == null || storageRoot == null || storageRoot.isBlank()) {
             return;
@@ -331,24 +349,43 @@ public class StudioDemo {
                 .orElseGet(io.pacod.cms.core.data.SiteSettings::new);
         boolean changed = false;
         if (brand.getFavicon() != null && (settings.getFavicon() == null || PLATFORM_FAVICON.equals(settings.getFavicon()))) {
-            java.nio.file.Files.createDirectories(folder);
-            java.nio.file.Files.write(folder.resolve("favicon.svg"), DemoPhotos.read(brand.getFavicon()));
-            settings.setFavicon("/assets/brand/favicon.svg");
+            settings.setFavicon(store(folder, "favicon", brand.getFavicon(), source.read(brand.getFavicon())));
             changed = true;
         }
-        if (brand.getShare() != null && (settings.getOgImage() == null || settings.getOgImage().isBlank())) {
-            DemoContent.ImageSeed image = seed.getImages().stream().filter(i -> i.getKey().equals(brand.getShare()))
-                    .findFirst().orElseThrow(() -> new IllegalStateException("No demo picture " + brand.getShare()));
-            java.nio.file.Files.createDirectories(folder);
-            java.nio.file.Files.write(folder.resolve("share.jpg"), DemoImages.jpeg(DemoPhotos.frame(
-                    DemoPhotos.read(image.getPhoto()), 1200, 630, image.getFocusX(), image.getFocusY()), 400 * 1024));
-            settings.setOgImage("/assets/brand/share.jpg");
+        boolean named = brand.getLogoName() == null || brand.getLogoName().equals(websiteName);
+        if (named && brand.getLogoLight() != null && (settings.getLogoLight() == null || settings.getLogoLight().isBlank())) {
+            settings.setLogoLight(store(folder, "logo-light", brand.getLogoLight(), source.read(brand.getLogoLight())));
+            String dark = brand.getLogoDark() != null ? brand.getLogoDark() : brand.getLogoLight();
+            settings.setLogoDark(store(folder, "logo-dark", dark, source.read(dark)));
+            changed = true;
+        }
+        if ((brand.getShare() != null || brand.getShareFile() != null)
+                && (settings.getOgImage() == null || settings.getOgImage().isBlank())) {
+            byte[] share;
+            if (brand.getShareFile() != null) {
+                share = DemoImages.jpeg(DemoPhotos.frame(source.read(brand.getShareFile()), 1200, 630, 0.5, 0.5), 400 * 1024);
+            } else {
+                DemoContent.ImageSeed image = seed.getImages().stream().filter(i -> i.getKey().equals(brand.getShare()))
+                        .findFirst().orElseThrow(() -> new IllegalStateException("No demo picture " + brand.getShare()));
+                share = DemoImages.jpeg(DemoPhotos.frame(source.read(image.getPhoto()), 1200, 630,
+                        image.getFocusX(), image.getFocusY()), 400 * 1024);
+            }
+            settings.setOgImage(store(folder, "share", "share.jpg", share));
             changed = true;
         }
         if (changed) {
             settings.setLastModifiedOn(java.time.LocalDateTime.now());
             siteSettings.save(settings);
         }
+    }
+
+    /** A brand file, named {@code name} plus the extension of the seed's file; its public path. */
+    private static String store(java.nio.file.Path folder, String name, String seedPath, byte[] bytes) throws java.io.IOException {
+        String file = name + (seedPath.toLowerCase(Locale.ROOT).endsWith(".png") ? ".png"
+                : seedPath.toLowerCase(Locale.ROOT).endsWith(".svg") ? ".svg" : ".jpg");
+        java.nio.file.Files.createDirectories(folder);
+        java.nio.file.Files.write(folder.resolve(file), bytes);
+        return "/assets/brand/" + file;
     }
 
     /** The seed's text with the website's name where it says {@value DemoContent#NAME}. */

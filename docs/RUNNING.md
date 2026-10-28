@@ -332,6 +332,22 @@ make seed SITE=acme DEMO=space   # Space travels
 It is written only into a website **without articles**, whose content language is English, and it
 is rerunnable: a run that stopped halfway is finished by running it again.
 
+**A seed of your own** -- a website's first articles, pages, menus, layouts, theme, advertisers and
+brand files, kept in another repository -- is a folder holding a `seed.json` in the demos' shape and
+the files it names by relative path. Check it, then create the website from it, or give it to an
+empty one:
+
+```bash
+make seed-check SEED_DIR=../pacod-web/build/seed [LANGUAGE=en]   # every problem, nothing written
+make site-create SLUG=pacod NAME=PACOD HOSTS=pacod.localhost SEED_DIR=../pacod-web/build/seed
+make seed SITE=pacod SEED_DIR=../pacod-web/build/seed
+```
+
+The folder is mounted read-only; its files must be readable by everyone. A seed with any problem is
+refused before anything is written, and its layouts choose the template set unless `TEMPLATE=` names
+another. Like the demos, it is written once, into a website without articles; afterwards the
+website is edited in the studio.
+
 **A website's standing pages** (About, Contact, Terms…) come from a seed when the website is
 created. `make reseed-pages SITE=<id>` rebuilds them from a changed seed. It backs the pages up
 first, only reports until `APPLY=1`, and outside dev also needs `CONFIRM=<env>`. Undo it with

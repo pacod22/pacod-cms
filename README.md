@@ -74,6 +74,7 @@ admin needs the studio's provisioner account in pacod-id, which `make up` create
 make site-create SLUG=acme NAME="Acme News" HOSTS=acme.localhost DEMO=1   # with the demo content
 make site-create SLUG=notes NAME="Notes" HOSTS=notes.localhost TEMPLATE=minimal
 make seed SITE=acme                # the demo content into a website that has no articles yet
+make seed SITE=acme SEED_DIR=…     # or a seed of your own, from a folder (docs/RUNNING.md)
 ```
 
 The demo content is written in English, so it is offered only to a website whose content language

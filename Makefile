@@ -88,8 +88,11 @@ confirm = $(if $(filter dev,$(ENV)),,$(if $(filter $(ENV),$(CONFIRM)),,$(error $
 need = $(if $($(1)),,$(error $(1) is not set$(if $(2),: $(2))))
 # A studio run without a web server, bootstrap, pacod-id or jobs, against the stack's MongoDB. Its log
 # is the terminal: its file stays inside the throwaway container, never beside the running studio's
-# cms-studio.log, which two processes would roll over each other.
-STUDIO_CLI = $(COMPOSE) run --rm --no-deps -T cms-studio --spring.main.web-application-type=none \
+# cms-studio.log, which two processes would roll over each other. SEED_DIR, a folder on this machine
+# holding a seed.json and the files it names, is mounted read-only at /seed; the image runs as `app`,
+# so its files must be readable by everyone.
+STUDIO_CLI = $(COMPOSE) run --rm --no-deps -T $(if $(SEED_DIR),-v "$(abspath $(SEED_DIR)):/seed:ro") cms-studio \
+	--spring.main.web-application-type=none \
 	--pacod.bootstrap.enabled=false --pacod.id.enabled=false --pacod.jobs.runner.enabled=false \
 	--logging.level.root=WARN --logging.level.io.pacod.cms.studio.site=INFO --app.log.dir=/tmp/logs
 # $(call MONGO_ROOT,exec-flags,tool): mongosh or mongorestore inside the cms-mongo container, as
@@ -131,15 +134,25 @@ status: ## The environment, its containers and its addresses
 	@$(MAKE) --no-print-directory urls
 
 ##@ Content
-.PHONY: site-create seed reseed-pages reseed-pages-restore restore mongo
-site-create: ## Create a website: SLUG=acme NAME="Acme News" HOSTS=acme.localhost [LANGUAGE= ORG=org_… TEMPLATE=minimal DEMO=1|space]
-	@test -n "$(SLUG)" -a -n "$(HOSTS)" || { echo 'usage: make site-create SLUG=acme NAME="Acme News" HOSTS=acme.example.net[,www.acme.example.net] [LANGUAGE=en] [ORG=org_…] [TEMPLATE=minimal] [DEMO=1|space]'; exit 2; }
-	$(STUDIO_CLI) --create-site --site-id="$(SLUG)" --site-name="$(or $(NAME),$(SLUG))" --hosts="$(HOSTS)" \
-		--language="$(or $(LANGUAGE),en)" $(if $(ORG),--org-id="$(ORG)") $(if $(TEMPLATE),--template-set="$(TEMPLATE)") $(if $(DEMO),--demo="$(DEMO)")
+.PHONY: site-create seed seed-check reseed-pages reseed-pages-restore restore mongo
+# $(seed-dir-check): refuses a SEED_DIR without a seed.json before a container is started for it.
+seed-dir-check = $(if $(SEED_DIR),@test -f "$(SEED_DIR)/seed.json" || { echo 'SEED_DIR=$(SEED_DIR) holds no seed.json'; exit 2; })
 
-seed: ## Give a website the demo content (SITE=<id>; dev/stage: demo) [DEMO=space] -- only one without articles
+site-create: ## Create a website: SLUG=acme NAME="Acme News" HOSTS=acme.localhost [LANGUAGE= ORG=org_… TEMPLATE=minimal DEMO=1|space | SEED_DIR=<folder>]
+	@test -n "$(SLUG)" -a -n "$(HOSTS)" || { echo 'usage: make site-create SLUG=acme NAME="Acme News" HOSTS=acme.example.net[,www.acme.example.net] [LANGUAGE=en] [ORG=org_…] [TEMPLATE=minimal] [DEMO=1|space | SEED_DIR=<folder>]'; exit 2; }
+	$(seed-dir-check)
+	$(STUDIO_CLI) --create-site --site-id="$(SLUG)" --site-name="$(or $(NAME),$(SLUG))" --hosts="$(HOSTS)" \
+		--language="$(or $(LANGUAGE),en)" $(if $(ORG),--org-id="$(ORG)") $(if $(TEMPLATE),--template-set="$(TEMPLATE)") $(if $(DEMO),--demo="$(DEMO)") $(if $(SEED_DIR),--seed-dir=/seed)
+
+seed: ## Give a website the demo content (SITE=<id>; dev/stage: demo) [DEMO=space | SEED_DIR=<folder>] -- only one without articles
 	$(call need,SITE,make seed SITE=<website id>)
-	$(STUDIO_CLI) --seed-demo --site-id="$(SITE)" $(if $(DEMO),--demo="$(DEMO)")
+	$(seed-dir-check)
+	$(STUDIO_CLI) --seed-demo --site-id="$(SITE)" $(if $(DEMO),--demo="$(DEMO)") $(if $(SEED_DIR),--seed-dir=/seed)
+
+seed-check: ## Check a seed folder without writing anything: SEED_DIR=<folder> [LANGUAGE=en]
+	$(call need,SEED_DIR,make seed-check SEED_DIR=<folder holding seed.json>)
+	$(seed-dir-check)
+	$(STUDIO_CLI) --seed-check --seed-dir=/seed --language="$(or $(LANGUAGE),en)"
 
 reseed-pages: ## Rebuild a website's standing pages from the seed (SITE=<id>); reports unless APPLY=1
 	$(call need,SITE,make reseed-pages SITE=<website id>)

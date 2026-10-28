@@ -86,4 +86,21 @@ class DemoPhotosTest {
         assertThat(share.getWidth()).isEqualTo(1200);
         assertThat(share.getHeight()).isEqualTo(630);
     }
+
+    @Test
+    @DisplayName("padded, a portrait picture is shown whole in the rule's shape, on its background")
+    void padKeepsTheWholePicture() throws IOException {
+        java.io.ByteArrayOutputStream png = new java.io.ByteArrayOutputStream();
+        ImageIO.write(FolderSeed.screenshot(), "png", png);
+        BufferedImage image = read(DemoPhotos.pad(png.toByteArray(), 600, 400, true, 400 * 1024, DemoPhotos.colour("#000000")));
+        assertThat(image.getWidth()).isEqualTo(900);
+        assertThat(image.getHeight()).isEqualTo(600);
+        assertThat(new java.awt.Color(image.getRGB(5, 300)).getRed()).as("the padding").isLessThan(40);
+        assertThat(new java.awt.Color(image.getRGB(450, 2)).getRed()).as("the picture's own frame").isGreaterThan(200);
+        // A wide one is padded above and below instead, and one already in shape is left as it is.
+        BufferedImage wide = read(DemoPhotos.pad(PHOTO, 600, 600, true, 0, DemoPhotos.colour("#ffffff")));
+        assertThat(wide.getWidth()).isEqualTo(wide.getHeight()).isEqualTo(1500);
+        assertThat(read(DemoPhotos.pad(PHOTO, 600, 400, true, 0, java.awt.Color.WHITE)).getWidth()).isEqualTo(1500);
+        assertThatThrownBy(() -> DemoPhotos.colour("green")).isInstanceOf(IllegalArgumentException.class);
+    }
 }

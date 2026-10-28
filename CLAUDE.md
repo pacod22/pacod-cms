@@ -1606,7 +1606,8 @@ outside, no third-party embed. The photographs are real and say whose they are.
   `Demo.of` reads blank, `true` and `1` as the journal and anything unknown as none, refused. The
   methods without a `Demo` (`install(website)`, `seed()`, `languages()`, …) are the journal's.
   **`--create-site --demo=space` without `--template-set` makes a magazine website**
-  (`CreateSiteCommand.forDemo`), as the bootstrap does; the new-website form stays explicit.
+  (`CreateSiteCommand.forSet`), as the bootstrap does, and so does `--seed-dir` with a seed whose
+  `layoutSet` is magazine; the new-website form stays explicit.
 - **Written only when asked**: the new-website form's checkbox, `--create-site --demo`
   (`make site-create … DEMO=1|space`), `--seed-demo --site-id=` (`SeedDemoCommand`, what `make seed` runs
   in a one-off studio container), and `PlatformBootstrap`'s demo website. **Not a `SiteSeedStep`**,
@@ -1660,13 +1661,38 @@ outside, no third-party embed. The photographs are real and say whose they are.
   the website still shows the platform's favicon / has no share image. The magazine set's masthead
   shows the favicon beside the website's name, set in the display face -- no logo files, so a
   website of any name looks right.
+- **A seed of one's own, from a folder** (`--seed-dir`, `make seed SITE=… SEED_DIR=<folder>`,
+  `make site-create … SEED_DIR=<folder>`): `core.seed.SeedSource` is where a seed and every file it
+  names are read -- `Demo` (the classpath) or `DirectorySeed` (`seed.json` at a folder's root, its
+  photographs, creatives and brand files by relative path). The folder is mounted read-only at `/seed`
+  in the one-off studio container; a path is refused when absolute, with a `..`/`.`/empty segment, a
+  backslash or NUL, or reached through a link (`toRealPath()` must equal the resolved path), and a
+  listing skips links and dot-files. The same JSON, read **strictly** (`FAIL_ON_UNKNOWN_PROPERTIES`),
+  plus fields a real website needs: `ArticleSeed.date`/`modified` (absolute, the website's time;
+  wins over `daysAgo`) and `status`, `Seed.imagePrefix` (default `demo-`), `Seed.languages` (Language
+  rows written while absent -- the way to Bulgarian or Russian -- and kept by `narrowLanguages`),
+  `SiteSeed.baseUrl` and the search consoles' ids (written while blank: no screen has them),
+  `ImageSeed.fit: pad` (`DemoPhotos.pad`: a screenshot shown whole on `background` in the rule's
+  shape, never cut), `BrandSeed.shareFile` and logos actually written (only for `logoName`'s website
+  when it is set), `BookingSeed.categories`. **Checked whole before anything is written**
+  (`core.seed.SeedRules`; refused as `Refusal.INVALID` with every problem): references, ids, whole
+  translations, a newer article with a higher id by its effective date, no published article in the
+  future, layouts resolving on their set, a theme `ThemeCss.clean` keeps, menu and link targets the
+  seed has, every file there and decodable, bookable pages and HTML5 heights, bodies without script,
+  frame or handler, a class only a body block's or a code block's `language-*`, a `src` only one of the
+  seed's pictures. **Not** the shipped demos' own choices, which stay in `SeedIntegrityTest`: English
+  only, no outside link, recent dates, every photograph used -- a product site links its
+  repositories. `--seed-check --seed-dir` (`make seed-check SEED_DIR=… [LANGUAGE=en]`) says the same
+  without a website. The new-website form offers the shipped demos only.
 - Tests: `SeedIntegrityTest`, **parameterised over every `Demo`** (references, ids, translations
   -- the journal's at least four --, clean bodies -- a `class` only a `BodyBlocks` one, a `src` only
   a demo picture's --, pages and their links, menus, every layout resolving on its set, issues, a
   picture drawn or a credited 3:2 photograph, every shipped photograph used, a theme
   `ThemeCss.clean` keeps whole), `DemoContentTest` (what is written, refusals, the rerun, photographs
   fitted to a stricter rule, each untouched-only guard, layouts only on their set), `DemoPhotosTest`,
-  `DemoImagesTest` (every motif), `StudioDemoTest` (the advertisers' archives -- every link inside a
+  `DemoImagesTest` (every motif), `DirectorySeedTest`, `SeedRulesTest` (a folder seed passes, each
+  thing broken in it is named), `SeedDemoCommandTest`, `StudioDemoTest` (the shipped demos keep
+  `SeedRules` too; a folder's creatives packed without dot-files; the advertisers' archives -- every link inside a
   page the seed writes, no outside address --, their bookings, the brand files), `CreateSiteCommandTest`,
   `PlatformBootstrapTest` (the fresh install's path; `space` on magazine),
   `PortalWebsitesTest.demoLanguageIsCheckedFirst`, `PortalScreensTest`'s demo cases, and

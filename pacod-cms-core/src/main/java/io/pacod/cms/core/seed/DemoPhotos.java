@@ -66,9 +66,37 @@ public final class DemoPhotos {
         BufferedImage image = rgb(decode(photo));
         if (dimensionCheck) {
             image = cropToShape(image, minWidth, minHeight, focusX, focusY);
-            if (image.getWidth() < minWidth) {
-                image = scale(image, minWidth, minHeight);
-            }
+        }
+        return encode(image, minWidth, minHeight, dimensionCheck, maxBytes);
+    }
+
+    /**
+     * {@link #fit}, but the photograph is shown whole: set in the middle of a frame of the rule's
+     * shape, on {@code background}, where {@code fit} would cut it to that shape. For a screenshot,
+     * whose edges are its menus and buttons.
+     */
+    public static byte[] pad(byte[] photo, int minWidth, int minHeight, boolean dimensionCheck, long maxBytes,
+                             java.awt.Color background) {
+        BufferedImage image = rgb(decode(photo));
+        if (dimensionCheck) {
+            image = padToShape(image, minWidth, minHeight, background);
+        }
+        return encode(image, minWidth, minHeight, dimensionCheck, maxBytes);
+    }
+
+    /** A {@code #rrggbb} colour. */
+    public static java.awt.Color colour(String hex) {
+        if (hex == null || !hex.matches("#[0-9a-fA-F]{6}")) {
+            throw new IllegalArgumentException("Not a #rrggbb colour: " + hex);
+        }
+        return new java.awt.Color(Integer.parseInt(hex.substring(1), 16));
+    }
+
+    /** The picture, now in the rule's shape, at a size and a quality that meet the rules. */
+    private static byte[] encode(BufferedImage shaped, int minWidth, int minHeight, boolean dimensionCheck, long maxBytes) {
+        BufferedImage image = shaped;
+        if (dimensionCheck && image.getWidth() < minWidth) {
+            image = scale(image, minWidth, minHeight);
         }
         int floorWidth = dimensionCheck ? minWidth : Math.min(image.getWidth(), 600);
         BufferedImage current = image;
@@ -156,6 +184,34 @@ public final class DemoPhotos {
         int x = clamp((int) Math.round(focusX * w - cropWidth / 2.0), 0, w - cropWidth);
         int y = clamp((int) Math.round(focusY * h - cropHeight / 2.0), 0, h - cropHeight);
         return image.getSubimage(x, y, cropWidth, cropHeight);
+    }
+
+    /** The smallest frame of the shape {@code shapeWidth:shapeHeight} that holds the whole picture, centred. */
+    private static BufferedImage padToShape(BufferedImage image, int shapeWidth, int shapeHeight, java.awt.Color background) {
+        int w = image.getWidth();
+        int h = image.getHeight();
+        int frameWidth = w;
+        int frameHeight = heightFor(w, shapeWidth, shapeHeight);
+        if (frameHeight < h) {
+            frameHeight = h;
+            frameWidth = (int) Math.ceil((double) h * shapeWidth / shapeHeight);
+            while (!ImageService.fitsShape(frameWidth, frameHeight, shapeWidth, shapeHeight)) {
+                frameWidth++;
+            }
+        }
+        if (frameWidth == w && frameHeight == h) {
+            return image;
+        }
+        BufferedImage out = new BufferedImage(frameWidth, frameHeight, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = out.createGraphics();
+        try {
+            g.setColor(background);
+            g.fillRect(0, 0, frameWidth, frameHeight);
+            g.drawImage(image, (frameWidth - w) / 2, (frameHeight - h) / 2, null);
+        } finally {
+            g.dispose();
+        }
+        return out;
     }
 
     private static int clamp(int value, int min, int max) {

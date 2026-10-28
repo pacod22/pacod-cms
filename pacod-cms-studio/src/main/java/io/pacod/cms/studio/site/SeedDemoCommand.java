@@ -3,6 +3,8 @@ package io.pacod.cms.studio.site;
 import io.pacod.cms.core.control.data.Website;
 import io.pacod.cms.core.control.repository.WebsiteRepository;
 import io.pacod.cms.core.seed.DemoContent;
+import io.pacod.cms.core.seed.DirectorySeed;
+import io.pacod.cms.core.seed.SeedSource;
 import io.pacod.cms.studio.demo.StudioDemo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -14,23 +16,34 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * {@code --seed-demo}: gives an existing website the demo content and exits.
+ * {@code --seed-demo}: gives an existing website the demo content, or a seed of its own, and exits.
  *
  * <pre>
  *   java -jar pacod-cms-studio.jar --spring.main.web-application-type=none --seed-demo --site-id=acme [--demo=space]
+ *   java -jar pacod-cms-studio.jar --spring.main.web-application-type=none --seed-demo --site-id=acme --seed-dir=/seed
+ *   java -jar pacod-cms-studio.jar --spring.main.web-application-type=none --seed-check --seed-dir=/seed [--language=en]
  * </pre>
- * {@code make seed SITE=acme [DEMO=space]} runs it in a one-off studio container; without
- * {@code --demo} it writes the journal ({@link DemoContent.Demo}). It refuses a website that
- * already has articles, or whose content language the demo is not written in, and writes nothing
- * then; a run that stopped halfway is finished by running it again ({@link DemoContent}).
+ * {@code make seed SITE=acme [DEMO=space | SEED_DIR=…]} runs it in a one-off studio container;
+ * without {@code --demo} it writes the journal ({@link DemoContent.Demo}). {@code --seed-dir} names
+ * a folder holding a seed instead ({@link DirectorySeed}), which is checked whole before anything is
+ * written ({@link io.pacod.cms.core.seed.SeedRules}). It refuses a website that already has
+ * articles, or whose content language the seed is not written in, and writes nothing then; a run
+ * that stopped halfway is finished by running it again ({@link DemoContent}).
  *
- * <p>Without {@code --seed-demo} this does nothing, which is every ordinary start.
+ * <p>{@code --seed-check} ({@code make seed-check SEED_DIR=…}) only says what keeps a seed out of a
+ * website in {@code --language}: it needs no website, and writes nothing anywhere.
+ *
+ * <p>Without {@code --seed-demo} or {@code --seed-check} this does nothing, which is every ordinary start.
  */
 @Slf4j
 @Component
 public class SeedDemoCommand implements ApplicationRunner {
 
     static final String OPTION = "seed-demo";
+
+    static final String CHECK = "seed-check";
+
+    static final String SEED_DIR = "seed-dir";
 
     private final WebsiteRepository websites;
     private final StudioDemo demo;
@@ -44,15 +57,24 @@ public class SeedDemoCommand implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (!args.containsOption(OPTION)) {
+        if (!args.containsOption(OPTION) && !args.containsOption(CHECK)) {
             return;
         }
         int status;
         List<String> ids = args.getOptionValues("site-id");
         String id = ids == null || ids.isEmpty() ? null : ids.getFirst();
         Website website = id == null ? null : websites.findById(id).orElse(null);
-        java.util.Optional<DemoContent.Demo> which = demo(args);
-        if (website == null) {
+        java.util.Optional<SeedSource> which;
+        try {
+            which = source(args);
+        } catch (IllegalArgumentException e) {
+            log.error("{}", e.getMessage());
+            System.exit(SpringApplication.exit(context, () -> 2));
+            return;
+        }
+        if (args.containsOption(CHECK)) {
+            status = which.map(source -> check(demo, source, value(args, "language", "en"))).orElse(2);
+        } else if (website == null) {
             log.error("--seed-demo needs --site-id naming a website that exists{}", id == null ? "" : "; there is no " + id);
             status = 2;
         } else if (which.isEmpty()) {
@@ -72,13 +94,41 @@ public class SeedDemoCommand implements ApplicationRunner {
         return DemoContent.Demo.of(values == null || values.isEmpty() ? null : values.getFirst());
     }
 
-    /** Writes the journal; see {@link #install(StudioDemo, DemoContent.Demo, Website)}. */
+    /**
+     * The seed in the folder {@code --seed-dir} names, else {@link #demo}'s.
+     *
+     * @throws IllegalArgumentException when both are given, or the folder does not exist
+     */
+    static java.util.Optional<SeedSource> source(ApplicationArguments args) {
+        String folder = value(args, SEED_DIR, null);
+        if (folder == null) {
+            return demo(args).map(SeedSource.class::cast);
+        }
+        if (args.containsOption("demo")) {
+            throw new IllegalArgumentException("--seed-dir and --demo each name a seed; give one");
+        }
+        return java.util.Optional.of(new DirectorySeed(java.nio.file.Path.of(folder)));
+    }
+
+    /** Says what keeps the seed out of a website in {@code language}; the exit status, 0 when nothing does. */
+    static int check(StudioDemo demo, SeedSource source, String language) {
+        List<String> problems = demo.check(source, language);
+        if (problems.isEmpty()) {
+            log.info("The seed of {} can be written into a website in {}", source.id(), language);
+            return 0;
+        }
+        problems.forEach(problem -> log.error("  {}", problem));
+        log.error("The seed of {} has {} problem(s)", source.id(), problems.size());
+        return 1;
+    }
+
+    /** Writes the journal; see {@link #install(StudioDemo, SeedSource, Website)}. */
     static int install(StudioDemo demo, Website website) {
         return install(demo, DemoContent.Demo.JOURNAL, website);
     }
 
-    /** Writes the demo content and says what happened; the exit status, 0 when it was written. */
-    static int install(StudioDemo demo, DemoContent.Demo which, Website website) {
+    /** Writes the seed and says what happened; the exit status, 0 when it was written. */
+    static int install(StudioDemo demo, SeedSource which, Website website) {
         try {
             StudioDemo.Outcome outcome = demo.install(which, website);
             DemoContent.Result content = outcome.content();
@@ -95,5 +145,10 @@ public class SeedDemoCommand implements ApplicationRunner {
                     website.getId(), e.getMessage());
             return 1;
         }
+    }
+
+    static String value(ApplicationArguments args, String option, String fallback) {
+        List<String> values = args.getOptionValues(option);
+        return values == null || values.isEmpty() || values.getFirst().isBlank() ? fallback : values.getFirst();
     }
 }

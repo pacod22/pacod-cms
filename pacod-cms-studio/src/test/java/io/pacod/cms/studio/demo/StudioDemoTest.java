@@ -249,6 +249,35 @@ class StudioDemoTest {
         assertThat(storage.resolve("sites/gamma/assets/brand")).doesNotExist();
     }
 
+    @Test
+    @DisplayName("a folder's advertiser: its creatives packed from the folder, below it, with no hidden file")
+    void folderAdvertiser(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        java.nio.file.Path folder = java.nio.file.Files.createDirectories(dir.resolve("creatives/pacod-gw/css"));
+        java.nio.file.Files.writeString(folder.resolve("../index.html"), "<a href=\"/p/pacod-gw\">pacod-gw</a>");
+        java.nio.file.Files.writeString(folder.resolve("creative.css"), "a{}");
+        java.nio.file.Files.writeString(folder.resolve("../.DS_Store"), "finder");
+        DemoContent.PartnerSeed partner = new DemoContent.PartnerSeed();
+        partner.setId("pacod-gw");
+        partner.setFolder("creatives/pacod-gw");
+
+        java.util.Map<String, String> files = unzip(StudioDemo.archive(new io.pacod.cms.core.seed.DirectorySeed(dir),
+                new DemoContent.Seed(), partner));
+
+        assertThat(files).containsOnlyKeys("css/creative.css", "index.html");
+        assertThat(files.get("index.html")).contains("/p/pacod-gw");
+        assertThat(StudioDemo.pictureType("still.PNG")).isEqualTo("image/png");
+        assertThat(StudioDemo.pictureType("still.jpg")).isEqualTo("image/jpeg");
+    }
+
+    @Test
+    @DisplayName("the shipped demos pass the rules every seed keeps, their creatives and brand files included")
+    void shippedDemosKeepTheRules() {
+        DemoContent shipped = new DemoContent(null, null, null, null, null, null, null, null, JsonMapper.builder().build());
+        for (DemoContent.Demo seed : DemoContent.Demo.values()) {
+            assertThat(shipped.check(seed, "en")).as(seed.id()).isEmpty();
+        }
+    }
+
     private static java.util.Map<String, String> unzip(byte[] zip) {
         java.util.Map<String, String> files = new java.util.LinkedHashMap<>();
         try (java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(new ByteArrayInputStream(zip))) {
