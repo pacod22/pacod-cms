@@ -879,6 +879,10 @@ a.mz-kicker:hover { color: var(--ink); }
 
     .mz-cover { min-height: min(72vh, 620px); }
     .mz-cover__text { padding-top: 120px; padding-bottom: 44px; }
+    /* The text spans the whole width here, over the picture's busy middle: shade all of it. */
+    .mz-cover::after {
+        background: linear-gradient(180deg, rgba(5, 7, 13, .45) 0%, rgba(5, 7, 13, .7) 45%, rgba(5, 7, 13, .92) 100%);
+    }
 
     .mz-grid, .mz-grid--list, .mz-grid--four { grid-template-columns: minmax(0, 1fr); gap: 36px; }
     .mz-grid--mosaic > .mz-card:first-child { grid-column: auto; grid-row: auto; }
