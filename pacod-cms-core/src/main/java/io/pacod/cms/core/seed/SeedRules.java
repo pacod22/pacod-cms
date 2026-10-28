@@ -53,9 +53,6 @@ public final class SeedRules {
     private static final Pattern LANGUAGE = Pattern.compile("[a-z]{2,3}");
     private static final Pattern COLOUR = Pattern.compile("#[0-9a-fA-F]{6}");
 
-    /** A code block's language, as the editor's code sample writes it on {@code pre} and {@code code}. */
-    private static final Pattern CODE_LANGUAGE = Pattern.compile("language-[a-z0-9+#-]{1,24}");
-
     private static final Pattern SCRIPT = Pattern.compile("<script|javascript:|<iframe|\\son[a-z]+\\s*=",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern CLASSES = Pattern.compile("<([a-zA-Z][a-zA-Z0-9]*)[^>]*?\\sclass=\"([^\"]*)\"");
@@ -273,7 +270,7 @@ public final class SeedRules {
             while (classes.find()) {
                 String element = classes.group(1).toLowerCase(Locale.ROOT);
                 for (String name : classes.group(2).trim().split("\\s+")) {
-                    boolean code = (element.equals("pre") || element.equals("code")) && CODE_LANGUAGE.matcher(name).matches();
+                    boolean code = io.pacod.cms.core.design.CodeBlocks.allowed(element, name);
                     if (!name.isEmpty() && !code && BodyBlocks.byClass(name).isEmpty()) {
                         problem("%s: the class %s is neither a body block nor a code block's language", as, name);
                     }
