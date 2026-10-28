@@ -1039,9 +1039,32 @@
                      'directionality nonbreaking pagebreak insertdatetime codesample importcss',
             toolbar: 'undo redo | blocks | bold italic underline strikethrough | ' +
                      'forecolor backcolor | alignleft aligncenter alignright alignjustify | ' +
-                     'bullist numlist outdent indent | link image media table | ' +
+                     'bullist numlist outdent indent | link image media table codesample | ' +
                      'charmap searchreplace | visualblocks | code preview fullscreen',
             menubar: 'edit view insert format table',
+            // A code sample is stored as <pre class="language-java"><code>…</code></pre>: the class on
+            // the <pre> alone, the code as escaped text. The plugin takes over only a <pre> whose
+            // own class names a language: it highlights it inside the editor and, on save, empties
+            // it and puts the bare text back in a fresh <code>, so a class on that <code> is dropped
+            // (and the fidelity check reports it). A <pre><code class="language-…"> -- Markdown's
+            // shape -- is left as it is: kept and coloured on the site, but a plain <pre> here,
+            // which the code sample dialog does not open. '*[*]' below keeps the classes.
+            // The site highlights these names with its own Prism (site-assets/vendor/prism/), and
+            // HtmlSafety.body keeps the class in AI answers (core.design.CodeBlocks). The values
+            // are Prism's names; the editor's bundled Prism colours only java and python of them,
+            // and shows the rest as plain text.
+            codesample_languages: [
+                {text: 'Shell', value: 'bash'},
+                {text: 'YAML', value: 'yaml'},
+                {text: 'JSON', value: 'json'},
+                {text: 'TOML', value: 'toml'},
+                {text: 'Rust', value: 'rust'},
+                {text: 'Java', value: 'java'},
+                {text: 'Python', value: 'python'},
+                {text: 'TypeScript', value: 'typescript'},
+                {text: 'SQL', value: 'sql'},
+                {text: t('editor.codePlainText'), value: 'plaintext'}
+            ],
             height: 620,
             // Attribution is "appreciated" rather than required under the GPL terms; the console
             // is an internal tool with no room for an upsell button.

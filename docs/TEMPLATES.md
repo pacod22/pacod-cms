@@ -171,6 +171,14 @@ are. **A set that restyles `.article-body` must style every block too**, or bodi
 render as plain paragraphs. Before renaming one, check the name against EasyList, EasyPrivacy and
 the Fanboy lists, as with `partner-`.
 
+A body may also hold **code samples**, `<pre class="language-java"><code>…</code></pre>` as the
+editor's code sample button writes them (the language class on the `pre`; `CodeBlocks` in core
+says which classes are kept). `site.css` styles `pre`, `code` and Prism's `.token` spans under
+`.article-body` from the theme tokens; `print.css` prints them plain. The colours need Prism,
+which `fragments/scripts :: codeHighlight(html)` loads only when `html` holds a `<pre>`: **a set
+that overrides `article.html`, `index.html` or `page.html` includes it** before `siteScripts`,
+with the body it renders (`${article.text}`, `${page.body}`).
+
 ## Writing templates
 
 Thymeleaf runs in **restricted mode**: no `new`, no static calls, no bean references in

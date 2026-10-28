@@ -11,6 +11,7 @@
 :root {
     --print-serif: 'Libertinus Serif', 'Noto Serif', 'Liberation Serif', 'DejaVu Serif', Georgia, serif;
     --print-sans: 'Noto Sans', 'Liberation Sans', 'DejaVu Sans', system-ui, sans-serif;
+    --print-mono: 'DejaVu Sans Mono', 'Liberation Mono', 'Noto Sans Mono', monospace;
 }
 
 @page { size: auto; }
@@ -100,6 +101,34 @@ body.sci { background: #fff; color: #111; }
 .sci-body .body-facts h3 { counter-increment: none; }
 .sci-body .body-facts h3::before { content: none; }
 .sci-body .body-figure figcaption { font: italic 8pt/1.3 var(--print-sans); color: #444; }
+
+/* ------------------------------------------------------------------ code */
+
+/* Both print views. Nothing highlights it here -- Gotenberg prints with scripting off, and these
+   templates do not load Prism -- so code prints plain, in a monospace the image ships, wrapped at
+   the page's or the column's edge rather than cut off there, ruled like the blocks, never filled. */
+.article-body pre {
+    margin: 0.8em 0;
+    padding: 6px 8px;
+    background: none;
+    border: 0.6pt solid #888;
+    border-radius: 0;
+    color: #111;
+    font: 8.5pt/1.4 var(--print-mono);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    overflow: visible;
+}
+.article-body pre code { font: inherit; }
+.article-body :not(pre) > code {
+    padding: 0 0.2em;
+    background: none;
+    border: 0.6pt solid #bbb;
+    color: inherit;
+    font-family: var(--print-mono);
+    overflow-wrap: anywhere;
+}
+.sci-body pre { font-size: 7.5pt; text-align: left; hyphens: none; }
 
 /* ------------------------------------------------------------------ an issue's front matter */
 

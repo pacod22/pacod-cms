@@ -300,6 +300,41 @@ class PublicTemplateRenderTest {
     }
 
     /**
+     * Prism comes only with a body that holds a code sample, on every set and every view that
+     * renders a body -- an article, the latest article, a standing page -- and in manual mode, run
+     * over the body alone. Any other page loads site.js alone ({@link #chromeIsTranslatedOnTheServer}),
+     * so its 34 KB are not every reader's.
+     */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"editorial", "minimal", "magazine"})
+    @DisplayName("The code highlighter loads only where the body holds a <pre>")
+    void codeHighlighterOnlyWithCode(String set) {
+        engine = io.pacod.cms.site.render.TemplateSets.engine(new io.pacod.cms.core.design.TemplateSetCatalog().chain(set),
+                new io.pacod.cms.site.config.ThymeleafConfig().messageSource(), false, List.of());
+        String prism = "<script defer data-manual src=\"/site-assets/vendor/prism/prism.min.js\"></script>";
+        Article withCode = article(7, true, null);
+        withCode.setText("<p>Пуснете:</p><pre class=\"language-bash\"><code>make verify</code></pre>");
+        io.pacod.cms.core.data.Page about = new io.pacod.cms.core.data.Page("about");
+
+        Map<String, String> withPre = Map.of(
+                "article", render("article", Map.of("article", new ArticleModel(withCode, "en", List.of()), "lang", "en")),
+                "index", render("index", Map.of("article", new ArticleModel(withCode, "en", List.of()), "lang", "en", "tags", List.of())),
+                // Older bodies may spell it in capitals.
+                "page", render("page", Map.of("lang", "en", "page", new io.pacod.cms.site.services.PageService.Rendered(
+                        about, "en", false, false, null, "About", "<PRE>make verify</PRE>", null))));
+        withPre.forEach((view, html) -> assertThat(html).as("%s on %s", view, set)
+                .contains(prism, "highlightAllUnder(body)", "class=\"article-body")
+                .containsSubsequence("class=\"article-body", prism, "<script defer src=\"/site-assets/site.js\"></script>"));
+
+        Map<String, String> without = Map.of(
+                "article", render("article", Map.of("article", new ArticleModel(article(7, true, null), "en", List.of()), "lang", "en")),
+                "page", render("page", Map.of("lang", "en", "page", new io.pacod.cms.site.services.PageService.Rendered(
+                        about, "en", false, false, null, "About", "<p>Only <code>inline</code> code, and &lt;pre&gt; as text.</p>", null))));
+        without.forEach((view, html) -> assertThat(html).as("%s on %s", view, set)
+                .doesNotContain("prism", "highlightAllUnder").contains("/site-assets/site.js"));
+    }
+
+    /**
      * Every public template renders in every language the site ships chrome for, with no
      * unresolved key -- Thymeleaf renders a missing one as {@code ??key_xx??} rather than failing,
      * which no other assertion here would notice.

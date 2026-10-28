@@ -50,6 +50,7 @@
 
 
 <th:block th:replace="~{fragments/footer :: footer(${lang})}"></th:block>
+<th:block th:replace="~{fragments/scripts :: codeHighlight(${article.text})}"></th:block>
 <th:block th:replace="~{fragments/scripts :: siteScripts}"></th:block>
 </body>
 </html>

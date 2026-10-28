@@ -9,6 +9,7 @@
     * No jQuery, no component framework, no icon font. site.js is the site's own script for
       readers -- the theme toggle, the mobile nav, the gallery and the bookings' beacons --
       and preview.js loads only in the studio's draft preview (fragments/head :: preview).
+      The one library, Prism, loads only on a page whose body holds code (codeHighlight).
     * No script that re-fetches the landing widgets over AJAX from /web/v1/bycategory/{id}:
       it would overwrite the server-rendered markup, including blanking widgets whose articles
       have no image. Every page is rendered on the server, and must stay that way.
@@ -42,6 +43,31 @@
 
 <th:block th:fragment="siteScripts">
     <script defer src="/site-assets/site.js"></script>
+</th:block>
+
+<!--/* Syntax colours for the code samples in a body (<pre class="language-java"><code>, as the
+       studio's editor stores them), on a page whose body has a <pre> and on no other: Prism,
+       vendored in /site-assets/vendor/prism/ (VENDORED.md there), 34 KB the other pages do not
+       load. html is the body as stored -- article.text, page.body.
+
+       data-manual keeps Prism from highlighting the whole document by itself; the listener runs it
+       over the .article-body alone. DOMContentLoaded fires after every deferred script has run, so
+       Prism is there whichever of this block and siteScripts comes first. The colours are
+       site.css's (.article-body .token), from the theme's tokens. A print view includes neither:
+       Gotenberg prints with scripting off, and print.css prints the code plain. */-->
+<th:block th:fragment="codeHighlight(html)">
+    <th:block th:if="${html != null and #strings.containsIgnoreCase(html, '<pre')}">
+        <script defer data-manual src="/site-assets/vendor/prism/prism.min.js"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                if (window.Prism) {
+                    document.querySelectorAll('.article-body').forEach(function (body) {
+                        window.Prism.highlightAllUnder(body);
+                    });
+                }
+            });
+        </script>
+    </th:block>
 </th:block>
 </body>
 </html>

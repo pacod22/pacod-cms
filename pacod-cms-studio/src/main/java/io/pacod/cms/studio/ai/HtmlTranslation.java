@@ -19,8 +19,14 @@ import java.util.TreeMap;
 /**
  * Whether a translation the model wrote may be stored: it must have exactly its source's
  * skeleton. Same elements in the same order, the same attributes with the same values, the same
- * script and style content, the same comments. Only the text between tags, and the values of the
- * few attributes that are words ({@link #TRANSLATABLE}), may differ.
+ * script and style content, the same comments, and the same code: the text of every
+ * {@code <pre>} and {@code <code>} ({@link #CODE}), whitespace included. Only the other text
+ * between tags, and the values of the few attributes that are words ({@link #TRANSLATABLE}), may
+ * differ.
+ *
+ * <p>Code is held to its source because a model asked to translate an article will also translate
+ * what reads like words in a code sample -- a comment, a string, an identifier -- and a command
+ * that no longer runs is worse than an untranslated one.
  *
  * <p>So a model can add nothing executable the source did not already have -- no
  * {@code <script>}, no {@code on*}, no changed {@code href} or {@code src} -- whatever a body's
@@ -33,6 +39,9 @@ public final class HtmlTranslation {
 
     /** Attribute values that are words a reader sees or hears, and so are translated. */
     static final Set<String> TRANSLATABLE = Set.of("alt", "title", "aria-label", "placeholder");
+
+    /** The elements whose text is code, kept exactly: a code sample, and code within a sentence. */
+    static final Set<String> CODE = Set.of("pre", "code");
 
     private HtmlTranslation() {
     }
@@ -74,10 +83,16 @@ public final class HtmlTranslation {
         return document;
     }
 
-    /** Everything but the translatable: elements, attributes, script and style data, comments. */
+    /**
+     * Everything but the translatable: elements, attributes, script and style data, comments, and
+     * the whole text of each outermost {@code pre} or {@code code}.
+     */
     static List<String> skeleton(Document document) {
         List<String> parts = new ArrayList<>();
         document.body().traverse(new NodeVisitor() {
+            /** How many pre and code elements the visit is inside; their text is counted once, by the outermost. */
+            private int inCode;
+
             @Override
             public void head(Node node, int depth) {
                 if (depth == 0) {
@@ -90,6 +105,9 @@ public final class HtmlTranslation {
                         attributes.put(name, TRANSLATABLE.contains(name) ? "*" : attribute.getValue());
                     }
                     parts.add("<" + element.normalName() + attributes);
+                    if (CODE.contains(element.normalName()) && inCode++ == 0) {
+                        parts.add("code:" + element.wholeText());
+                    }
                 } else if (node instanceof DataNode data) {
                     parts.add("data:" + data.getWholeData());
                 } else if (node instanceof Comment comment) {
@@ -101,6 +119,9 @@ public final class HtmlTranslation {
             public void tail(Node node, int depth) {
                 if (depth > 0 && node instanceof Element element) {
                     parts.add("</" + element.normalName());
+                    if (CODE.contains(element.normalName())) {
+                        inCode--;
+                    }
                 }
             }
         });

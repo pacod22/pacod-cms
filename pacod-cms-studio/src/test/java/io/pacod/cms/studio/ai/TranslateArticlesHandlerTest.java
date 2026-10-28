@@ -117,6 +117,47 @@ class TranslateArticlesHandlerTest {
         verify(writer, never()).put(anyInt(), anyString(), any(), any(), any());
     }
 
+    /** Answers every call with the user's message, its words replaced by {@code words}. */
+    private void translateWith(Map<String, String> words) {
+        when(gateway.complete(any())).thenAnswer(i -> {
+            AiGateway.Call call = i.getArgument(0);
+            String text = call.user();
+            for (Map.Entry<String, String> word : words.entrySet()) {
+                text = text.replace(word.getKey(), word.getValue());
+            }
+            return new AiGateway.Answer(json.readTree(json.writeValueAsString(Map.of("text", text))), 0, "gw");
+        });
+    }
+
+    @Test
+    @DisplayName("the model is told to leave code alone, and a body whose code is kept is stored")
+    void codeKeptIsStored() {
+        article.setText("<p>Пуснете:</p><pre class=\"language-bash\"><code>make verify # проверка</code></pre>");
+        translateWith(Map.of("Пуснете", "Run"));
+        JobContext context = context(Map.of("ids", "12", "languages", "de"));
+        handler.run(context);
+
+        ArgumentCaptor<AiGateway.Call> calls = ArgumentCaptor.forClass(AiGateway.Call.class);
+        verify(gateway, times(3)).complete(calls.capture());
+        assertThat(calls.getValue().system()).contains("inside <pre> and <code>", "it is code");
+        verify(writer).put(12, "de", "Добро утро", "Кратко",
+                "<p>Run:</p><pre class=\"language-bash\"><code>make verify # проверка</code></pre>");
+        assertThat(context.failed()).isZero();
+    }
+
+    @Test
+    @DisplayName("an answer that translates the code fails that language, and nothing of it is written")
+    void codeTranslatedFails() {
+        article.setText("<p>Пуснете:</p><pre class=\"language-bash\"><code>make verify # проверка</code></pre>");
+        translateWith(Map.of("Пуснете", "Run", "проверка", "check"));
+        JobContext context = context(Map.of("ids", "12", "languages", "de"));
+        handler.run(context);
+
+        assertThat(context.failed()).isEqualTo(1);
+        assertThat(context.progress().log()).contains("changed its markup or its code");
+        verify(writer, never()).put(anyInt(), anyString(), any(), any(), any());
+    }
+
     @Test
     @DisplayName("a gateway failure fails that language; the job goes on to the next")
     void gatewayFailure() {

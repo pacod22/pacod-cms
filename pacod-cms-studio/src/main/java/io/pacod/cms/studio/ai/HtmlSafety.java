@@ -7,6 +7,7 @@ import org.jsoup.safety.Cleaner;
 import org.jsoup.safety.Safelist;
 
 import io.pacod.cms.core.design.BodyBlocks;
+import io.pacod.cms.core.design.CodeBlocks;
 
 import java.util.HashSet;
 import java.util.Locale;
@@ -26,8 +27,9 @@ import java.util.regex.Pattern;
  * result before it is inserted.
  *
  * <p>An article body ({@link #body}) may also hold the styled blocks of {@link BodyBlocks}: a
- * {@code class} survives only where it names a block on that block's own element, and a
- * {@code div} left with none is unwrapped. Its links, like its images, are the source's: a link to
+ * {@code class} survives only where it names a block on that block's own element, or a code
+ * sample's language on its {@code pre} or {@code code} ({@link CodeBlocks}), and a {@code div}
+ * left with none is unwrapped. Its links, like its images, are the source's: a link to
  * an address the source neither links nor writes out is unwrapped, its text kept -- a model asked
  * to lay out, extend or draft a text has no address of its own to give.
  */
@@ -54,7 +56,9 @@ public final class HtmlSafety {
             .addAttributes("p", "class")
             .addAttributes("div", "class")
             .addAttributes("blockquote", "class")
-            .addAttributes("figure", "class");
+            .addAttributes("figure", "class")
+            .addAttributes("pre", "class")
+            .addAttributes("code", "class");
 
     private HtmlSafety() {
     }
@@ -69,15 +73,16 @@ public final class HtmlSafety {
 
     /**
      * {@code html} cleaned for an article body: {@link #clean}'s allow-list plus the blocks of
-     * {@link BodyBlocks}, every other class removed and a {@code div} without one unwrapped, and a
-     * link kept only to an address {@code source} links or writes out.
+     * {@link BodyBlocks} and the language classes of {@link CodeBlocks}, every other class removed
+     * and a {@code div} without one unwrapped, and a link kept only to an address {@code source}
+     * links or writes out.
      */
     public static String body(String source, String html) {
         Document clean = cleaned(source, html, BODY);
         for (Element element : clean.body().select("[class]")) {
             Set<String> kept = new java.util.LinkedHashSet<>();
             for (String name : element.classNames()) {
-                if (BodyBlocks.allowed(element.normalName(), name)) {
+                if (BodyBlocks.allowed(element.normalName(), name) || CodeBlocks.allowed(element.normalName(), name)) {
                     kept.add(name);
                 }
             }

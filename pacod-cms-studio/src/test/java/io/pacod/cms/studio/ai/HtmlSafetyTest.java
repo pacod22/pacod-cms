@@ -75,8 +75,25 @@ class HtmlSafetyTest {
     }
 
     @Test
+    @DisplayName("a body keeps a code sample's language class on its pre or code, and no other class there")
+    void bodyCodeSamples() {
+        String cleaned = HtmlSafety.body("<p>x</p>", """
+                <pre class="language-rust"><code>fn main() { println!("&lt;hi&gt;"); }</code></pre>
+                <pre><code class="language-bash token">make verify</code></pre>
+                <pre class="language-Rust language-x;y hljs"><code>a</code></pre>
+                <pre class="language-%s"><code>b</code></pre>
+                <p class="language-java">Not code</p>
+                <p>Inline <code class="language-sql" style="color:red">select 1</code></p>""".formatted("a".repeat(25)));
+        assertThat(cleaned).contains("<pre class=\"language-rust\"><code>fn main() { println!(\"&lt;hi&gt;\"); }</code></pre>",
+                        "<pre><code class=\"language-bash\">make verify</code></pre>", "<pre><code>a</code></pre>",
+                        "<pre><code>b</code></pre>", "<p>Not code</p>", "<code class=\"language-sql\">select 1</code>")
+                .doesNotContain("token", "hljs", "Rust", "x;y", "style", "<p class");
+    }
+
+    @Test
     @DisplayName("the plain allow-list still takes no blocks")
     void cleanTakesNoBlocks() {
         assertThat(HtmlSafety.clean("", "<div class=\"body-callout\"><p>x</p></div>")).isEqualTo("<p>x</p>");
+        assertThat(HtmlSafety.clean("", "<pre class=\"language-java\"><code>x</code></pre>")).isEqualTo("<pre><code>x</code></pre>");
     }
 }

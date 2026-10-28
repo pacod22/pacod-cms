@@ -14,6 +14,8 @@ import java.util.Set;
  * class goes. The names begin {@code body-} and were checked against EasyList, EasyPrivacy and both
  * Fanboy lists, which hide generic names such as {@code .body-ad} and site-specific
  * {@code .callout}s -- grep all four before renaming one.
+ *
+ * <p>A code sample's {@code language-…} class is not a block: it is {@link CodeBlocks}'.
  */
 public enum BodyBlocks {
 

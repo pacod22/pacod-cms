@@ -1059,6 +1059,18 @@ an iframe), claiming only `application/x-mgmt-image` drags, positioned through
 `caretRangeFromPoint`/`caretPositionFromPoint` (two spellings; no browser has both). Fullscreen is
 the plugin's; `#editor-fullscreen` exists because the toolbar hides it in its `•••` overflow.
 
+**Code samples are the `codesample` plugin's** (toolbar, beside `table`). `codesample_languages`
+holds Prism's names: `bash` (shown as Shell), `yaml`, `json`, `toml`, `rust`, `java`, `python`,
+`typescript`, `sql`, `plaintext`. The stored shape is
+**`<pre class="language-x"><code>…</code></pre>`, the class on the `pre` alone**, and anything that
+writes bodies (an import, a seed) should write it. The plugin takes over only a `pre` whose own
+class names a language: it highlights it in the editor and, on save, empties it and writes the bare
+text into a fresh `<code>`, so with a class on **both** the `code`'s is dropped on the first open
+(the fidelity check reports it). **`<pre><code class="language-x">`** (Markdown's shape) is left
+verbatim — kept and coloured on the site — but is a plain `pre` in the editor, which the code
+sample dialog does not open. The editor's own Prism (1.25, inside the plugin) colours only `java`
+and `python` of these and shows the rest plain; the site's is its own (*The design system*).
+
 ### The article editor's layout
 
 **One `.editor-grid`, and the `<form>` is not it.** The image, restore and delete cards are their
@@ -1916,6 +1928,10 @@ feature's model is `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, 
     skeleton (jsoup): the same elements in order, the same attributes and values (only `alt`,
     `title`, `aria-label`, `placeholder` may change), and the same script, style and comment data.
     What is stored is jsoup's serialisation of the checked output, never the raw string.
+  - **Code is never translated**: the prompt says to leave `<pre>` and `<code>` as they are, and
+    the skeleton holds the whole text of each outermost `pre` or `code` (`HtmlTranslation.CODE`),
+    whitespace included, so a translated comment, string or reflowed line refuses the answer
+    ("changed its markup or its code"). `TranslateSiteHandler` shares the prompt and the check.
   - A field that was text stays text: an element added there is refused.
   - So a model can add nothing executable a body did not already have. A legacy body keeps its
     tables, `<font>`, `<style>` and YouTube frame, where an allow-list sanitiser would strip them.
@@ -2027,12 +2043,13 @@ feature's model is `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, 
     http, https, mailto or relative. Images survive only where the selection already had the same
     `src`. Never `style`, `on*`, scripts, frames or forms. **`HtmlSafety.body`** (rewrites,
     drafts, writes, layouts) adds `div`, `figure`, `figcaption` and a `class` that names a
-    **`BodyBlocks`** block on that block's own element; every other class goes and a `div` left
-    without one is unwrapped. `clean` (section settings) takes no class at all. **`body` keeps a
-    link only to an address its source gives** — the source's own `href`s, or a web or e-mail
-    address written in its text (case and a trailing `/` ignored, a `mailto:` by its address) — and
-    unwraps any other, keeping its text. The source is the passage, the brief (a draft), or the
-    brief plus the article (a write), so a model has no address of its own to link.
+    **`BodyBlocks`** block on that block's own element, or a code sample's language on its `pre` or
+    `code` (**`CodeBlocks.isLanguageClass`**, `language-[a-z0-9+#-]{1,24}`); every other class goes
+    and a `div` left without one is unwrapped. `clean` (section settings) takes no class at all.
+    **`body` keeps a link only to an address its source gives** — the source's own `href`s, or a
+    web or e-mail address written in its text (case and a trailing `/` ignored, a `mailto:` by its
+    address) — and unwraps any other, keeping its text. The source is the passage, the brief (a
+    draft), or the brief plus the article (a write), so a model has no address of its own to link.
   - **Drafts and written passages invent nothing**: the prompt allows only the brief's (and the
     body's) facts and asks for a `[placeholder]` where one is missing. A draft is in
     `original()`'s language.
@@ -2121,7 +2138,7 @@ feature's model is `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, 
   - `AiGatewayTest` runs against a local stand-in: headers, the one 429 retry, 402 and 504,
     cut-off, refusal, not-JSON, the ping, a refusal's code and request id;
   - `PortalScreensTest.aiConnectionTest`: the card, both flashes, 403 for an organisation's admin;
-  - `HtmlTranslationTest` runs on a legacy body and injection attempts;
+  - `HtmlTranslationTest` runs on a legacy body, injection attempts and code samples;
   - `TranslateArticlesHandlerTest` and `TranslateSiteHandlerTest` use an echoing gateway, as the
     mock does;
   - `TranslationWriterIT` uses real MongoDB: every id shape (int, slug, name), an absent list, a
@@ -2493,7 +2510,8 @@ The look is one stylesheet, `static/site-assets/site.css`, plus `site.js`, serve
 at `/site-assets/**` by `WebSiteAssetsConfiguration` (not `/assets/`, each website's own files),
 exempt from the host lookup. It maps only `/site-assets/**`, which beats `/**` because
 `SimpleUrlHandlerMapping` picks the most specific pattern. No Bootstrap, jQuery,
-icon font or CDN script. Keep in `site.css`: **`.video-container`** (the responsive-iframe rule
+icon font or CDN script; the one library, Prism, is vendored and loads only where it is needed
+(below). Keep in `site.css`: **`.video-container`** (the responsive-iframe rule
 widgets and articles inject YouTube into), **`.article-body`**'s guards for legacy bodies (inline
 widths, `<font>`, `<style>`, Word markup, tables — a fresh seed will not show them), and real CSS
 rules for every hover state.
@@ -2506,6 +2524,21 @@ them. The studio draws them in the editor from its own `mgmt-assets/body-blocks.
 `BodyBlocksCssTest` fails when either sheet lacks a block. The names were checked against EasyList,
 EasyPrivacy and both Fanboy lists (`.body-ad` and site-specific `.callout`s exist there); grep all
 four before renaming.
+
+**Code samples are coloured by Prism 1.30.0**, vendored in `static/site-assets/vendor/prism/`
+(core and eleven grammars in one file, MIT; `VENDORED.md` there has the source, hashes and the
+rebuild, which runs nothing from the package). **`fragments/scripts :: codeHighlight(html)`** loads
+it only when the body (`article.text`, `page.body`) contains `<pre` (any case) — article, latest
+and standing page on all three sets — with `defer` and `data-manual`, plus an inline
+`DOMContentLoaded` listener that runs `Prism.highlightAllUnder` over each `.article-body`; every
+other page still loads `site.js` alone (`codeHighlighterOnlyWithCode`,
+`chromeIsTranslatedOnTheServer`).
+The colours are `site.css`'s (`.article-body .token.…`, grouped by role; a later group wins for a
+two-name token), all from the theme: `--highlight` keywords, `--faint`/`--muted` comments and
+punctuation, and three fixed hues mixed into `--ink` (`--code-*` on `.article-body`), so night mode
+and themes follow — never `--accent` (a background, dark at night) and never `--font-label` (sans
+on magazine and minimal). `print.css` prints code plain and wrapped (`pre-wrap`, a DejaVu/Liberation
+mono stack, a ruled box): Gotenberg runs no script.
 
 **The article images are a scroll-snap strip (`.gallery`) that `initGallery()` upgrades into a
 carousel.** The template writes the strip only; **the script builds every control** and adds

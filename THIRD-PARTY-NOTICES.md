@@ -22,7 +22,8 @@ restricts the licence of this project. Regenerate the list with:
 | TinyMCE | 8.8.2 | `pacod-cms-studio/src/main/resources/static/mgmt-assets/tinymce/` | GPL-2.0-or-later |
 | TinyMCE language packs (`bg-BG`, `de`, `ru`) | for 8.x | `…/mgmt-assets/tinymce/langs/` | GPL-2.0-or-later, distributed with TinyMCE |
 | DOMPurify | 3.3.2 | inside `tinymce.min.js` | MPL-2.0 OR Apache-2.0 |
-| Prism, prism-themes | 1.25.0, 1.9.0 | inside TinyMCE's `codesample` plugin | MIT |
+| Prism, prism-themes | 1.25.0, 1.9.0 | inside TinyMCE's `codesample` plugin (the studio's editor) | MIT |
+| Prism (core and eleven grammars), the public site's highlighter | 1.30.0 | `pacod-cms-site/src/main/resources/static/site-assets/vendor/prism/`; what is in it and how it was built in `VENDORED.md` there | MIT (`LICENSE.txt` beside it) |
 | Simple Icons | 15.0.0 | brand glyph paths in `pacod-cms-site/src/main/resources/templates/sets/editorial/social.html` | CC0-1.0 |
 | Maven Wrapper | 3.3.4 | `mvnw`, `mvnw.cmd`, `.mvn/wrapper/` | Apache-2.0 |
 | Fraunces (variable, weight axis; Latin, Latin Extended) | 5.3.0 of `@fontsource-variable/fraunces` | `pacod-cms-site/src/main/resources/static/site-assets/fonts/` | SIL OFL 1.1 (`OFL-Fraunces.txt` beside it) |

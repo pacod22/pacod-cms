@@ -391,7 +391,7 @@ public class TranslateSiteHandler implements JobHandler {
             context.addCostMicros(answer.costMicros());
             String translated = answer.json().path("text").asString("");
             return check.apply(text, translated)
-                    .orElseThrow(() -> new TranslateArticlesHandler.Refused("the translation of " + what + " changed its markup; refused"));
+                    .orElseThrow(() -> new TranslateArticlesHandler.Refused("the translation of " + what + " changed its markup or its code; refused"));
         }
     }
 

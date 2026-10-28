@@ -100,12 +100,14 @@ public class WritingAssist {
                     "html", Map.of("type", "string")),
             "required", List.of("title", "description", "html"), "additionalProperties", false);
 
-    /** What the model is told it may write in a body: simple structure, and the blocks. */
+    /** What the model is told it may write in a body: simple structure, the blocks, and the material's code samples. */
     private static final String BODY_MARKUP = "Write simple HTML: <p>, <h2> and <h3> headings, <ul>/<ol> lists, "
             + "<strong>/<em>, <a href> links only to addresses the material gives, simple tables, and where they help the "
             + "reader these styled blocks, "
             + "each with exactly this class and element:\n- " + String.join("\n- ", BodyBlocks.describe())
-            + "\nNo other class, no style attribute, no script, no image that is not already in the material.";
+            + "\nA code sample in the material stays as it is -- <pre class=\"language-java\"><code>…</code></pre> or "
+            + "another language -- its class kept and its code unchanged. No other class, no style attribute, no script, "
+            + "no image that is not already in the material.";
 
     private final AiGateway gateway;
     private final String model;

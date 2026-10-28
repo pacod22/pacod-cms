@@ -49,6 +49,36 @@ class HtmlTranslationTest {
                 .contains("<p>Nutze &lt;b&gt; für Fett</p>");
     }
 
+    /** A body with a code sample, as the editor's codesample plugin stores it, and code within a sentence. */
+    private static final String CODE = """
+            <p>Пуснете проверката:</p>
+            <pre class="language-bash"><code># проверка преди всяко предаване
+            make verify &amp;&amp; echo "готово"</code></pre>
+            <p>или само <code>make test</code>.</p>""";
+
+    @Test
+    @DisplayName("the code is kept exactly while the words around it are translated")
+    void codeIsKept() {
+        String translated = CODE.replace("Пуснете проверката:", "Run the check:").replace("или само", "or just");
+        assertThat(HtmlTranslation.html(CODE, translated)).hasValueSatisfying(html -> assertThat(html)
+                .contains("<p>Run the check:</p>", "<pre class=\"language-bash\"><code># проверка преди всяко предаване\n"
+                        + "make verify &amp;&amp; echo \"готово\"</code></pre>", "<p>or just <code>make test</code>.</p>"));
+        // The same text, spelled with other entities, is the same code.
+        assertThat(HtmlTranslation.html(CODE, translated.replace("&amp;&amp;", "&#38;&#x26;"))).isPresent();
+    }
+
+    @Test
+    @DisplayName("an answer that changes, reflows or reorders code is refused, in a sample or within a sentence")
+    void changedCodeRefused() {
+        assertThat(HtmlTranslation.html(CODE, CODE.replace("# проверка", "# check"))).isEmpty();
+        assertThat(HtmlTranslation.html(CODE, CODE.replace("\"готово\"", "\"done\""))).isEmpty();
+        assertThat(HtmlTranslation.html(CODE, CODE.replace("make test", "make Test"))).isEmpty();
+        assertThat(HtmlTranslation.html(CODE, CODE.replace("предаване\nmake", "предаване make"))).isEmpty();
+        assertThat(HtmlTranslation.html(CODE, CODE.replace("make verify", "make  verify"))).isEmpty();
+        assertThat(HtmlTranslation.html("<pre><code>a</code></pre><pre><code>b</code></pre>",
+                "<pre><code>b</code></pre><pre><code>a</code></pre>")).isEmpty();
+    }
+
     @Test
     @DisplayName("a title that is text stays text, unescaped; one that brings an element is refused")
     void textFields() {

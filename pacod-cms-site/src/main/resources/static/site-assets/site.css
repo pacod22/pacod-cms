@@ -1210,6 +1210,94 @@ a.kicker:hover { background: var(--greenDark); color: var(--onPanel); }
     .article-body .body-pullquote { font-size: 22px; }
 }
 
+/* --- code: a sample (<pre class="language-java"><code>, as the studio's codesample plugin stores
+       it; CodeBlocks in core) and code within a sentence. Prism, loaded only on a page whose body
+       has a <pre> (fragments/scripts :: codeHighlight), wraps the code in .token spans; without it,
+       and in print, the code is simply plain.
+
+       Every colour comes from the theme: keywords are --highlight, comments --faint drawn towards
+       --muted, punctuation --muted, and three fixed hues are mixed into --ink, so they turn dark
+       on a light theme and light on a dark one. Night mode and every theme follow, each role at
+       4.5:1 or better on the code's panel with all three sets' tokens. IBM Plex Mono is the
+       head's (it has Cyrillic); the rest of the stack is what a system has. Not --font-label:
+       magazine and minimal make that sans. --- */
+.article-body {
+    --code-font: 'IBM Plex Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas,
+                 'DejaVu Sans Mono', monospace;
+    --code-bg: color-mix(in srgb, var(--ink) 5%, var(--bg));
+    --code-comment: color-mix(in srgb, var(--faint) 40%, var(--muted));
+    --code-keyword: color-mix(in srgb, var(--highlight) 80%, var(--ink));
+    --code-string: color-mix(in srgb, #2f8a4f 60%, var(--ink));
+    --code-number: color-mix(in srgb, #8a4fd1 60%, var(--ink));
+    --code-name: color-mix(in srgb, #2b6cc4 60%, var(--ink));
+}
+
+.article-body pre {
+    margin: 0 0 22px;
+    padding: 16px 20px;
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font: 400 15px/1.6 var(--code-font);
+    color: var(--ink);
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+    tab-size: 4;
+}
+.article-body pre code { padding: 0; background: none; border: 0; font: inherit; color: inherit; }
+.article-body :not(pre) > code {
+    padding: .1em .35em;
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-family: var(--code-font);
+    font-size: .84em;
+    color: var(--ink);
+}
+
+/* Prism's token names, grouped by role. A later group wins where a token carries two names (a
+   YAML key is "key atrule", a Java annotation "annotation punctuation"), so the order matters. */
+.article-body .token.punctuation,
+.article-body .token.operator,
+.article-body .token.namespace { color: var(--muted); }
+.article-body .token.number,
+.article-body .token.boolean,
+.article-body .token.constant,
+.article-body .token.symbol,
+.article-body .token.variable,
+.article-body .token.entity,
+.article-body .token.date { color: var(--code-number); }
+.article-body .token.string,
+.article-body .token.char,
+.article-body .token.attr-value,
+.article-body .token.regex,
+.article-body .token.url,
+.article-body .token.inserted { color: var(--code-string); }
+.article-body .token.keyword,
+.article-body .token.atrule,
+.article-body .token.rule,
+.article-body .token.important,
+.article-body .token.annotation,
+.article-body .token.decorator,
+.article-body .token.deleted { color: var(--code-keyword); }
+.article-body .token.function,
+.article-body .token.class-name,
+.article-body .token.builtin,
+.article-body .token.property,
+.article-body .token.key,
+.article-body .token.attr-name,
+.article-body .token.tag,
+.article-body .token.selector,
+.article-body .token.table { color: var(--code-name); }
+.article-body .token.comment,
+.article-body .token.prolog,
+.article-body .token.doctype,
+.article-body .token.cdata,
+.article-body .token.shebang { color: var(--code-comment); font-style: italic; }
+.article-body .token.bold { font-weight: 600; }
+.article-body .token.italic { font-style: italic; }
+
 /* --- guards for older markup. Do not remove: article bodies and standing pages may hold
        hand-written or imported HTML with inline widths, <font>, <style> blocks, Word markup
        and tables. --- */
