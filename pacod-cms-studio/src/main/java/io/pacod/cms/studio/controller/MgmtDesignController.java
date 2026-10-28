@@ -272,6 +272,7 @@ public class MgmtDesignController {
         common(model);
         model.addAttribute("editor", layouts.editor(type));
         model.addAttribute("categories", categories.findAll(null, null, null, Map.of()));
+        model.addAttribute("pages", layouts.pageChoices(text.current()));
         model.addAttribute("pageTypeSlug", type.name().toLowerCase(Locale.ROOT));
         return "mgmt/design-layout";
     }

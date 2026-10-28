@@ -1,5 +1,6 @@
 package io.pacod.cms.studio.design;
 
+import io.pacod.cms.core.data.Page;
 import io.pacod.cms.core.design.Layout;
 import io.pacod.cms.core.design.LayoutResolver;
 import io.pacod.cms.core.design.PageType;
@@ -12,6 +13,7 @@ import io.pacod.cms.core.repository.LayoutRepository;
 import io.pacod.cms.core.tenant.Tenant;
 import io.pacod.cms.core.tenant.TenantContext;
 import io.pacod.cms.studio.MgmtOperationException;
+import io.pacod.cms.studio.MgmtPageService;
 import io.pacod.cms.studio.access.StudioPrincipals;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * A website's layouts, as the studio edits them: every change goes to the draft, and readers see
@@ -34,12 +37,22 @@ import java.util.Optional;
 @Service
 public class DesignLayouts {
 
+    /**
+     * The section types design assist is neither offered nor shown, which its draft therefore keeps
+     * as they were, at the end of their regions ({@link #assistDraft}). A page section names one of
+     * the website's pages: offering it would mean handing the model the website's slugs and
+     * holding its answer to them, and a refine it was never shown must not delete one.
+     */
+    public static final Set<SectionType> NOT_ASSISTED = Set.of(SectionType.PAGE);
+
     private final LayoutRepository layouts;
     private final TemplateSetCatalog catalog;
+    private final MgmtPageService pages;
 
-    public DesignLayouts(LayoutRepository layouts, TemplateSetCatalog catalog) {
+    public DesignLayouts(LayoutRepository layouts, TemplateSetCatalog catalog, MgmtPageService pages) {
         this.layouts = layouts;
         this.catalog = catalog;
+        this.pages = pages;
     }
 
     /** The set the bound website renders with. */
@@ -109,6 +122,23 @@ public class DesignLayouts {
                 doc.map(Layout::assistUndoable).orElse(false));
     }
 
+    /**
+     * A standing page as the editor offers it for a page section: its title in the studio's
+     * language when it has one there, else its slug. Every page, published or not -- an
+     * unpublished one shows nothing until it is published.
+     */
+    public record PageChoice(String slug, String label) {
+    }
+
+    public List<PageChoice> pageChoices(String uiLanguage) {
+        List<PageChoice> out = new ArrayList<>();
+        for (Page page : pages.findAll(null)) {
+            String title = page.rawTitle(uiLanguage);
+            out.add(new PageChoice(page.getSlug(), title == null ? page.getSlug() : title));
+        }
+        return out;
+    }
+
     /** The draft: as saved, else what is published, else the set's default -- a copy, never the stored one. */
     public Map<String, List<Section>> draftOf(PageType type) {
         Optional<Layout> doc = layouts.findById(type.name());
@@ -144,7 +174,8 @@ public class DesignLayouts {
     }
 
     /**
-     * New settings for a section, from the form's values.
+     * New settings for a section, from the form's values. A page section must name one of the
+     * website's pages ({@code page:page} otherwise), which {@link SectionSettings} cannot know.
      *
      * @throws MgmtOperationException {@code design.error.settings}, naming the refused fields
      */
@@ -156,6 +187,9 @@ public class DesignLayouts {
             SectionSettings.Result result = SectionSettings.check(sectionType, values);
             if (!result.ok()) {
                 throw new SettingsRefused(result.errors());
+            }
+            if (sectionType == SectionType.PAGE && pages.find((String) result.settings().get("page")).isEmpty()) {
+                throw new SettingsRefused(List.of("page:page"));
             }
             section.setSettings(new LinkedHashMap<>(result.settings()));
         });
@@ -279,8 +313,8 @@ public class DesignLayouts {
      * and their settings, and what the draft was kept for {@link #undoAssist}. A page with content
      * of its own keeps its {@code primary} section -- the one the draft had, id and all -- first
      * in the region it was in, else in the first. Sections the current set cannot render (kept for
-     * a switch back, {@code LayoutResolver}) stay, at the end of their regions: the model was never
-     * shown them.
+     * a switch back, {@code LayoutResolver}) and those of a type design assist is not offered
+     * ({@link #NOT_ASSISTED}) stay, at the end of their regions: the model was never shown them.
      *
      * <p>A person's assist always refills the undo slot; a job ({@code jobId}) refills it unless it
      * is its own, so a job run again from the start still undoes to the draft before its first try.
@@ -295,15 +329,16 @@ public class DesignLayouts {
         List<String> setRegions = set.spec(type).regions();
         Section primary = null;
         String primaryRegion = null;
-        Map<String, List<Section>> unrendered = new LinkedHashMap<>();
+        Map<String, List<Section>> notShown = new LinkedHashMap<>();
         for (Map.Entry<String, List<Section>> region : draft.entrySet()) {
             for (Section section : region.getValue()) {
                 if (SectionType.PRIMARY.id().equals(section.getType())) {
                     primary = section;
                     primaryRegion = region.getKey();
                 } else if (!setRegions.contains(region.getKey())
-                        || SectionType.byId(section.getType()).filter(set::renders).isEmpty()) {
-                    unrendered.computeIfAbsent(region.getKey(), r -> new ArrayList<>()).add(section);
+                        || SectionType.byId(section.getType()).filter(set::renders).isEmpty()
+                        || SectionType.byId(section.getType()).filter(NOT_ASSISTED::contains).isPresent()) {
+                    notShown.computeIfAbsent(region.getKey(), r -> new ArrayList<>()).add(section);
                 }
             }
         }
@@ -314,7 +349,7 @@ public class DesignLayouts {
             Section kept = primary != null ? primary : new Section("primary", SectionType.PRIMARY.id(), Map.of());
             draft.computeIfAbsent(region, r -> new ArrayList<>()).addFirst(kept);
         }
-        unrendered.forEach((region, sections) -> draft.computeIfAbsent(region, r -> new ArrayList<>()).addAll(sections));
+        notShown.forEach((region, sections) -> draft.computeIfAbsent(region, r -> new ArrayList<>()).addAll(sections));
 
         if (jobId == null || !jobId.equals(doc.getBeforeAssistJob())) {
             doc.setBeforeAssist(Layout.copy(before));

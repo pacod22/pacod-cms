@@ -30,7 +30,7 @@ id: notes
 name: Notes
 description: A single column with a quiet sidebar.
 extends: editorial            # optional: what this set does not provide, the parent does
-sections: [primary, article-list, rich-text, call-to-action]
+sections: [primary, article-list, rich-text, call-to-action, page]
 pageTypes:
   HOME:
     regions: [main]
@@ -109,10 +109,11 @@ type** from a closed vocabulary that every set implements or skips:
 | `call-to-action` | `callToAction` | `heading`, `text`, `label`, `url` |
 | `search-box` | `searchBox` | `heading` |
 | `social-links` | `socialLinks` | `heading` |
+| `page` | `standingPage` | `page`: the slug of one of the website's standing pages |
 
 `sections.html` holds one fragment per type the set renders, each taking `(s, lang)`, where `s` is
-a ready `RenderedSection`: its settings (`s.setting('style')`), and for an article list its data
-(`s.data`), already looked up. A page template loops each region over them:
+a ready `RenderedSection`: its settings (`s.setting('style')`), and for an article list or a page
+its data (`s.data`), already looked up. A page template loops each region over them:
 
 ```html
 <th:block th:each="s : ${regions.get('main')}">
@@ -132,6 +133,24 @@ The rules that keep this safe:
   stays in the layout for a set that can.
 - A page with content of its own always gets its `primary` section, at the end of the first region
   if the layout has none.
+
+**A `page` section is a layout's translated text.** A heading, a rich text or a call to action is
+one string; a standing page (`/p/{slug}`) is written per language and translated by the studio's
+jobs. The section shows that page's body in the language `/p/{slug}` would serve the reader (asked
+for, then English, then the website's own), and nothing at all -- not even its region's wrapper --
+for a page that does not exist, is not published or has no body. Its `s.data` is a
+`PageService.Rendered` (`body`, `language`); the shipped sets render it without a title:
+
+```html
+<section class="section section--page" th:lang="${s.data.language}">
+    <div class="article-body" th:utext="${s.data.body}"></div>
+</section>
+```
+
+`.article-body` is what styles the body blocks, so they look as on the page itself. A fragment for
+it must read `s.data`, never `${page}`, which on `/p/{slug}` is the page being viewed. A seed names
+one as `{"type": "page", "settings": {"page": "platform"}}`; the studio offers the website's pages
+to choose from, and refuses a slug that is none of them.
 
 ## Themes
 

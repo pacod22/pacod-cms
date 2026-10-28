@@ -28,7 +28,13 @@ public record SettingField(String name, Kind kind, boolean required, Object defa
         /** A category's numeric id. */
         CATEGORY,
         /** An http(s) address, or one on the website itself ({@code /…}). */
-        URL
+        URL,
+        /**
+         * One of the website's standing pages, by its slug. Only its shape is checked here: whether
+         * the page exists is the studio's to check against the website and a seed's against its own
+         * pages, and the site renders nothing for one that is missing.
+         */
+        PAGE
     }
 
     public SettingField {
@@ -61,5 +67,9 @@ public record SettingField(String name, Kind kind, boolean required, Object defa
 
     static SettingField url(String name, boolean required) {
         return new SettingField(name, Kind.URL, required, null, 0, 2000, List.of());
+    }
+
+    static SettingField page(String name) {
+        return new SettingField(name, Kind.PAGE, true, null, 0, 64, List.of());
     }
 }

@@ -28,11 +28,11 @@ import java.util.Map;
  * <p>The answer's JSON schema is built from what the website can actually take: the token
  * vocabulary ({@link ThemeToken}: colours as {@code #rrggbb}, fonts from {@code FONTS}, lengths
  * within bounds) for a theme; for a layout, the regions of the page type on the current set and
- * the section types that set renders, with each type's settings. Then everything is checked again
- * as if typed -- {@link ThemeCss#clean}, {@link SectionSettings#check}, HTML settings cleaned
- * ({@link HtmlSafety}) -- and only what passes reaches the <b>draft</b>, which someone allowed to
- * publish then publishes, or not. What failed is named. An answer with nothing usable changes
- * nothing: an empty layout must never wipe a draft.
+ * the section types that set renders, with each type's settings -- all but a page section, which
+ * the draft keeps as it was. Then everything is checked again as if typed -- {@link ThemeCss#clean},
+ * {@link SectionSettings#check}, HTML settings cleaned ({@link HtmlSafety}) -- and only what passes
+ * reaches the <b>draft</b>, which someone allowed to publish then publishes, or not. What failed is
+ * named. An answer with nothing usable changes nothing: an empty layout must never wipe a draft.
  *
  * <p>By default the model <b>refines</b> the current draft, which it is shown: a theme's
  * {@code null} keeps the draft's value, a layout is the current one changed only as the brief
@@ -172,7 +172,10 @@ public class DesignAssist {
         List<String> regions = set.spec(pageType).regions();
         List<SectionType> types = new ArrayList<>();
         for (SectionType type : SectionType.values()) {
-            if (type != SectionType.PRIMARY && set.renders(type)) {
+            // Never a page section (DesignLayouts.NOT_ASSISTED): its setting names one of the
+            // website's pages, which the schema would have to carry and every answer be held to
+            // again. The draft keeps the ones it has, unshown.
+            if (type != SectionType.PRIMARY && set.renders(type) && !DesignLayouts.NOT_ASSISTED.contains(type)) {
                 types.add(type);
             }
         }

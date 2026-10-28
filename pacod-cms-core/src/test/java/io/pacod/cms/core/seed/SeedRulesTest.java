@@ -90,4 +90,19 @@ class SeedRulesTest {
         assertThat(SeedRules.check(seed, source, "en", null, STANDING, NOW))
                 .singleElement().asString().contains("broadsheet");
     }
+
+    @Test
+    @DisplayName("a page section names a page the seed writes or one already standing, else it is named")
+    void pageSections() throws IOException {
+        String layouts = "\"layoutSet\": \"magazine\", \"layouts\": {\"HOME\": {"
+                + "\"wide\": [{\"type\": \"page\", \"settings\": {\"page\": \"pacod-gw\"}}], "
+                + "\"aside\": [{\"type\": \"page\", \"settings\": {\"page\": \"about\"}}]}}, \"imagePrefix\"";
+        assertThat(check(FolderSeed.JSON.replace("\"imagePrefix\"", layouts), "en")).isEmpty();
+
+        assertThat(check(FolderSeed.JSON.replace("\"imagePrefix\"", layouts.replace("\"about\"", "\"pacod-kb\"")), "en"))
+                .singleElement().asString().contains("layout HOME", "no page pacod-kb, standing or the seed's");
+        // One that names no page fails its settings, as the studio's would.
+        assertThat(check(FolderSeed.JSON.replace("\"imagePrefix\"", layouts.replace("\"about\"", "\"\"")), "en"))
+                .singleElement().asString().contains("layout HOME", "required:page");
+    }
 }

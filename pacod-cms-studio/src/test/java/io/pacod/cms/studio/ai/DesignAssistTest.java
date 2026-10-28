@@ -157,6 +157,27 @@ class DesignAssistTest {
     }
 
     @Test
+    @DisplayName("a page section is never offered, shown or taken: it names a page of the website, which the draft keeps")
+    void pageSectionsAreNotAssisted() {
+        when(layouts.draftOf(PageType.HOME)).thenReturn(Map.of("main", List.of(
+                Section.of(io.pacod.cms.core.design.SectionType.PAGE, Map.of("page", "platform")),
+                Section.of(io.pacod.cms.core.design.SectionType.RICH_TEXT, Map.of("html", "<p>x</p>")))));
+        answer(Map.of("sections", List.of(
+                Map.of("region", "main", "type", "page", "settings", Map.of("page", "terms")),
+                Map.of("region", "main", "type", "rich-text", "settings", Map.of("html", "<p>y</p>")))));
+
+        DesignAssist.Outcome outcome = assist.layout(PageType.HOME, "a word about us", DesignAssist.Mode.REFINE,
+                new DesignAssist.Actor("usr_a", null));
+        assertThat(outcome.applied()).isEqualTo(1);
+        assertThat(outcome.refused()).containsExactly("page");
+        ArgumentCaptor<AiGateway.Call> call = ArgumentCaptor.forClass(AiGateway.Call.class);
+        verify(gateway).complete(call.capture());
+        // Minimal renders page sections; the model is still never told of them, nor shown the draft's.
+        assertThat(call.getValue().schema().toString()).contains("rich-text").doesNotContain("page");
+        assertThat(call.getValue().user()).contains("rich-text").doesNotContain("platform");
+    }
+
+    @Test
     @DisplayName("an absent or unknown mode refines; only replace starts over")
     void modes() {
         assertThat(DesignAssist.Mode.of(null)).isEqualTo(DesignAssist.Mode.REFINE);

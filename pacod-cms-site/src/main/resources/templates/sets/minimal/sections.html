@@ -3,9 +3,9 @@
 <body>
 <!--/*
   The minimal set's sections -- the types design/sets/minimal.yaml names: article lists, rich text,
-  calls to action (and the page's own content, which each page template renders itself). A search
-  box or social links in a layout never reach this file on this set: LayoutResolver leaves them
-  out and the studio flags them.
+  calls to action, standing pages (and the page's own content, which each page template renders
+  itself). A search box or social links in a layout never reach this file on this set:
+  LayoutResolver leaves them out and the studio flags them.
 
   Article lists are lists here, whatever their style, except the lead story ('hero'), which keeps
   editorial's widget. Fragments only read what PageComposer looked up (s.data).
@@ -60,6 +60,14 @@
         <h2 class="callout__title" th:text="${s.setting('heading')}">Heading</h2>
         <p class="callout__text" th:if="${s.setting('text') != null}" th:text="${s.setting('text')}">Text</p>
         <a class="callout__button" th:href="${s.setting('url')}" th:text="${s.setting('label')}">Label</a>
+    </section>
+</th:block>
+
+<!--/* A standing page's body, as editorial's: s.data is the PageService.Rendered PageComposer
+       chose, its body in .article-body; no title, no notice. */-->
+<th:block th:fragment="standingPage(s, lang)">
+    <section class="section section--page" th:lang="${s.data.language}">
+        <div class="article-body" th:utext="${s.data.body}">Text</div>
     </section>
 </th:block>
 

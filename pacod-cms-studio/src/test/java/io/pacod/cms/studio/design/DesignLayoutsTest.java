@@ -8,6 +8,7 @@ import io.pacod.cms.core.repository.LayoutRepository;
 import io.pacod.cms.core.tenant.Tenant;
 import io.pacod.cms.core.tenant.TenantContext;
 import io.pacod.cms.studio.MgmtOperationException;
+import io.pacod.cms.studio.MgmtPageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ class DesignLayoutsTest {
 
     private final Map<String, Layout> store = new HashMap<>();
     private LayoutRepository repository;
+    private MgmtPageService pages;
     private DesignLayouts layouts;
 
     @BeforeEach
@@ -43,7 +45,17 @@ class DesignLayoutsTest {
             store.put(l.getId(), l);
             return l;
         });
-        layouts = new DesignLayouts(repository, new TemplateSetCatalog());
+        pages = mock(MgmtPageService.class);
+        io.pacod.cms.core.data.Page platform = new io.pacod.cms.core.data.Page("platform");
+        platform.putTitle("en", "The platform");
+        platform.putTitle("bg", "Платформата");
+        io.pacod.cms.core.data.Page draft = new io.pacod.cms.core.data.Page("draft");
+        draft.setPublished(false);
+        when(pages.findAll(null)).thenReturn(List.of(platform, draft));
+        when(pages.find(anyString())).thenReturn(Optional.empty());
+        when(pages.find("platform")).thenReturn(Optional.of(platform));
+        when(pages.find("draft")).thenReturn(Optional.of(draft));
+        layouts = new DesignLayouts(repository, new TemplateSetCatalog(), pages);
     }
 
     private <T> T on(String set, java.util.function.Supplier<T> work) {
@@ -227,5 +239,37 @@ class DesignLayoutsTest {
         run("editorial", () -> layouts.add(PageType.HOME, "aside", "search-box"));
         run("minimal", () -> layouts.assistDraft(PageType.HOME, richText("<p>ai</p>"), "usr_a", null));
         assertThat(asideTypes()).startsWith("rich-text").endsWith("search-box");
+    }
+
+    @Test
+    @DisplayName("a page section names one of the website's pages, published or not; any other is refused by name")
+    void pageSection() throws Exception {
+        assertThat(on("magazine", () -> layouts.editor(PageType.HOME)).addable()).contains(io.pacod.cms.core.design.SectionType.PAGE);
+        run("magazine", () -> {
+            var added = layouts.add(PageType.HOME, "wide", "page");
+            assertThatThrownBy(() -> layouts.update(PageType.HOME, added.getId(), Map.of("page", "")))
+                    .isInstanceOfSatisfying(DesignLayouts.SettingsRefused.class, e -> assertThat(e.errors()).containsExactly("required:page"));
+            assertThatThrownBy(() -> layouts.update(PageType.HOME, added.getId(), Map.of("page", "nowhere")))
+                    .isInstanceOfSatisfying(DesignLayouts.SettingsRefused.class, e -> assertThat(e.errors()).containsExactly("page:page"));
+            layouts.update(PageType.HOME, added.getId(), Map.of("page", "draft"));
+            layouts.update(PageType.HOME, added.getId(), Map.of("page", " platform "));
+        });
+        assertThat(store.get("HOME").getDraft().get("wide").getLast().getSettings()).containsExactly(Map.entry("page", "platform"));
+        // Offered by the title in the studio's language, else by the slug.
+        assertThat(layouts.pageChoices("bg")).containsExactly(new DesignLayouts.PageChoice("platform", "Платформата"),
+                new DesignLayouts.PageChoice("draft", "draft"));
+        assertThat(layouts.pageChoices("de")).extracting(DesignLayouts.PageChoice::label).containsExactly("platform", "draft");
+    }
+
+    @Test
+    @DisplayName("an AI draft keeps the page sections it was never offered, where they were, at the end of their regions")
+    void assistDraftKeepsPageSections() throws Exception {
+        run("editorial", () -> {
+            var added = layouts.add(PageType.HOME, "aside", "page");
+            layouts.update(PageType.HOME, added.getId(), Map.of("page", "platform"));
+        });
+        run("editorial", () -> layouts.assistDraft(PageType.HOME, richText("<p>ai</p>"), "usr_a", null));
+        assertThat(asideTypes()).containsExactly("rich-text", "page");
+        assertThat(store.get("HOME").getDraft().get("aside").getLast().getSettings()).containsEntry("page", "platform");
     }
 }

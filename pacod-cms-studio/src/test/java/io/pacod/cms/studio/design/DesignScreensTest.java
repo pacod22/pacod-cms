@@ -89,6 +89,8 @@ class DesignScreensTest {
     @MockitoBean
     private MgmtLanguageService languages;
     @MockitoBean
+    private io.pacod.cms.studio.MgmtPageService pages;
+    @MockitoBean
     private WebsiteRepository websites;
     @MockitoBean
     private io.pacod.cms.core.design.PreviewTokens tokens;
@@ -112,7 +114,8 @@ class DesignScreensTest {
         Layout home = new Layout(io.pacod.cms.core.design.PageType.HOME);
         home.setDraft(Map.of("main", List.of(new Section("s1", "article-list", Map.of("source", "latest", "count", 3,
                         "style", "cards", "heading", "Newest")), new Section("s2", "search-box", Map.of())),
-                "gone", List.of(new Section("s3", "carousel", Map.of()))));
+                "gone", List.of(new Section("s3", "carousel", Map.of())),
+                "wide", List.of(new Section("s4", "page", Map.of("page", "platform")))));
         when(layouts.findById(anyString())).thenReturn(Optional.empty());
         when(layouts.findById("HOME")).thenReturn(Optional.of(home));
         when(layouts.save(any(Layout.class))).thenAnswer(i -> i.getArgument(0));
@@ -144,6 +147,10 @@ class DesignScreensTest {
         en.setAdminName("English");
         en.setNativeName("English");
         when(languages.findAll()).thenReturn(List.of(en));
+        io.pacod.cms.core.data.Page platform = new io.pacod.cms.core.data.Page("platform");
+        platform.putTitle("en", "The platform");
+        platform.putTitle("bg", "Платформата");
+        when(pages.findAll(null)).thenReturn(List.of(platform, new io.pacod.cms.core.data.Page("unnamed")));
         when(websites.findById("alpha")).thenReturn(Optional.of(new Website("alpha", "org_a", "Alpha")));
         when(jobQueue.forSite(any(), any(), any())).thenReturn(org.springframework.data.domain.Page.empty());
 
@@ -194,6 +201,10 @@ class DesignScreensTest {
         String home = render("/sites/alpha/mgmt/design/layouts/home");
         assertThat(home).contains("Newest", "Search box", "f_source", "f_count", "data-arrange=\"/sites/alpha/mgmt/design/layouts/home/arrange\"",
                 "not on this template", "this template has no such region", "carousel", "value=\"4\"");
+        // A page section: the website's pages to choose from, by their titles in the studio's language.
+        assertThat(home).contains("Standing page", "/p/platform", "name=\"f_page\"",
+                "value=\"platform\" selected=\"selected\">The platform</option>", "value=\"unnamed\">unnamed</option>",
+                "in the reader&#39;s language").doesNotContain("Платформата");
         assertThat(render("/sites/alpha/mgmt/design/layouts/article")).contains("own content", "It can be moved, not removed.");
         // The swatches read the preset by key: SpEL takes map[k] as the literal key "k", hence .get(k).
         assertThat(render("/sites/alpha/mgmt/design/theme")).contains("value=\"#1d4e6f\"", "Harbour", "name=\"css\"",

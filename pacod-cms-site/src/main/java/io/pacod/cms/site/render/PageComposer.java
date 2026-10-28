@@ -10,6 +10,7 @@ import io.pacod.cms.core.tenant.TenantContext;
 import io.pacod.cms.site.data.LandingSlot;
 import io.pacod.cms.site.data.ListItem;
 import io.pacod.cms.site.services.CategoryWidgetReader;
+import io.pacod.cms.site.services.PageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,10 @@ import java.util.Map;
  *
  * <p>Every lookup is isolated: a section whose data cannot be read is left out and logged, and the
  * page renders. A fragment never queries anything.
+ *
+ * <p>A page section whose page has nothing to show -- none of that slug, not published, no body --
+ * is left out too, without a word: so a region holding nothing else stays empty, and a set that
+ * draws a band around a region that has sections (magazine's {@code wide}) draws none.
  */
 @Slf4j
 @Service
@@ -38,13 +43,15 @@ public class PageComposer {
     private final TemplateSetCatalog catalog;
     private final LayoutReader layouts;
     private final CategoryWidgetReader widgets;
+    private final PageService pages;
     private final MessageSource messages;
 
     public PageComposer(TemplateSetCatalog catalog, LayoutReader layouts, CategoryWidgetReader widgets,
-                        MessageSource messages) {
+                        PageService pages, MessageSource messages) {
         this.catalog = catalog;
         this.layouts = layouts;
         this.widgets = widgets;
+        this.pages = pages;
         this.messages = messages;
     }
 
@@ -59,8 +66,12 @@ public class PageComposer {
             List<RenderedSection> rendered = new ArrayList<>();
             for (LayoutResolver.ResolvedSection section : sections) {
                 try {
+                    Object data = data(section, lang);
+                    if (section.type() == SectionType.PAGE && data == null) {
+                        continue;
+                    }
                     rendered.add(new RenderedSection(section.id(), section.type().id(), section.type().fragment(),
-                            section.settings(), data(section, lang)));
+                            section.settings(), data));
                 } catch (RuntimeException e) {
                     log.warn("Section {} ({}) of the {} layout could not be prepared; leaving it out: {}",
                             section.id(), section.type().id(), pageType, e.toString());
@@ -72,10 +83,25 @@ public class PageComposer {
     }
 
     private Object data(LayoutResolver.ResolvedSection section, String lang) {
-        if (section.type() != SectionType.ARTICLE_LIST) {
-            return null;
-        }
-        Map<String, Object> s = section.settings();
+        return switch (section.type()) {
+            case ARTICLE_LIST -> articleList(section.settings(), lang);
+            case PAGE -> standingPage((String) section.settings().get("page"), lang);
+            default -> null;
+        };
+    }
+
+    /**
+     * The page's body in the language {@code /p/{slug}} would serve this reader
+     * ({@link PageService#render}: asked for, then English, then the original), through the same
+     * cached list of published pages; null when there is nothing to show.
+     */
+    private PageService.Rendered standingPage(String slug, String lang) {
+        return pages.bySlug(slug).map(page -> pages.render(page, lang))
+                .filter(rendered -> rendered.body() != null && !rendered.body().isBlank())
+                .orElse(null);
+    }
+
+    private LandingSlot articleList(Map<String, Object> s, String lang) {
         int count = (Integer) s.get("count");
         int offset = (Integer) s.get("offset");
         String source = (String) s.get("source");

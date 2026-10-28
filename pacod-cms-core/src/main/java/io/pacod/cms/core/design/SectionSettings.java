@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Checks a section's settings against its type's fields and returns them clean: numbers as
@@ -17,6 +18,9 @@ import java.util.Map;
  */
 public final class SectionSettings {
 
+    /** A standing page's slug, as the studio makes them and as a menu's page link takes them. */
+    private static final Pattern SLUG = Pattern.compile("[a-z0-9][a-z0-9-]*");
+
     private SectionSettings() {
     }
 
@@ -25,7 +29,7 @@ public final class SectionSettings {
      *
      * @param errors one entry per refused field: {@code <code>:<field>}, the code one of
      *               {@code required}, {@code number}, {@code range}, {@code choice}, {@code length},
-     *               {@code url}
+     *               {@code url}, {@code slug}
      */
     public record Result(Map<String, Object> settings, List<String> errors) {
 
@@ -85,6 +89,18 @@ public final class SectionSettings {
                         out.put(field.name(), s);
                     } else {
                         errors.add("url:" + field.name());
+                    }
+                }
+                case PAGE -> {
+                    // Checked as written, never lowercased: the studio and a seed look the page up
+                    // by exactly this slug.
+                    String s = String.valueOf(value).strip();
+                    if (s.length() > field.max()) {
+                        errors.add("length:" + field.name());
+                    } else if (SLUG.matcher(s).matches()) {
+                        out.put(field.name(), s);
+                    } else {
+                        errors.add("slug:" + field.name());
                     }
                 }
             }

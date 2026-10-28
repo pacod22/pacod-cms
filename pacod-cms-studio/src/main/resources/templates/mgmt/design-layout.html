@@ -119,6 +119,8 @@
                                           th:text="' · ' + ${labels.choice('style', v.section.settings['style'])}"> · Cards</th:block>
                                 <th:block th:if="${v.section.settings['source'] != null}"
                                           th:text="' · ' + ${labels.choice('source', v.section.settings['source'])}"> · Latest</th:block>
+                                <th:block th:if="${v.section.settings['page'] != null}"
+                                          th:text="'/p/' + ${v.section.settings['page']}">/p/about</th:block>
                             </span>
                             <span class="badge off" th:unless="${v.rendered}" th:text="#{design.notRendered}">not rendered</span>
                             <span class="spacer" style="margin-left:auto"></span>
@@ -168,6 +170,13 @@
                                             <option th:each="c : ${categories}" th:value="${c.id}" th:text="${c.name}"
                                                     th:selected="${value != null and c.id == value}">Category</option>
                                         </select>
+                                        <!--/* The website's standing pages (DesignLayouts.pageChoices), each by its title in
+                                               the studio's language, else its slug; DesignLayouts.update refuses any other. */-->
+                                        <select th:case="'PAGE'" th:id="${fid}" th:name="'f_' + ${f.name()}">
+                                            <option value="" th:text="'—'">—</option>
+                                            <option th:each="p : ${pages}" th:value="${p.slug}" th:text="${p.label}"
+                                                    th:selected="${value != null and p.slug == value}">About</option>
+                                        </select>
                                         <input th:case="'NUMBER'" type="number" th:id="${fid}" th:name="'f_' + ${f.name()}"
                                                th:min="${f.min()}" th:max="${f.max()}" th:value="${value}">
                                         <textarea th:case="'LONG_TEXT'" th:id="${fid}" th:name="'f_' + ${f.name()}" rows="3"
@@ -179,6 +188,7 @@
                                     </th:block>
                                     <span class="hint" th:if="${f.kind().name() == 'URL'}" th:text="#{design.hint.url}">An https address, or one on the website.</span>
                                     <span class="hint" th:if="${f.kind().name() == 'HTML'}" th:text="#{design.hint.html}">HTML, as in an article body.</span>
+                                    <span class="hint" th:if="${f.kind().name() == 'PAGE'}" th:text="#{design.hint.page}">Its text, in the reader's language.</span>
                                 </div>
                                 <div class="actions">
                                     <button class="btn btn-primary" type="submit">

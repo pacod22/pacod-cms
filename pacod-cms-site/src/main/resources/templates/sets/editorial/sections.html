@@ -106,5 +106,16 @@
     </section>
 </th:block>
 
+<!--/* A standing page's body (s.data, a PageService.Rendered: the body in the language /p/{slug}
+       would serve, chosen by PageComposer), as page.html renders it: stored HTML in .article-body,
+       which carries the body blocks' styles and the guards for pasted markup. No title and no
+       fallback notice: the body has its own headings. lang says which language it is in, which a
+       fallback makes another than the page's. Never ${page}: on /p/{slug} that is the page itself. */-->
+<th:block th:fragment="standingPage(s, lang)">
+    <section class="section section--page" th:lang="${s.data.language}">
+        <div class="article-body" th:utext="${s.data.body}">Text</div>
+    </section>
+</th:block>
+
 </body>
 </html>

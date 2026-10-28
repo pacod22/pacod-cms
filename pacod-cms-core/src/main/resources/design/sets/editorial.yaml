@@ -10,7 +10,7 @@
 id: editorial
 name: Editorial
 description: A magazine front page with a lead story, cards and a ranked aside.
-sections: [primary, article-list, rich-text, call-to-action, search-box, social-links]
+sections: [primary, article-list, rich-text, call-to-action, search-box, social-links, page]
 pageTypes:
   HOME:
     regions: [main, aside, wide]

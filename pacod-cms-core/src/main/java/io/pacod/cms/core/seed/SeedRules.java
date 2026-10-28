@@ -9,6 +9,7 @@ import io.pacod.cms.core.data.SocialLinkPlacement;
 import io.pacod.cms.core.design.BodyBlocks;
 import io.pacod.cms.core.design.LayoutResolver;
 import io.pacod.cms.core.design.PageType;
+import io.pacod.cms.core.design.SectionType;
 import io.pacod.cms.core.design.TemplateSetManifest;
 import io.pacod.cms.core.design.ThemeCss;
 import io.pacod.cms.core.util.HttpUrls;
@@ -403,6 +404,11 @@ public final class SeedRules {
                     Map<String, Object> settings = section.getSettings();
                     if (settings.get("category") instanceof Integer category && !categories.contains(category)) {
                         problem("%s: no section %d in the seed", as, category);
+                    }
+                    // The site shows nothing for a page that is not there, and says nothing.
+                    if (SectionType.PAGE.id().equals(section.getType()) && settings.get("page") instanceof String slug
+                            && !slug.isBlank() && !pages.contains(slug.strip())) {
+                        problem("%s: no page %s, standing or the seed's", as, slug);
                     }
                     if (settings.get("url") instanceof String url) {
                         address(as, url);

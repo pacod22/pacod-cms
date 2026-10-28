@@ -11,6 +11,9 @@ import io.pacod.cms.site.config.ThymeleafConfig;
 import io.pacod.cms.site.data.LandingSlot;
 import io.pacod.cms.site.data.ListItem;
 import io.pacod.cms.site.services.CategoryWidgetReader;
+import io.pacod.cms.site.services.LanguageReader;
+import io.pacod.cms.site.services.PageReader;
+import io.pacod.cms.site.services.PageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -40,6 +44,7 @@ class PageComposerTest {
 
     private LayoutReader layouts;
     private CategoryWidgetReader widgets;
+    private PageReader pages;
     private PageComposer composer;
 
     @BeforeEach
@@ -49,7 +54,10 @@ class PageComposerTest {
         when(layouts.published(org.mockito.ArgumentMatchers.any())).thenReturn(new LayoutReader.Stored(null));
         when(widgets.readLatest(anyInt(), anyString())).thenAnswer(i -> slot(null, "", i.getArgument(0)));
         when(widgets.read(anyInt(), anyInt(), anyString())).thenAnswer(i -> slot(i.getArgument(0), "Category", i.getArgument(1)));
-        composer = new PageComposer(CATALOG, layouts, widgets, new ThymeleafConfig().messageSource());
+        pages = mock(PageReader.class);
+        when(pages.findAll()).thenReturn(List.of());
+        composer = new PageComposer(CATALOG, layouts, widgets, new PageService(pages, mock(LanguageReader.class)),
+                new ThymeleafConfig().messageSource());
     }
 
     private static LandingSlot slot(Integer category, String name, int count) {
@@ -142,6 +150,40 @@ class PageComposerTest {
     @DisplayName("a website on a set this installation lacks composes with the default set")
     void unknownSetUsesTheDefault() {
         assertThat(compose(composer, "vanished", PageType.HOME).get("main")).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("a page section is its page's body in the language the page itself would serve; nothing of a page with nothing to show")
+    void pageSection() {
+        io.pacod.cms.core.data.Page platform = new io.pacod.cms.core.data.Page("platform");
+        platform.putTitle("en", "The platform");
+        platform.putBody("en", "<p>One platform.</p>");
+        platform.putBody("de", "<p>Eine Plattform.</p>");
+        platform.putBody("bg", "<p>Една платформа.</p>");
+        io.pacod.cms.core.data.Page titled = new io.pacod.cms.core.data.Page("titled");
+        titled.putTitle("en", "A title alone");
+        // The reader's list holds the published pages alone: an unpublished one is not in it.
+        when(pages.findAll()).thenReturn(List.of(platform, titled));
+        when(layouts.published(PageType.HOME)).thenReturn(new LayoutReader.Stored(Map.of(
+                "wide", List.of(new Section("p", "page", Map.of("page", "platform"))),
+                "aside", List.of(new Section("t", "page", Map.of("page", "titled")),
+                        new Section("u", "page", Map.of("page", "unpublished"))))));
+
+        for (String[] asked : new String[][]{{"de", "de", "<p>Eine Plattform.</p>"}, {"fr", "en", "<p>One platform.</p>"},
+                {null, "bg", "<p>Една платформа.</p>"}}) {
+            // A Bulgarian website: the chain is the language asked for, English, then Bulgarian.
+            Tenant tenant = new Tenant("alpha", "org_a", "site_alpha", "bg", ZoneId.of("UTC"), "magazine");
+            Regions regions = TenantContext.callAs(tenant, () -> composer.compose(PageType.HOME, asked[0]));
+            RenderedSection section = regions.get("wide").getFirst();
+            assertThat(section.type()).isEqualTo("page");
+            assertThat(section.fragment()).isEqualTo("standingPage");
+            PageService.Rendered page = (PageService.Rendered) section.data();
+            assertThat(page.language()).as(asked[0]).isEqualTo(asked[1]);
+            assertThat(page.body()).as(asked[0]).isEqualTo(asked[2]);
+            // No body, or no page: no section -- so the region is empty, and no band is drawn round it.
+            assertThat(regions.isEmpty("aside")).isTrue();
+        }
+        verify(pages, atLeastOnce()).findAll();
     }
 
     @Test

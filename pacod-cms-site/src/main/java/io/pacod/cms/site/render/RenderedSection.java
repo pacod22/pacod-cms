@@ -9,8 +9,9 @@ import java.util.Map;
  * the lookups happen in {@link PageComposer}, where one failure costs one section, not the page.
  *
  * @param fragment the fragment of the set's {@code sections} template that renders it
- * @param data     what its type looked up -- a {@code LandingSlot} for an article list; null for
- *                 the others
+ * @param data     what its type looked up -- a {@code LandingSlot} for an article list, a
+ *                 {@code PageService.Rendered} for a page (never null: a page with nothing to show
+ *                 is no section at all); null for the others
  */
 public record RenderedSection(String id, String type, String fragment, Map<String, Object> settings, Object data) {
 

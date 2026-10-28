@@ -135,4 +135,39 @@ class LayoutRenderIT extends TwoWebsitesIT {
         assertThat(get(ALPHA_HOST, "/").body()).doesNotContain("/theme.css");
         assertThat(get(ALPHA_HOST, "/theme.css", "text/css").body()).doesNotContain("#1d4e6f");
     }
+
+    @Test
+    @DisplayName("a page section: the page's body in the reader's language, full width below magazine's columns; a missing page, nothing")
+    void pageSection() {
+        website("iota", "iota.test");
+        controlPlane.updateFirst(org.springframework.data.mongodb.core.query.Query.query(
+                        org.springframework.data.mongodb.core.query.Criteria.where("_id").is("iota")),
+                org.springframework.data.mongodb.core.query.Update.update("templateSet", "magazine"),
+                io.pacod.cms.core.control.data.Website.class);
+        directory.evictAll();
+        Tenant iota = directory.bySite("iota").orElseThrow();
+        TenantContext.runAs(iota, () -> {
+            io.pacod.cms.core.data.Page platform = new io.pacod.cms.core.data.Page("platform");
+            platform.putTitle("en", "One platform");
+            platform.putBody("en", "<p class=\"body-lead\">Four languages, one layout.</p>");
+            platform.putBody("de", "<p class=\"body-lead\">Vier Sprachen, ein Layout.</p>");
+            pages.save(platform);
+
+            Layout home = new Layout(PageType.HOME);
+            home.setPublished(Map.of(
+                    "wide", List.of(Section.of(SectionType.PAGE, Map.of("page", "platform"))),
+                    "aside", List.of(Section.of(SectionType.PAGE, Map.of("page", "gone")))));
+            layouts.save(home);
+        });
+
+        String english = get("iota.test", "/").body();
+        assertThat(english).containsSubsequence("class=\"layout__aside\"", "class=\"mz-wide\"",
+                        "mz-section--page\" lang=\"en\"", "<div class=\"article-body\"><p class=\"body-lead\">Four languages, one layout.</p>")
+                .doesNotContain("One platform", "Vier Sprachen");
+        assertThat(get("iota.test", "/?lang=de").body()).contains("mz-section--page\" lang=\"de\"", "Vier Sprachen, ein Layout.")
+                .doesNotContain("Four languages");
+        // No French: English, as /p/platform would serve it.
+        assertThat(get("iota.test", "/?lang=fr").body()).contains("Four languages, one layout.");
+        assertThat(get("iota.test", "/").statusCode()).isEqualTo(200);
+    }
 }

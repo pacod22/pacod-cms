@@ -44,6 +44,23 @@ class SectionSettingsTest {
         }
     }
 
+    @Test
+    @DisplayName("a page section names one page by its slug, as written -- never blank, never another shape")
+    void pageSlug() {
+        assertThat(SectionType.byId("page")).contains(SectionType.PAGE);
+        assertThat(SectionType.PAGE.fields()).extracting(SettingField::name).containsExactly("page");
+        SectionSettings.Result ok = SectionSettings.check(SectionType.PAGE, Map.of("page", " platform-2 ", "heading", "x"));
+        assertThat(ok.ok()).isTrue();
+        assertThat(ok.settings()).containsExactly(Map.entry("page", "platform-2"));
+
+        assertThat(SectionSettings.check(SectionType.PAGE, Map.of()).errors()).containsExactly("required:page");
+        assertThat(SectionSettings.check(SectionType.PAGE, Map.of("page", "  ")).errors()).containsExactly("required:page");
+        for (String bad : new String[]{"About", "-about", "p/about", "/p/about", "about us", "../terms", "über"}) {
+            assertThat(SectionSettings.check(SectionType.PAGE, Map.of("page", bad)).errors()).as(bad).containsExactly("slug:page");
+        }
+        assertThat(SectionSettings.check(SectionType.PAGE, Map.of("page", "a".repeat(65))).errors()).containsExactly("length:page");
+    }
+
     private static Map<String, Object> with(Map<String, Object> base, String url) {
         java.util.Map<String, Object> m = new java.util.HashMap<>(base);
         m.put("url", url);

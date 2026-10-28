@@ -9,7 +9,7 @@ id: minimal
 name: Minimal
 description: One centred column of text; lists instead of grids; nothing beside the content.
 extends: editorial
-sections: [primary, article-list, rich-text, call-to-action]
+sections: [primary, article-list, rich-text, call-to-action, page]
 pageTypes:
   HOME:
     regions: [main]

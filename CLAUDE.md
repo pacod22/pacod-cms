@@ -362,8 +362,27 @@ installs — there is no upload, because Thymeleaf is code.
   `PAGE`, `SEARCH`. **Section types** (`SectionType`, a closed vocabulary every set implements or
   skips): `primary` (the page's own content, no settings), `article-list` (source latest, category
   or most-read; count, offset, style, heading), `rich-text`, `call-to-action`, `search-box`,
-  `social-links`. Each declares its `SettingField`s; `SectionSettings` validates and normalises
-  against them, the one check the studio, the resolver and (later) design assist share.
+  `social-links`, `page`. Each declares its `SettingField`s; `SectionSettings` validates and
+  normalises against them, the one check the studio, the resolver and design assist share.
+- **`page` is how a layout carries translated text**: every other setting is one string, so a
+  heading or a rich text cannot be translated, while a standing page is translated per language,
+  edited in the studio and covered by the translation job. Its one setting, `page`, is a slug
+  (`SettingField.Kind.PAGE`: required, `[a-z0-9][a-z0-9-]*`, at most 64, checked as written --
+  `slug:page`); no heading, as the body has its own. **`SectionSettings` checks only the shape;
+  whether the page exists** is `DesignLayouts.update`'s (`page:page`, any page of the website,
+  published or not, through `MgmtPageService`) and `SeedRules`' (the seed's pages or the standing
+  ones). `PageComposer` reads it through `PageService.bySlug`/`render` -- the cached list of
+  published pages and `/p/{slug}`'s own chain, so it falls back as the page does -- and **leaves the
+  section out when there is nothing to show** (no such page, unpublished, no body): no error, and a
+  region holding nothing else stays empty, so magazine draws no `wide` band around it. Every set's
+  `sections.html` renders it as `standingPage`: `<section class="section section--page" lang="…">`
+  (magazine `section mz-section mz-section--page`) around `<div class="article-body">` and the
+  stored body, no title, no fallback notice; `lang` is the language served. **Never `${page}` in
+  that fragment**: on `/p/{slug}` it is the page being viewed. A `<pre>` in it gets no colours:
+  `codeHighlight` is passed the page's own body only. Tests: `SectionSettingsTest.pageSlug`,
+  `PageComposerTest.pageSection`, `PublicTemplateRenderTest.pageSectionsInEveryRegion` (composed
+  into every region of every page type on every set), `DesignLayoutsTest`, `DesignAssistTest`,
+  `DesignScreensTest`, `SeedRulesTest.pageSections`, `LayoutRenderIT.pageSection`.
 - **A `Layout` (collection `layout`, id the page type's name) holds a `draft` and a `published`
   map of region → sections**, stored per website and page type, *not* per set, so a layout survives
   a template switch. Null means "the set's default".
@@ -1518,10 +1537,12 @@ drafts that an admin publishes.
   an unsaved default made every section unfindable on the next request.
 - **The layout editor** (`design-layout.html`): sections added per region from the types the set
   implements, configured by forms built from their `SettingField`s, moved with ↑/↓ and between
-  regions (form POSTs), removed — **never `primary`**, which can only move. The drag-and-drop in
-  `mgmt.js` posts the whole new order as JSON to `…/arrange`, applied **all or nothing** (a stale
-  page cannot drop a section another tab added) and then reloads; the forms remain the no-script
-  path. Sections the set cannot render stay listed, flagged with their issue.
+  regions (form POSTs), removed — **never `primary`**, which can only move. A page section's page
+  is a select of the website's pages (`DesignLayouts.pageChoices`: the title in the studio's
+  language, else the slug; published or not). The drag-and-drop in `mgmt.js` posts the whole new
+  order as JSON to `…/arrange`, applied **all or nothing** (a stale page cannot drop a section
+  another tab added) and then reloads; the forms remain the no-script path. Sections the set cannot
+  render stay listed, flagged with their issue.
 - **The theme editor** takes each token as `t_<token>` and `t_<token>@dark`, refuses an invalid
   value by name, and applies a preset by replacing the draft's values. **Its swatches read
   `p.tokens().get(k)`: SpEL takes `map[k]` with a bare identifier as the literal key `"k"`**, which
@@ -1701,12 +1722,14 @@ outside, no third-party embed. The photographs are real and say whose they are.
   (`core.seed.SeedRules`; refused as `Refusal.INVALID` with every problem): references, ids, whole
   translations, a newer article with a higher id by its effective date, no published article in the
   future, layouts resolving on their set, a theme `ThemeCss.clean` keeps, menu and link targets the
-  seed has, every file there and decodable, bookable pages and HTML5 heights, bodies without script,
-  frame or handler, a class only a body block's or a code block's `language-*`, a `src` only one of the
-  seed's pictures. **Not** the shipped demos' own choices, which stay in `SeedIntegrityTest`: English
-  only, no outside link, recent dates, every photograph used -- a product site links its
-  repositories. `--seed-check --seed-dir` (`make seed-check SEED_DIR=… [LANGUAGE=en]`) says the same
-  without a website. The new-website form offers the shipped demos only.
+  seed has, a `page` section's page among the seed's or the standing ones, every file there and
+  decodable, bookable pages and HTML5 heights, bodies without script, frame or handler, a class only
+  a body block's or a code block's `language-*`, a `src` only one of the seed's pictures. **Not** the
+  shipped demos' own choices, which stay in `SeedIntegrityTest`: English only, no outside link,
+  recent dates, every photograph used -- a product site links its repositories. `--seed-check
+  --seed-dir` (`make seed-check SEED_DIR=… [LANGUAGE=en]`) says the same without a website. The
+  new-website form offers the shipped demos only. A layout section in a seed is
+  `{"type": "page", "settings": {"page": "<slug>"}}`, under `layouts.<PAGE_TYPE>.<region>`.
 - Tests: `SeedIntegrityTest`, **parameterised over every `Demo`** (references, ids, translations
   -- the journal's at least four --, clean bodies -- a `class` only a `BodyBlocks` one, a `src` only
   a demo picture's --, pages and their links, menus, every layout resolving on its set, issues, a
@@ -2008,6 +2031,10 @@ feature's model is `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, 
     `DesignTheme.assistDraft` keeps the draft's CSS, and `DesignLayouts.assistDraft` keeps the
     page's own `primary`, id and region, and **the sections the current set cannot render** (kept
     for a switch back; the model is never shown them), at the end of their regions.
+  - **A `page` section is neither offered nor shown** (`DesignLayouts.NOT_ASSISTED`): its setting
+    names one of the website's pages, which the schema would have to carry and every answer be
+    held to. `assistDraft` keeps the ones the draft has, at the end of their regions, as it keeps
+    the unrendered ones -- or a refine, and the whole-site job, would delete them unseen.
   - What failed is named in the flash. **An answer with nothing usable changes nothing**, and an
     empty layout (the mock's) must never wipe a draft.
   - **It refines by default** (`Mode`, the forms' `mode`; only `replace` starts over): the user

@@ -438,6 +438,8 @@ html.night .masthead__logo .masthead__logo-dark { display: block; }
 /* A layout's first section in a column starts at the column's top. */
 .layout__main > .section:first-child, .layout__aside > .section:first-child { padding-top: 0; }
 .region-wide { padding-bottom: 48px; }
+/* A standing page's body placed by a layout: the section's space above it, not the body's too. */
+.section--page > .article-body { margin-top: 0; }
 
 /* Sections a layout places (templates/sets/editorial/sections.html). */
 .callout {

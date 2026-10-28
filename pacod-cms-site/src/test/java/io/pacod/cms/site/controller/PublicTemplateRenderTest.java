@@ -335,6 +335,95 @@ class PublicTemplateRenderTest {
     }
 
     /**
+     * A page section wherever a layout may put it -- every region of every page type, on every set,
+     * magazine's full-width {@code wide} on the home page among them -- is the standing page's body
+     * in the language the page itself would serve, in {@code .article-body} (its blocks styled as on
+     * {@code /p/{slug}}) and without its title; a page with nothing to show is nothing at all.
+     * Composed for real, PageComposer over PageService, so the language is chosen where production
+     * chooses it.
+     */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"editorial", "minimal", "magazine"})
+    @DisplayName("A page section shows its page's body in every region of every page, in the reader's language")
+    void pageSectionsInEveryRegion(String set) {
+        io.pacod.cms.core.design.TemplateSetCatalog catalog = new io.pacod.cms.core.design.TemplateSetCatalog();
+        org.springframework.context.MessageSource messages = new io.pacod.cms.site.config.ThymeleafConfig().messageSource();
+        engine = io.pacod.cms.site.render.TemplateSets.engine(catalog.chain(set), messages, false, List.of());
+
+        io.pacod.cms.core.data.Page platform = new io.pacod.cms.core.data.Page("platform");
+        platform.putTitle("en", "The platform");
+        platform.putTitle("de", "Die Plattform");
+        platform.putBody("en", "<p class=\"body-lead\">One platform.</p><div class=\"body-columns\"><div><h3>Gateway</h3></div></div>");
+        platform.putBody("de", "<p class=\"body-lead\">Eine Plattform.</p><div class=\"body-columns\"><div><h3>Gateway</h3></div></div>");
+        io.pacod.cms.core.data.Page titled = new io.pacod.cms.core.data.Page("titled");
+        titled.putTitle("en", "A title alone");
+        io.pacod.cms.site.services.PageReader reader = org.mockito.Mockito.mock(io.pacod.cms.site.services.PageReader.class);
+        org.mockito.Mockito.when(reader.findAll()).thenReturn(List.of(platform, titled));
+
+        io.pacod.cms.core.design.TemplateSetManifest manifest = catalog.find(set).orElseThrow();
+        io.pacod.cms.site.render.LayoutReader layouts = org.mockito.Mockito.mock(io.pacod.cms.site.render.LayoutReader.class);
+        for (io.pacod.cms.core.design.PageType type : io.pacod.cms.core.design.PageType.values()) {
+            Map<String, List<io.pacod.cms.core.design.Section>> stored = new java.util.LinkedHashMap<>();
+            for (String region : manifest.spec(type).regions()) {
+                stored.put(region, List.of(
+                        new io.pacod.cms.core.design.Section(region + "-p", "page", Map.of("page", "platform")),
+                        new io.pacod.cms.core.design.Section(region + "-t", "page", Map.of("page", "titled")),
+                        new io.pacod.cms.core.design.Section(region + "-m", "page", Map.of("page", "missing"))));
+            }
+            org.mockito.Mockito.when(layouts.published(type)).thenReturn(new io.pacod.cms.site.render.LayoutReader.Stored(stored));
+        }
+        io.pacod.cms.site.render.PageComposer composer = new io.pacod.cms.site.render.PageComposer(catalog, layouts,
+                org.mockito.Mockito.mock(io.pacod.cms.site.services.CategoryWidgetReader.class),
+                new io.pacod.cms.site.services.PageService(reader,
+                        org.mockito.Mockito.mock(io.pacod.cms.site.services.LanguageReader.class)), messages);
+        // A Bulgarian website: German is asked for and there; French is not, and English is served.
+        io.pacod.cms.core.tenant.Tenant tenant = new io.pacod.cms.core.tenant.Tenant("alpha", "org_a", "site_alpha", "bg",
+                java.time.ZoneId.of("UTC"), set);
+
+        for (String lang : List.of("de", "fr")) {
+            String served = lang.equals("de") ? "de" : "en";
+            String body = lang.equals("de") ? "<p class=\"body-lead\">Eine Plattform.</p>" : "<p class=\"body-lead\">One platform.</p>";
+            io.pacod.cms.core.data.Page about = new io.pacod.cms.core.data.Page("about");
+            Map<io.pacod.cms.core.design.PageType, Map.Entry<String, Map<String, Object>>> views = Map.of(
+                    io.pacod.cms.core.design.PageType.HOME, Map.entry("landing", Map.of()),
+                    io.pacod.cms.core.design.PageType.ARTICLE, Map.entry("article",
+                            Map.of("article", new ArticleModel(article(7, true, null), lang, List.of()))),
+                    io.pacod.cms.core.design.PageType.LATEST, Map.entry("index",
+                            Map.of("article", new ArticleModel(article(7, true, null), lang, List.of()), "tags", List.of())),
+                    io.pacod.cms.core.design.PageType.CATEGORY, Map.entry("list", Map.of("list", list(30))),
+                    io.pacod.cms.core.design.PageType.PAGE, Map.entry("page", Map.of("page", new io.pacod.cms.site.services.PageService.Rendered(
+                            about, lang, false, false, null, "About", "<p>About us.</p>", null))),
+                    io.pacod.cms.core.design.PageType.SEARCH, Map.entry("search", Map.of("q", "x", "searched", true,
+                            "results", ArticleListPageable.builder().page(org.springframework.data.domain.Page.empty()).build())));
+            views.forEach((type, view) -> {
+                io.pacod.cms.site.render.Regions regions = io.pacod.cms.core.tenant.TenantContext.callAs(tenant,
+                        () -> composer.compose(type, lang));
+                Map<String, Object> model = new java.util.HashMap<>(view.getValue());
+                model.put("lang", lang);
+                model.put("regions", regions);
+                String html = render(view.getKey(), model);
+                int expected = manifest.spec(type).regions().size();
+                String as = view.getKey() + " on " + set + " in " + lang;
+                assertThat(count(html, body)).as(as).isEqualTo(expected);
+                assertThat(count(html, "--page\" lang=\"" + served + "\">")).as(as).isEqualTo(expected);
+                assertThat(html).as(as).containsSubsequence("--page\" lang=\"" + served + "\">", "<div class=\"article-body\">" + body)
+                        .contains("<div class=\"body-columns\"><div><h3>Gateway</h3></div></div>")
+                        .doesNotContain("The platform", "Die Plattform", "A title alone", "??");
+            });
+        }
+
+        // The home page's full width, below the columns, on the sets that have it.
+        io.pacod.cms.site.render.Regions home = io.pacod.cms.core.tenant.TenantContext.callAs(tenant,
+                () -> composer.compose(io.pacod.cms.core.design.PageType.HOME, "de"));
+        String landing = render("landing", Map.of("lang", "de", "regions", home));
+        if (set.equals("magazine")) {
+            assertThat(landing).containsSubsequence("class=\"layout__aside\"", "class=\"mz-wide\"", "Eine Plattform.");
+        } else if (set.equals("editorial")) {
+            assertThat(landing).containsSubsequence("class=\"layout__aside\"", "region-wide", "Eine Plattform.");
+        }
+    }
+
+    /**
      * Every public template renders in every language the site ships chrome for, with no
      * unresolved key -- Thymeleaf renders a missing one as {@code ??key_xx??} rather than failing,
      * which no other assertion here would notice.

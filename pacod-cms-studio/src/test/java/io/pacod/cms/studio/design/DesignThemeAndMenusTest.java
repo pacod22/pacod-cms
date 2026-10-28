@@ -38,7 +38,8 @@ class DesignThemeAndMenusTest {
         ThemeRepository themes = mock(ThemeRepository.class);
         when(themes.findById(Theme.ID)).thenAnswer(i -> Optional.ofNullable(stored));
         when(themes.save(any(Theme.class))).thenAnswer(i -> stored = i.getArgument(0));
-        theme = new DesignTheme(themes, new DesignLayouts(mock(LayoutRepository.class), new TemplateSetCatalog()));
+        theme = new DesignTheme(themes, new DesignLayouts(mock(LayoutRepository.class), new TemplateSetCatalog(),
+                mock(io.pacod.cms.studio.MgmtPageService.class)));
         MenuRepository repo = mock(MenuRepository.class);
         when(repo.findById(anyString())).thenAnswer(i -> Optional.ofNullable(menuStore.get(i.<String>getArgument(0))));
         when(repo.save(any(Menu.class))).thenAnswer(i -> {

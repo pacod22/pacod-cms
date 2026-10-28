@@ -38,7 +38,15 @@ public enum SectionType {
             SettingField.text("heading", false, 120))),
 
     SOCIAL_LINKS("social-links", "socialLinks", List.of(
-            SettingField.text("heading", false, 120)));
+            SettingField.text("heading", false, 120))),
+
+    /**
+     * A standing page's body ({@code /p/{slug}}), in the reader's language as the page itself
+     * falls back: a layout's text that can be translated, as no setting can. No heading of its own
+     * -- the body has its headings -- and no title.
+     */
+    PAGE("page", "standingPage", List.of(
+            SettingField.page("page")));
 
     private final String id;
     private final String fragment;

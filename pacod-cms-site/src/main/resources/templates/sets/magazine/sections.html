@@ -118,5 +118,14 @@
     </section>
 </th:block>
 
+<!--/* A standing page's body (s.data, a PageService.Rendered, chosen by PageComposer), as the
+       standing page renders it: plain .article-body -- not .mz-body, so no drop cap -- carrying the
+       body blocks' styles. No title and no fallback notice; lang says which language it is in. */-->
+<th:block th:fragment="standingPage(s, lang)">
+    <section class="section mz-section mz-section--page" th:lang="${s.data.language}">
+        <div class="article-body" th:utext="${s.data.body}">Text</div>
+    </section>
+</th:block>
+
 </body>
 </html>
