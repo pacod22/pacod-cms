@@ -414,15 +414,19 @@ class ArticleTemplateControllerTest {
 
     /* ---------------------------------------------------------------- the head */
 
-    /** What SiteChromeAdvice adds before every handler: here, a website offering four languages. */
-    @org.springframework.web.bind.annotation.ControllerAdvice
-    static class MultilingualSite {
-        @org.springframework.web.bind.annotation.ModelAttribute("site")
-        io.pacod.cms.site.data.SiteChrome site() {
-            return io.pacod.cms.site.data.SiteChrome.of(io.pacod.cms.site.testing.TestSites.settings(), java.util.Map.of(),
-                    "http://localhost", java.util.stream.Stream.of("bg", "en", "de", "ru")
-                            .map(io.pacod.cms.core.data.Language::new).toList(), "/", null);
-        }
+    /**
+     * SiteChromeAdvice itself, over a website offering four languages. Not an annotated class of
+     * this test's own: the ITs' context scans io.pacod.cms.site on the test classpath, and would
+     * add such an advice to every page the running site renders.
+     */
+    private static SiteChromeAdvice multilingualSite() {
+        io.pacod.cms.site.services.SiteChromeReader chrome = mock(io.pacod.cms.site.services.SiteChromeReader.class);
+        when(chrome.settings()).thenReturn(io.pacod.cms.site.testing.TestSites.settings());
+        when(chrome.menus()).thenReturn(java.util.Map.of());
+        io.pacod.cms.site.services.LanguageReader languages = mock(io.pacod.cms.site.services.LanguageReader.class);
+        when(languages.findAll()).thenReturn(java.util.stream.Stream.of("bg", "en", "de", "ru")
+                .map(io.pacod.cms.core.data.Language::new).toList());
+        return new SiteChromeAdvice(chrome, languages, mock(io.pacod.cms.site.render.ThemeReader.class));
     }
 
     private static io.pacod.cms.site.data.HeadMeta head(org.springframework.test.web.servlet.ResultActions result) {
@@ -461,7 +465,7 @@ class ArticleTemplateControllerTest {
                 .standaloneSetup(new ArticleTemplateController(
                         articleService, tagService, composer, bannerService, metrics, new SitePdfs(""),
                         new PrintExtras(mock(PdfEnrichmentRepository.class))))
-                .setControllerAdvice(new MultilingualSite())
+                .setControllerAdvice(multilingualSite())
                 .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
                 .build();
 
