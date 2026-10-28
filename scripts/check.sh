@@ -210,6 +210,13 @@ if [ -n "$external" ]; then
   fi
 fi
 
+# ---- directives for the websites' site, in either mode -------------------------------------------
+extra=$(get CMS_PUBLIC_EXTRA_FILE)
+if [ -n "$extra" ]; then
+  if [ -f "$extra" ]; then ok "CMS_PUBLIC_EXTRA_FILE: $extra goes into the websites' site"
+  else bad "CMS_PUBLIC_EXTRA_FILE=$extra is not a file"; fi
+fi
+
 # ---- a certificate pair of this machine's own --------------------------------------------------
 if [ -n "$(get SSL_CERT_FILE)$(get SSL_KEY_FILE)" ]; then
   SSL_CERT_FILE=$(get SSL_CERT_FILE) SSL_KEY_FILE=$(get SSL_KEY_FILE) ./scripts/check-tls.sh | sed '1d;s/^/  /' || errors=$((errors + 1))

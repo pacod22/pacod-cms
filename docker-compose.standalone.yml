@@ -227,6 +227,10 @@ services:
       # Caddyfile then imports supplied-pair.caddy, which serves the pair for every name it covers;
       # otherwise this is empty and Caddy obtains every certificate itself.
       CADDY_SUPPLIED_PAIR: ${SSL_CERT_FILE:+import supplied-pair.caddy}
+      # Directives for the websites' site before it proxies, such as the redirects of a website's
+      # old addresses (platform/caddy/cms.caddy's CMS_PUBLIC_EXTRA): the file CMS_PUBLIC_EXTRA_FILE
+      # names, mounted below; unset, none.
+      CMS_PUBLIC_EXTRA: ${CMS_PUBLIC_EXTRA_FILE:+import /etc/caddy/public-extra.conf}
     depends_on:
       cms-site:
         condition: service_healthy
@@ -248,6 +252,7 @@ services:
       # host. Unset, a placeholder stands in -- a bind mount needs a source -- and is never read.
       - ${SSL_CERT_FILE:-./docker/caddy/no-certificate}:/etc/caddy/tls/fullchain.pem:ro
       - ${SSL_KEY_FILE:-./docker/caddy/no-certificate}:/etc/caddy/tls/privkey.pem:ro
+      - ${CMS_PUBLIC_EXTRA_FILE:-./docker/caddy/no-public-extra.conf}:/etc/caddy/public-extra.conf:ro
       # The certificates, Caddy's local CA and the account with the CA. Keep it: a CA rate-limits
       # re-issuing.
       - pacod-caddy-data:/data

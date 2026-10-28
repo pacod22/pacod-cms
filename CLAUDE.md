@@ -2352,8 +2352,9 @@ pacod-id already run, so their names are taken): no shared component of cms's ow
 `cms-studio` join `${CADDY_NETWORK}`; `make caddy-config` (`scripts/caddy-config.sh`) writes
 `cms.caddy` with its placeholders filled from `.env` for that Caddy, refusing a catch-all
 `CMS_PUBLIC_SITE`, with `CMS_STUDIO_TLS`, `CMS_PUBLIC_TLS` and `CMS_PUBLIC_EXTRA_FILE` (directives
-before the websites' proxy, e.g. a site's old-address redirects); `make check` skips cms's own
-pacod-id secrets, mail and internal-listener rules there.
+before the websites' proxy, e.g. a site's old-address redirects; the bundled Caddy mounts the same
+file at `/etc/caddy/public-extra.conf` and imports it through `CMS_PUBLIC_EXTRA`); `make check`
+skips cms's own pacod-id secrets, mail and internal-listener rules there.
 
 **`docker-compose.standalone.yml`** holds cms's copies of the shared components: `pacod-caddy` (the
 front door, `${HTTP_PORT:-8000}`, `${HTTPS_PORT:-8443}` tcp and udp; volumes

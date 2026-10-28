@@ -380,7 +380,11 @@ would take every other site that Caddy serves. So the script refuses a catch-all
 and `CMS_PUBLIC_TLS` carry the `tls` lines that Caddy needs. Where it obtains certificates itself,
 leave them unset. `CMS_PUBLIC_EXTRA_FILE` names a file of directives for the websites' site, which
 the script copies in before the proxy. Use it for the redirects of a website's old addresses. Name
-it anything but `*.caddy` if it lies in the sites folder.
+it anything but `*.caddy` if it lies in the sites folder. The bundled Caddy takes the same setting:
+there the file is mounted and imported in the same place, and its `{$VAR}` placeholders are that
+Caddy's environment, so their defaults apply. Its hosts still need a certificate: in the bundled
+Caddy one comes on demand only for a website's own hosts, so a host that only redirects is either
+one of the website's addresses or covered by a supplied certificate pair.
 
 The existing Caddyfile needs `import sites/*.caddy` (or `import /etc/caddy/sites/*.caddy`) once,
 with the folder mounted. Without it, paste the file in. Where that Caddy's admin API is off,
