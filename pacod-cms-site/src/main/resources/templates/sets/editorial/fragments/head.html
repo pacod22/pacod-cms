@@ -5,18 +5,24 @@
 
   Site-level identity -- the name, the share image, the tracking and verification ids -- comes
   from ${site} (SiteChrome, put in the model by SiteChromeAdvice); everything that varies per
-  page is a parameter.
+  page is a parameter, or ${head}.
 
   Parameters (pass them by name at the call site -- there are six):
 
     lang          resolved two-letter code; drives og:locale and CONTENT-LANGUAGE
-    pageTitle     <title> and og:title
-    pageDesc      description meta and og:description
-    ogUrl         canonical absolute URL of this page
+    pageTitle     <title>, og:title and twitter:title
+    pageDesc      description meta, og:description and twitter:description
+    ogUrl         absolute URL of this page, for og:url when there is no ${head}
     ogImagePath   site-relative image path, e.g. /assets/img/articles/x.jpg. Made absolute
                   here, and also emitted as a high-priority preload -- it is the LCP image
                   on the article page.
     ogImageType   MIME type of that image, or null
+
+  ${head} (HeadMeta), put in the model by the reader routes' controllers, is the page's address
+  and kind: the canonical link -- which og:url then names too -- the hreflang alternates, og:type
+  article with its article:* tags and the BlogPosting JSON-LD, and the Atom feed links. It is
+  absent from the error page, the issues and the print views, which render without all of that:
+  no canonical is ever derived from ogUrl, which on the error page names the home page.
 
   THE STYLESHEET SET IS DELIBERATE: the design is a self-contained system in site.css, served
   from the jar. Nothing else is layered under it.
@@ -27,7 +33,10 @@
 <head th:fragment="head(lang, pageTitle, pageDesc, ogUrl, ogImagePath, ogImageType)"
       th:with="ogLocale=${site != null ? site.ogLocale(lang) : 'en_US'},
                siteName=${site != null ? site.name(lang) : ''},
-               shareImage=${!#strings.isEmpty(ogImagePath) ? ogImagePath : (site != null ? site.ogImage() : null)}">
+               shareImage=${!#strings.isEmpty(ogImagePath) ? ogImagePath : (site != null ? site.ogImage() : null)},
+               shareUrl=${#strings.isEmpty(shareImage) ? null : (site != null ? site.url(#uris.escapePath(shareImage)) : #uris.escapePath(shareImage))},
+               metaDesc=${pageDesc != null ? pageDesc : (site?.description(lang) ?: pageTitle)},
+               canonicalUrl=${site != null and head?.canonical() != null ? site.url(head.canonical()) : null}">
     <!--/* Restores the stored theme before first paint. localStorage can throw in private
            browsing, hence the try. Key and values match site.js. */-->
     <!--/* Also included on its own, as fragments/head :: theme, by social.html -- which has a head of
@@ -61,25 +70,44 @@
     <meta name="msvalidate.01" th:if="${site?.bingSiteVerification() != null}"
           th:content="${site.bingSiteVerification()}"/>
     <meta name="author" th:if="${!#strings.isEmpty(siteName)}" th:content="${siteName}"/>
-    <meta name="description" th:content="${pageDesc != null ? pageDesc : (site?.description(lang) ?: pageTitle)}"/>
-    <meta property="og:url" th:content="${ogUrl}"/>
+    <meta name="description" th:content="${metaDesc}"/>
+    <!--/* The one address the page is filed under (HeadMeta): the language it shows, by its own
+           route, absolute. og:url says the same, so a share and a crawler agree. */-->
+    <link rel="canonical" th:if="${canonicalUrl != null}" th:href="${canonicalUrl}"/>
+    <th:block th:if="${site != null and head != null}">
+    <link rel="alternate" th:each="alt : ${head.alternates()}" th:hreflang="${alt.hreflang()}" th:href="${site.url(alt.path())}"/>
+    </th:block>
+    <meta property="og:url" th:content="${canonicalUrl ?: ogUrl}"/>
     <meta property="og:title" th:content="${pageTitle}"/>
-    <meta property="og:type" content="website"/>
+    <meta property="og:type" th:content="${head != null and head.isArticle() ? 'article' : 'website'}"/>
+    <th:block th:if="${head != null and head.isArticle()}">
+    <meta property="article:published_time" th:if="${head.published() != null}" th:content="${head.published()}"/>
+    <meta property="article:modified_time" th:if="${head.modified() != null}" th:content="${head.modified()}"/>
+    <meta property="article:section" th:if="${head.section() != null}" th:content="${head.section()}"/>
+    <meta property="article:tag" th:each="tag : ${head.tags()}" th:content="${tag}"/>
+    </th:block>
     <meta property="og:site_name" th:if="${!#strings.isEmpty(siteName)}" th:content="${siteName}"/>
-    <meta property="og:description" th:content="${pageDesc != null ? pageDesc : (site?.description(lang) ?: pageTitle)}"/>
+    <meta property="og:description" th:content="${metaDesc}"/>
     <!--/* ArticleModel.getImage() and getContent() return "" -- not null -- for an article
            with no images, so these test for emptiness; the website's own share image stands in.
            A bare th:if="!= null" would emit an og:image naming the bare host. */-->
-    <meta property="og:image" th:if="${!#strings.isEmpty(shareImage)}"
-          th:content="${site != null ? site.url(#uris.escapePath(shareImage)) : #uris.escapePath(shareImage)}"/>
-    <meta property="og:image:secure_url" th:if="${!#strings.isEmpty(shareImage)}"
-          th:content="${site != null ? site.url(#uris.escapePath(shareImage)) : #uris.escapePath(shareImage)}"/>
+    <meta property="og:image" th:if="${shareUrl != null}" th:content="${shareUrl}"/>
+    <meta property="og:image:secure_url" th:if="${shareUrl != null}" th:content="${shareUrl}"/>
     <meta property="og:image:type" th:if="${!#strings.isEmpty(ogImagePath) and !#strings.isEmpty(ogImageType)}" th:content="${ogImageType}"/>
     <!--/* No og:image:width/height: the upload rule is a minimum and a shape, not one size (an
            article picture may be 600x400 or 1500x1000), and a stated size that is wrong is worse
            than none -- a scraper reads it from the image. */-->
     <meta property="fb:app_id" th:if="${site?.facebookAppId() != null}" th:content="${site.facebookAppId()}"/>
     <meta property="og:locale" th:content="${ogLocale}"/>
+    <th:block th:if="${site != null and head != null}">
+    <meta property="og:locale:alternate" th:each="alt : ${head.alternates()}" th:if="${alt.hreflang() != 'x-default' and alt.hreflang() != lang}" th:content="${site.ogLocale(alt.hreflang())}"/>
+    </th:block>
+    <!--/* X reads og:title, og:description and og:image too, but only its own card type: the large
+           one wants a picture, which every page with a share image has. */-->
+    <meta name="twitter:card" th:content="${shareUrl != null ? 'summary_large_image' : 'summary'}"/>
+    <meta name="twitter:title" th:content="${pageTitle}"/>
+    <meta name="twitter:description" th:content="${metaDesc}"/>
+    <meta name="twitter:image" th:if="${shareUrl != null}" th:content="${shareUrl}"/>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     <meta http-equiv="CONTENT-LANGUAGE" th:content="${ogLocale}"/>
     <link rel="preload" fetchpriority="high" as="image"
@@ -92,6 +120,15 @@
       "url": /*[[${site.url('/')}]]*/ "https://www.example.com/"
     }
     </script>
+    <!--/* An article's BlogPosting (HeadMeta.posting): a map, which the inlining writes as JSON
+           escaped for a script element, every value the article lacks left out. */-->
+    <script type="application/ld+json" th:if="${site != null and head != null and head.isArticle()}"
+            th:inline="javascript">/*[[${head.posting(site, lang, pageTitle, metaDesc, shareUrl)}]]*/ {}</script>
+    <!--/* The website's Atom feed in the page's language, and a category list's own (FeedController). */-->
+    <link rel="alternate" type="application/atom+xml" th:if="${site != null and head?.feed() != null}"
+          th:title="${siteName}" th:href="${site.url(head.feed())}"/>
+    <link rel="alternate" type="application/atom+xml" th:if="${site != null and head?.sectionFeed() != null}"
+          th:title="${pageTitle}" th:href="${site.url(head.sectionFeed())}"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <th:block th:if="${site?.gtmId() != null}">

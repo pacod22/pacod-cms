@@ -8,6 +8,8 @@ import io.pacod.cms.core.data.PdfFormat;
 import io.pacod.cms.core.data.PdfMode;
 import io.pacod.cms.site.data.ArticleListPageable;
 import io.pacod.cms.site.data.ArticleModel;
+import io.pacod.cms.site.data.HeadMeta;
+import io.pacod.cms.site.data.SiteChrome;
 import io.pacod.cms.site.exceptions.ArticleNotFoundException;
 import io.pacod.cms.core.data.Tag;
 import io.pacod.cms.core.services.TagService;
@@ -119,6 +121,7 @@ public class ArticleTemplateController {
         // The home page has no content of its own: its layout's sections are all of it.
         model.addAttribute("regions", composer.compose(PageType.HOME, resolvedLang));
         model.addAttribute("lang", resolvedLang);
+        model.addAttribute("head", HeadMeta.home(resolvedLang, site(model)));
         pageRendered(model, request, BannerPage.LANDING);
 
         return "landing";
@@ -212,6 +215,7 @@ public class ArticleTemplateController {
         model.addAttribute("tags", tags);
         model.addAttribute("pdf", pdfs.article(articleModel.getId(), lang).orElse(null));
         model.addAttribute("regions", composer.compose(PageType.LATEST, lang));
+        model.addAttribute("head", HeadMeta.latest(lang, site(model)));
         pageRendered(model, request, BannerPage.INDEX, latest.map(ArticleTemplateController::categoryIds).orElse(List.of()));
 
         return "index";
@@ -255,9 +259,11 @@ public class ArticleTemplateController {
      * rendered. That self-heals rather than persisting -- every in-page link is built from the
      * {@code lang} model attribute this method sets.
      *
-     * <p>{@code og:url} names the {@code /article/{id}?lang=} form on both, so the two URLs
-     * advertise one identity. A {@code rel="canonical"}/{@code hreflang} pair would say it more
-     * loudly; the head fragment carries neither, for any route.
+     * <p>The head files every spelling under one address ({@link HeadMeta#article}): the
+     * original's bare {@code /article/{id}}, a translation's {@code /{lang}/article/{id}} --
+     * {@code rel="canonical"} and {@code og:url} alike -- and lists the others as {@code hreflang}
+     * alternates. {@code /article/5?lang=de} and {@code /de/article/5} name the same canonical,
+     * and a language the article is not translated into names the one it fell back to.
      */
     @RequestMapping(value = {"/article/{id}", "/{pathLang:[a-z]{2,3}}/article/{id}"}, method = RequestMethod.GET)
     public String getArticle(HttpServletRequest request, @PathVariable(required = false) Integer id, @PathVariable(required = false) String pathLang, Model model, @RequestParam(required = false) String lang, java.util.Locale locale) throws ArticleNotFoundException {
@@ -285,6 +291,7 @@ public class ArticleTemplateController {
         model.addAttribute("lang", lang);
         model.addAttribute("pdf", pdfs.article(articleModel.getId(), lang).orElse(null));
         model.addAttribute("regions", composer.compose(PageType.ARTICLE, lang));
+        model.addAttribute("head", HeadMeta.article(articleModel, site(model)));
         pageRendered(model, request, BannerPage.ARTICLE, categoryIds(article));
         return "article";
     }
@@ -374,9 +381,19 @@ public class ArticleTemplateController {
         model.addAttribute("list", list);
         model.addAttribute("lang", lang);
         model.addAttribute("regions", composer.compose(PageType.CATEGORY, lang));
+        model.addAttribute("head", HeadMeta.list(id, pageable.getPageNumber(),
+                listId != null && !WebArticleService.isMostRead(listId), lang, site(model)));
         pageRendered(model, request, BannerPage.LIST, listId == null ? List.of() : List.of(listId));
 
         return "list";
+    }
+
+    /**
+     * The chrome {@code SiteChromeAdvice} put in the model before this handler ran, or null where
+     * no advice runs (a standalone controller test): the languages the head's alternates name.
+     */
+    private static SiteChrome site(Model model) {
+        return model.getAttribute("site") instanceof SiteChrome site ? site : null;
     }
 
     /**

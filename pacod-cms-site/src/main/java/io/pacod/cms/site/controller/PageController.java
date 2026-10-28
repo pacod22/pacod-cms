@@ -7,6 +7,8 @@ import io.pacod.cms.core.data.BannerPage;
 import io.pacod.cms.core.data.BannerPlacement;
 import io.pacod.cms.core.data.Page;
 import io.pacod.cms.core.data.LanguageChain;
+import io.pacod.cms.site.data.HeadMeta;
+import io.pacod.cms.site.data.SiteChrome;
 import io.pacod.cms.site.exceptions.PageNotFoundException;
 import io.pacod.cms.site.services.BannerService;
 import io.pacod.cms.site.services.PageService;
@@ -93,6 +95,10 @@ public class PageController {
         model.addAttribute("requestedLang", resolved);
         model.addAttribute("languages", pageService.languages());
         model.addAttribute("regions", composer.compose(PageType.PAGE, rendered.language()));
+        // Filed under the language served, not the one asked for: /de/p/about with no German is a
+        // copy of /p/about. The chrome SiteChromeAdvice added names the website's languages.
+        model.addAttribute("head", HeadMeta.page(page, rendered.language(),
+                model.getAttribute("site") instanceof SiteChrome site ? site : null));
 
         model.addAttribute("topBanners", bannerService.forPage(BannerPlacement.TOP, BannerPage.PAGE));
         model.addAttribute("sidebarBanners", bannerService.forPage(BannerPlacement.SIDEBAR, BannerPage.PAGE));

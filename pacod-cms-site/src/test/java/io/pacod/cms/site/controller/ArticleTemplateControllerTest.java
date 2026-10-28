@@ -411,4 +411,101 @@ class ArticleTemplateControllerTest {
                 .andExpect(view().name("list"))
                 .andExpect(model().attributeExists("list"));
     }
+
+    /* ---------------------------------------------------------------- the head */
+
+    /** What SiteChromeAdvice adds before every handler: here, a website offering four languages. */
+    @org.springframework.web.bind.annotation.ControllerAdvice
+    static class MultilingualSite {
+        @org.springframework.web.bind.annotation.ModelAttribute("site")
+        io.pacod.cms.site.data.SiteChrome site() {
+            return io.pacod.cms.site.data.SiteChrome.of(io.pacod.cms.site.testing.TestSites.settings(), java.util.Map.of(),
+                    "http://localhost", java.util.stream.Stream.of("bg", "en", "de", "ru")
+                            .map(io.pacod.cms.core.data.Language::new).toList(), "/", null);
+        }
+    }
+
+    private static io.pacod.cms.site.data.HeadMeta head(org.springframework.test.web.servlet.ResultActions result) {
+        return (io.pacod.cms.site.data.HeadMeta) result.andReturn().getModelAndView().getModel().get("head");
+    }
+
+    private static Article translated(int id) {
+        Article article = article(id);
+        article.setTexts(List.of(io.pacod.cms.core.data.TextItem.builder().lang("de").text("<p>Text</p>").build()));
+        return article;
+    }
+
+    @Test
+    @DisplayName("Every spelling of a translated article names one canonical address")
+    void articleHeadIsFiledUnderItsLanguage() throws Exception {
+        when(tagService.getAllTags()).thenReturn(List.of());
+        when(articleService.getArticleById(1)).thenReturn(Optional.of(translated(1)));
+
+        assertThat(head(mockMvc.perform(get("/de/article/1"))).canonical()).isEqualTo("/de/article/1");
+        assertThat(head(mockMvc.perform(get("/article/1").param("lang", "de"))).canonical()).isEqualTo("/de/article/1");
+        assertThat(head(mockMvc.perform(get("/article/1").param("lang", "bg"))).canonical()).isEqualTo("/article/1");
+        // Not translated into Russian: the Bulgarian original is what /ru/ shows.
+        io.pacod.cms.site.data.HeadMeta russian = head(mockMvc.perform(get("/ru/article/1")));
+        assertThat(russian.canonical()).isEqualTo("/article/1");
+        assertThat(russian.isArticle()).isTrue();
+        // No advice here, so no languages to choose alternates from.
+        assertThat(russian.alternates()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("The head's alternates are the languages the advice's chrome offers and the article is written in")
+    void articleHeadReadsTheAdvicesLanguages() throws Exception {
+        when(tagService.getAllTags()).thenReturn(List.of());
+        when(articleService.getArticleById(1)).thenReturn(Optional.of(translated(1)));
+        MockMvc advised = MockMvcBuilders
+                .standaloneSetup(new ArticleTemplateController(
+                        articleService, tagService, composer, bannerService, metrics, new SitePdfs(""),
+                        new PrintExtras(mock(PdfEnrichmentRepository.class))))
+                .setControllerAdvice(new MultilingualSite())
+                .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
+                .build();
+
+        assertThat(head(advised.perform(get("/de/article/1"))).alternates())
+                .extracting(io.pacod.cms.site.data.HeadMeta.Alternate::hreflang).containsExactly("bg", "de", "x-default");
+        assertThat(head(advised.perform(get("/").param("lang", "ru"))).alternates())
+                .extracting(io.pacod.cms.site.data.HeadMeta.Alternate::hreflang)
+                .containsExactly("bg", "en", "de", "ru", "x-default");
+    }
+
+    @Test
+    @DisplayName("The home page and /latest are filed under ?lang=, in the language they render")
+    void landingAndLatestHeads() throws Exception {
+        when(tagService.getAllTags()).thenReturn(List.of());
+        when(articleService.getLatestArticle()).thenReturn(Optional.of(article(2)));
+
+        assertThat(head(mockMvc.perform(get("/"))).canonical()).isEqualTo("/");
+        assertThat(head(mockMvc.perform(get("/").param("lang", "en"))).canonical()).isEqualTo("/?lang=en");
+        assertThat(head(mockMvc.perform(get("/").cookie(new Cookie("lang", "de")))).canonical()).isEqualTo("/?lang=de");
+        io.pacod.cms.site.data.HeadMeta latest = head(mockMvc.perform(get("/latest").param("lang", "de")));
+        assertThat(latest.canonical()).isEqualTo("/latest?lang=de");
+        assertThat(latest.isArticle()).isFalse();
+    }
+
+    @Test
+    @DisplayName("A list is filed under its own segment and page, and only a category advertises a feed of its own")
+    void listHeads() throws Exception {
+        when(tagService.getAllTags()).thenReturn(List.of());
+        when(articleService.getAllArticlesByCategoryPageable(any(), any(), anyString()))
+                .thenReturn(ArticleListPageable.builder().id(5).name("cat").build());
+        when(articleService.getAllArticlesByTagPageable(anyString(), any(), anyString()))
+                .thenReturn(ArticleListPageable.builder().name("alpha").build());
+
+        io.pacod.cms.site.data.HeadMeta category = head(mockMvc.perform(get("/de/list/5").param("page", "2")));
+        assertThat(category.canonical()).isEqualTo("/de/list/5?page=2");
+        assertThat(category.sectionFeed()).isEqualTo("/list/5/feed.xml?lang=de");
+        assertThat(head(mockMvc.perform(get("/list/5").param("lang", "bg"))).canonical()).isEqualTo("/list/5");
+        // A tag is filed under its own name, not the translated one the list displays.
+        when(tagService.getAllTags()).thenReturn(List.of(io.pacod.cms.core.data.Tag.builder().name("alpha")
+                .translations(List.of(io.pacod.cms.core.data.TextItem.builder().lang("de").text("Alpha-DE").build())).build()));
+        io.pacod.cms.site.data.HeadMeta tag = head(mockMvc.perform(get("/de/list/alpha")));
+        assertThat(tag.canonical()).isEqualTo("/de/list/alpha");
+        assertThat(tag.sectionFeed()).isNull();
+        // The most-read list is a list, not a category with a feed.
+        assertThat(head(mockMvc.perform(get("/list/100001"))).sectionFeed()).isNull();
+    }
 }

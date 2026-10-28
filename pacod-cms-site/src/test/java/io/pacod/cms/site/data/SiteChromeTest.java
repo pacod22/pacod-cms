@@ -180,6 +180,43 @@ class SiteChromeTest {
         assertThat(other.languageLinks("en").get(1).href()).isEqualTo("/social?lang=de");
     }
 
+    @Test
+    @DisplayName("the website's languages are its codes in the switcher's order, and offers() asks about one")
+    void languagesOffered() {
+        List<io.pacod.cms.core.data.Language> languages = List.of(new io.pacod.cms.core.data.Language("en"),
+                new io.pacod.cms.core.data.Language("de"), new io.pacod.cms.core.data.Language("EN"),
+                new io.pacod.cms.core.data.Language());
+        SiteChrome chrome = SiteChrome.of(TestSites.settings(), Map.of(), "http://localhost", languages, "/", null);
+
+        assertThat(chrome.languageCodes()).containsExactly("en", "de");
+        assertThat(chrome.offers("de")).isTrue();
+        assertThat(chrome.offers("de-AT")).isTrue();
+        assertThat(chrome.offers("ru")).isFalse();
+        assertThat(chrome.offers(null)).isFalse();
+        // No language list (a render that is not a reader's page, or an unreadable collection).
+        assertThat(TestSites.chrome().languageCodes()).isEmpty();
+        assertThat(TestSites.chrome().offers("bg")).isFalse();
+    }
+
+    @Test
+    @DisplayName("the origin is the base URL, else the request's, without a trailing slash, as SiteOrigin rules")
+    void originIsSiteOrigins() {
+        SiteSettings settings = new SiteSettings();
+        assertThat(SiteOrigin.of(settings, "http://demo.localhost:8000//")).isEqualTo("http://demo.localhost:8000");
+        assertThat(SiteOrigin.of(null, (String) null)).isEmpty();
+        settings.setBaseUrl(" https://www.example.org/ ");
+        assertThat(SiteOrigin.of(settings, "http://demo.localhost:8000")).isEqualTo("https://www.example.org");
+        assertThat(SiteChrome.of(settings, Map.of(), "http://demo.localhost:8000").origin())
+                .isEqualTo(SiteOrigin.of(settings, "http://demo.localhost:8000"));
+
+        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
+        request.setServerName("alpha.test");
+        request.setServerPort(8000);
+        request.setRequestURI("/article/5");
+        assertThat(SiteOrigin.ofRequest(request)).isEqualTo("http://alpha.test:8000");
+        assertThat(SiteOrigin.of(new SiteSettings(), request)).isEqualTo("http://alpha.test:8000");
+    }
+
     private static MenuItem item(MenuLinkKind kind, String target, String label) {
         MenuItem item = new MenuItem();
         item.setKind(kind);

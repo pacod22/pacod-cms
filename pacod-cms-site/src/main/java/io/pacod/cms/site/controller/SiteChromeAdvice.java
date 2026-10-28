@@ -1,6 +1,7 @@
 package io.pacod.cms.site.controller;
 
 import io.pacod.cms.site.data.SiteChrome;
+import io.pacod.cms.site.data.SiteOrigin;
 import io.pacod.cms.site.render.SitePreview;
 import io.pacod.cms.site.render.SitePrint;
 import io.pacod.cms.site.services.LanguageReader;
@@ -10,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.webmvc.autoconfigure.error.BasicErrorController;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.util.Optional;
 
@@ -71,7 +71,7 @@ public class SiteChromeAdvice {
      */
     @ModelAttribute("site")
     public SiteChrome site(HttpServletRequest request) {
-        String origin = origin(request);
+        String origin = SiteOrigin.ofRequest(request);
         try {
             if (SitePreview.of(request).isPresent()) {
                 return SiteChrome.of(reader.settingsNow(), reader.menusNow(), origin, languageReader.findAll(),
@@ -85,11 +85,5 @@ public class SiteChromeAdvice {
             log.error("Could not build the site chrome; rendering it empty: {}", e.getMessage());
             return SiteChrome.empty(origin);
         }
-    }
-
-    /** Scheme, host and port as the reader sees them: forwarded headers are already applied. */
-    static String origin(HttpServletRequest request) {
-        return ServletUriComponentsBuilder.fromContextPath(request)
-                .replacePath(null).replaceQuery(null).build().toUriString();
     }
 }

@@ -240,4 +240,105 @@ class ArticleModelTest {
         assertThat(model.hasTranslation(null)).isFalse();
         assertThat(model.hasTranslation("fr")).isFalse();
     }
+
+    // ---------------------------------------------------------------- the head's facts
+
+    /** Bulgarian original, an English and a German body, and a French title with no body. */
+    private static Article translated() {
+        Article article = new Article(5);
+        article.setTitle("Заглавие");
+        article.setText("<p>Тяло</p>");
+        article.setTitles(List.of(item("en", "Title"), item("de", "Titel"), item("fr", "Titre")));
+        article.setTexts(List.of(item("en", "<p>Body</p>"), item("de", "<p>Text</p>"), item("ru", " ")));
+        return article;
+    }
+
+    @Test
+    @DisplayName("an article's languages are its original and every language with a body of its own")
+    void languagesAreTheBodies() {
+        // French is a title alone, Russian a blank body: neither is a page in that language.
+        assertThat(new ArticleModel(translated(), "en").languages()).containsExactly("bg", "de", "en");
+        assertThat(new ArticleModel(new Article(6), "en").languages()).containsExactly("bg");
+    }
+
+    @Test
+    @DisplayName("the served language is the one whose body renders: asked for, else English, else the original")
+    void servedLanguageFollowsTheBody() {
+        assertThat(new ArticleModel(translated(), "de").servedLanguage()).isEqualTo("de");
+        assertThat(new ArticleModel(translated(), "de-AT").servedLanguage()).isEqualTo("de");
+        assertThat(new ArticleModel(translated(), "bg").servedLanguage()).isEqualTo("bg");
+        assertThat(new ArticleModel(translated(), null).servedLanguage()).isEqualTo("bg");
+        // French has a title and no body: getText() falls back to the English body, and so does this.
+        ArticleModel french = new ArticleModel(translated(), "fr");
+        assertThat(french.getText()).isEqualTo("<p>Body</p>");
+        assertThat(french.servedLanguage()).isEqualTo("en");
+        // No English either: the original.
+        Article untranslated = new Article(6);
+        untranslated.setText("<p>Тяло</p>");
+        assertThat(new ArticleModel(untranslated, "fr").servedLanguage()).isEqualTo("bg");
+    }
+
+    @Test
+    @DisplayName("the publication time is the editor's date in the website's zone, to the second")
+    void publishedAtIsTheDateInTheWebsitesZone() {
+        Article article = new Article(5);
+        article.setCreatedOn(java.time.LocalDateTime.of(2026, 1, 2, 9, 0));
+        article.setDate(java.time.LocalDateTime.of(2026, 3, 4, 12, 0, 7, 123_000_000));
+        ArticleModel model = new ArticleModel(article, "bg");
+
+        assertThat(model.publishedAt(java.time.ZoneId.of("Europe/Sofia")))
+                .hasToString("2026-03-04T12:00:07+02:00");
+        // No date: when it was created; neither: nothing.
+        article.setDate(null);
+        assertThat(new ArticleModel(article, "bg").publishedAt(java.time.ZoneOffset.UTC)).hasToString("2026-01-02T09:00Z");
+        assertThat(new ArticleModel(new Article(6), "bg").publishedAt(java.time.ZoneOffset.UTC)).isNull();
+    }
+
+    @Test
+    @DisplayName("the modification time is read in the JVM's zone, shown in the website's, and never precedes publication")
+    void modifiedAtIsTheStampInItsOwnZone() {
+        java.time.ZoneId sofia = java.time.ZoneId.of("Europe/Sofia");
+        Article article = new Article(5);
+        article.setDate(java.time.LocalDateTime.of(2026, 3, 4, 12, 0));
+        // Last: every setter stamps lastModifiedOn with the clock.
+        article.setLastModifiedOn(java.time.LocalDateTime.of(2026, 3, 5, 8, 30));
+
+        // Stamped 08:30 in a UTC JVM is 10:30 in Sofia.
+        assertThat(new ArticleModel(article, "bg").modifiedAt(sofia, java.time.ZoneOffset.UTC))
+                .hasToString("2026-03-05T10:30+02:00");
+        // Stamped before the date it was published under (a back-dated or seeded article): the date.
+        article.setLastModifiedOn(java.time.LocalDateTime.of(2026, 3, 1, 8, 30));
+        assertThat(new ArticleModel(article, "bg").modifiedAt(sofia, java.time.ZoneOffset.UTC))
+                .hasToString("2026-03-04T12:00+02:00");
+        article.setLastModifiedOn(null);
+        assertThat(new ArticleModel(article, "bg").modifiedAt(sofia, java.time.ZoneOffset.UTC))
+                .hasToString("2026-03-04T12:00+02:00");
+    }
+
+    @Test
+    @DisplayName("the section is the first category's name in the article's language")
+    void sectionIsTheFirstCategory() {
+        io.pacod.cms.core.data.Category culture = new io.pacod.cms.core.data.Category(9, "Култура",
+                List.of(item("en", "Culture")), "bg");
+        io.pacod.cms.core.data.Category other = new io.pacod.cms.core.data.Category(10, "Друго", List.of(), "bg");
+        Article article = new Article(5);
+        article.setCategories(new java.util.ArrayList<>(java.util.Arrays.asList(null, culture, other)));
+
+        assertThat(new ArticleModel(article, "bg").sectionName()).isEqualTo("Култура");
+        assertThat(new ArticleModel(article, "en").sectionName()).isEqualTo("Culture");
+        // No German name: English, as every localised text falls back.
+        assertThat(new ArticleModel(article, "de").sectionName()).isEqualTo("Culture");
+        assertThat(new ArticleModel(new Article(6), "bg").sectionName()).isNull();
+    }
+
+    @Test
+    @DisplayName("the tag names are the translated ones, or the keywords themselves without a tag collection")
+    void tagNamesAreTranslated() {
+        Article article = new Article(5);
+        article.setTags(List.of("космос", "наука", "космос"));
+        Tag space = Tag.builder().name("космос").translations(List.of(item("en", "space"))).build();
+
+        assertThat(new ArticleModel(article, "en", List.of(space)).tagNames()).containsExactly("space", "наука");
+        assertThat(new ArticleModel(article, "en").tagNames()).containsExactly("космос", "наука");
+    }
 }

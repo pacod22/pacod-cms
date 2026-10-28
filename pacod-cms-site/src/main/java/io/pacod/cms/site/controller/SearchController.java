@@ -10,6 +10,7 @@ import io.pacod.cms.core.data.BannerPage;
 import io.pacod.cms.core.data.BannerPlacement;
 import io.pacod.cms.core.data.LanguageChain;
 import io.pacod.cms.site.data.ArticleListPageable;
+import io.pacod.cms.site.data.HeadMeta;
 import io.pacod.cms.site.data.ListItem;
 import io.pacod.cms.site.services.BannerService;
 import io.pacod.cms.site.services.SiteMetricCollector;
@@ -105,6 +106,9 @@ public class SearchController {
         }
 
         model.addAttribute("lang", resolved);
+        // The feed link alone: no canonical and no alternates for a results page (HeadMeta.minimal).
+        model.addAttribute("head", HeadMeta.minimal(resolved,
+                model.getAttribute("site") instanceof SiteChrome site ? site : null));
         model.addAttribute("regions", composer.compose(PageType.SEARCH, resolved));
         pageRendered(model, request);
 
@@ -153,6 +157,7 @@ public class SearchController {
 
         model.addAttribute("q", term);
         model.addAttribute("lang", resolved);
+        model.addAttribute("head", HeadMeta.minimal(resolved, site));
         pageRendered(model, request);
 
         return "search-google";

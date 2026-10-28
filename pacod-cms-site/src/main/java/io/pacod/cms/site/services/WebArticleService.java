@@ -30,6 +30,11 @@ public class WebArticleService {
     /** Synthetic pseudo-category id for the "most read" list; not a real category document. */
     private final static Integer MOST_READ_ID = 100001;
 
+    /** Whether {@code id} is the most-read list's: a list, but no category with a feed of its own. */
+    public static boolean isMostRead(Integer id) {
+        return MOST_READ_ID.equals(id);
+    }
+
     private final ArticleRepository articleRepository;
     private final ArticleService articleService;
     private final CategoryRepository categoryRepository;

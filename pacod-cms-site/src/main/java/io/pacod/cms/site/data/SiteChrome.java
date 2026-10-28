@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  *
  * <p>Built per request from the cached {@link SiteSettings} and {@link Menu}s plus the origin the
  * request arrived at, so absolute URLs name a host even before anyone has filled in
- * {@link SiteSettings#getBaseUrl()}.
+ * {@link SiteSettings#getBaseUrl()} ({@link SiteOrigin}).
  *
  * <p><b>Every third-party identifier is validated here, not in the template.</b> The tracking
  * container id is written into a script; an id that is not the shape its vendor issues renders
@@ -63,8 +63,7 @@ public final class SiteChrome {
                        List<Language> languages, String path, String query) {
         this.settings = settings != null ? settings : new SiteSettings();
         this.menus = menus != null ? menus : Map.of();
-        String base = this.settings.baseUrlOrEmpty();
-        this.origin = !base.isEmpty() ? base : stripTrailingSlash(origin);
+        this.origin = SiteOrigin.of(this.settings, origin);
         this.languages = languages != null ? languages : List.of();
         this.path = path != null && path.startsWith("/") ? path : "/";
         this.query = query;
@@ -274,6 +273,27 @@ public final class SiteChrome {
         return links;
     }
 
+    /**
+     * The codes of the languages the website offers, in the switcher's order: what a page's
+     * {@code hreflang} alternates are chosen from ({@link HeadMeta}).
+     */
+    public List<String> languageCodes() {
+        List<String> codes = new ArrayList<>(languages.size());
+        for (Language language : languages) {
+            String code = language != null ? LanguageChain.normalise(language.getCode()) : null;
+            if (code != null && !codes.contains(code)) {
+                codes.add(code);
+            }
+        }
+        return codes;
+    }
+
+    /** Whether the website offers {@code code}: one of {@link #languageCodes()}. */
+    public boolean offers(String code) {
+        String normalised = LanguageChain.normalise(code);
+        return normalised != null && languageCodes().contains(normalised);
+    }
+
     /** One entry of the language switcher. */
     public record LanguageLink(String code, String name, String href, boolean current) {
     }
@@ -363,17 +383,6 @@ public final class SiteChrome {
 
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.strip();
-    }
-
-    private static String stripTrailingSlash(String value) {
-        if (value == null) {
-            return "";
-        }
-        String trimmed = value.strip();
-        while (trimmed.endsWith("/")) {
-            trimmed = trimmed.substring(0, trimmed.length() - 1);
-        }
-        return trimmed;
     }
 
     /**

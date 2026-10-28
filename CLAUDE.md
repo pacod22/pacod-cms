@@ -274,9 +274,10 @@ its id.
 - **`SiteChrome` builds every menu address** from kind and target — `/list/{id}` only for a numeric
   id, `/p/{slug}` only for a slug, a `URL` only if `SocialTargets.isValidTarget` — and adds
   `?lang=`. An item whose label resolves to nothing or whose address is refused is dropped. Absolute
-  URLs (`og:url`, `og:image`, JSON-LD) come from `baseUrl`, or the request's origin while it is
-  blank. **`SiteSettings.ownHosts()`** is `baseUrl`'s host with and without `www.` — what an
-  absolute link must name to count as the website's own.
+  URLs (canonical, `og:url`, `og:image`, JSON-LD, sitemap) come from `baseUrl`, or the request's
+  origin while it is blank — one rule, **`SiteOrigin`** (site), which `SiteChrome` and
+  `SitemapController` share. **`SiteSettings.ownHosts()`** is `baseUrl`'s host with and without
+  `www.` — what an absolute link must name to count as the website's own.
 - **`SiteBootstrap` seeds both from `seed/site.json`**, which describes the demo: **a website whose
   name is not one of the seed's names gets its own name and a "© name" footer note** (in its default
   language), the seed's icons and logos, and nothing else — no taglines, contact details or `baseUrl`.
@@ -2597,7 +2598,11 @@ Every word of public chrome is a `#{key}` from the site's `messages*.properties`
 `templates/sets/editorial/fragments/` — `head`, `navbar`, `ad-sidebar`, `footer`, `widgets`, `article-view`,
 `scripts` — serves `landing`, `article`, `index`, `list`, `page`, `search`, `search-google` and
 `error`; `social` takes `head :: theme` and `:: gtm` by name. `head` is parameterised (`lang`,
-`pageTitle`, `pageDesc`, `ogUrl`, `ogImagePath`, `ogImageType`, passed by name); `index` and
+`pageTitle`, `pageDesc`, `ogUrl`, `ogImagePath`, `ogImageType`, passed by name) and reads
+**`${head}`** (`HeadMeta`, *Routes*) for the canonical, `hreflang`, `og:type article` and its
+`article:*` tags, the `BlogPosting` JSON-LD and the feed links — all absent without it, so the
+error page, the issues and the print views render as before (`ogUrl` is then `og:url`, and no
+canonical is ever derived from it); `twitter:card` is on every page; `index` and
 `article` share `article-view`; `navbar`/`footer` render from the menus and `${site}` (no logo:
 the name as text; no contact details: no block). **`ad-sidebar` takes the banner lists, and an
 absent attribute renders an empty column**, so every "no booking here" assertion is paired with a
@@ -2635,7 +2640,17 @@ renders `message`.
     cookie; in-page links carry the model's `lang`.
   - **On `/p/{slug}` the prefix is the *requested* language**: `/de/p/about` with no German renders
     English, says so in German, writes `<html lang="en">`.
-  - `og:url` names the bare `?lang=` form; no `rel="canonical"` or `hreflang`.
+  - **One address per language** (`HeadMeta`, `${head}`, built by the reader routes' controllers
+    from what they hold — not a bean): the original is the bare route, every other language the
+    `/{lang}/` prefix; `/` and `/latest` (no prefix) use `?lang=`. `rel="canonical"` and `og:url`
+    name the language the page **shows**: an article's `servedLanguage()` (asked for, else English,
+    else the original — `getText`'s fallback), a page's `Rendered.language()`, a list's language plus
+    `?page=N` past the first (0-based; size and sort dropped). `hreflang` alternates are the
+    languages the content has a **body** in (`ArticleModel.languages()` = original +
+    `translatedIn()`; `Page.writtenIn()`; lists and the home page: all) **and** `SiteChrome.offers`,
+    only when two or more, `x-default` the original's. `/latest` is its own canonical; search names
+    none (robots keeps crawlers off it). Dates are ISO-8601 with the website's offset
+    (`Tenant.timezone()`; `lastModifiedOn` is read in the JVM's zone and never precedes the date).
   - **No top-level route may be two or three lowercase letters**, and identifier-less routes get no
     prefix (`/{lang}` alone would swallow every single-segment path).
 - **`/robots.txt` and `/sitemap.xml` are answered per website** (`SitemapController`), from its own
@@ -2647,9 +2662,9 @@ renders `message`.
     while there is one, and the newest 45,000 published articles,
     through a projection (`findPublishedForSitemap`: no row resolves its `@DBRef`s). Bare
     addresses, `lastmod` a date alone.
-  - Absolute addresses come from `baseUrl`, else the request's origin, like `og:url`. A database
-    that cannot be read is a **503** with `Retry-After`, never an empty sitemap a crawler would
-    believe. Both cache an hour; `make smoke` probes both.
+  - Absolute addresses come from `baseUrl`, else the request's origin (`SiteOrigin`), like `og:url`.
+    A database that cannot be read is a **503** with `Retry-After`, never an empty sitemap a crawler
+    would believe. Both cache an hour; `make smoke` probes both.
 
 ### Search
 

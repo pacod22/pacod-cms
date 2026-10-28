@@ -5,6 +5,10 @@ import io.pacod.cms.core.data.*;
 import io.pacod.cms.site.utils.DateFormatter;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -288,6 +292,116 @@ public class ArticleModel extends Article {
         return hasTranslationInList(super.getTitles(), lang) ||
                 hasTranslationInList(super.getDescriptions(), lang) ||
                 hasTranslationInList(super.getTexts(), lang);
+    }
+
+    /**
+     * The languages this article has an address in, as bare codes: its original first, then every
+     * language it is translated into, sorted.
+     *
+     * <p>A translation is a body of its own ({@link Article#translatedIn()}, the console's chips),
+     * not merely a title: a title-only translation renders the original's body under it, and a
+     * page of that is a duplicate of the original's, not an alternate of it. {@link HeadMeta}'s
+     * canonical and {@code hreflang} links and the feed's language filter all read this one
+     * list, so they cannot disagree. Not a getter, for {@link Article#visibleImages()}'s reason.
+     */
+    public List<String> languages() {
+        List<String> codes = new ArrayList<>();
+        codes.add(LanguageChain.original());
+        for (String code : translatedIn()) {
+            if (!codes.contains(code)) {
+                codes.add(code);
+            }
+        }
+        return codes;
+    }
+
+    /**
+     * The language of the body {@link #getText()} renders for this article's {@code lang}: that
+     * language when the article is translated into it, else English when it is translated into
+     * English (the fallback {@link #getLocalizedText} tries next), else the original. What the
+     * page's canonical address names: {@code /fr/article/5} on a Bulgarian website, with only an
+     * English translation, shows the English text, and is a copy of {@code /en/article/5}.
+     */
+    public String servedLanguage() {
+        String code = LanguageChain.normalise(getLang());
+        String original = LanguageChain.original();
+        if (code == null || code.equals(original)) {
+            return original;
+        }
+        List<String> translated = translatedIn();
+        if (translated.contains(code)) {
+            return code;
+        }
+        if (!LanguageChain.FALLBACK.equals(code) && translated.contains(LanguageChain.FALLBACK)) {
+            return LanguageChain.FALLBACK;
+        }
+        return original;
+    }
+
+    /**
+     * When the article was published, in {@code zone}: its {@code date} -- the editor's wall clock,
+     * typed in the website's zone -- else its {@code createdOn}; null when it has neither. To the
+     * second, for {@code article:published_time}, the structured data and the feed.
+     */
+    public OffsetDateTime publishedAt(ZoneId zone) {
+        LocalDateTime when = getDate() != null ? getDate() : getCreatedOn();
+        return when != null ? when.atZone(zone).toOffsetDateTime().truncatedTo(ChronoUnit.SECONDS) : null;
+    }
+
+    /**
+     * When the article was last changed, in {@code zone}, never before {@link #publishedAt}.
+     *
+     * <p>{@code lastModifiedOn} is not the editor's clock: every setter stamps it with
+     * {@code LocalDateTime.now()}, the JVM's zone, which is {@code stampZone} here. A seed that
+     * copies the date into it, or a back-dated article, would otherwise read as changed before
+     * it appeared. Falls back to the publication time.
+     */
+    public OffsetDateTime modifiedAt(ZoneId zone, ZoneId stampZone) {
+        OffsetDateTime published = publishedAt(zone);
+        LocalDateTime stamped = getLastModifiedOn();
+        if (stamped == null) {
+            return published;
+        }
+        OffsetDateTime modified = stamped.atZone(stampZone).withZoneSameInstant(zone).toOffsetDateTime()
+                .truncatedTo(ChronoUnit.SECONDS);
+        return published != null && modified.isBefore(published) ? published : modified;
+    }
+
+    /**
+     * The first category's name in this article's language, or null: {@code article:section}. The
+     * scalar name is the original's, as an article's title is; the list holds the translations.
+     */
+    public String sectionName() {
+        if (getCategories() == null) {
+            return null;
+        }
+        for (Category category : getCategories()) {
+            if (category != null) {
+                String code = LanguageChain.normalise(getLang());
+                String name = code == null || code.equals(LanguageChain.original())
+                        ? category.getName()
+                        : getLocalizedText(category.getNames(), category.getName(), code);
+                return name != null && !name.isBlank() ? name.strip() : null;
+            }
+        }
+        return null;
+    }
+
+    /** The tags as a reader sees them, translated where the tag collection has a translation. */
+    public List<String> tagNames() {
+        List<String> names = new ArrayList<>();
+        List<String> source = new ArrayList<>();
+        if (!getTranslatedTags().isEmpty()) {
+            getTranslatedTags().forEach(tag -> source.add(tag.translate(getLang())));
+        } else {
+            source.addAll(getTags());
+        }
+        for (String name : source) {
+            if (name != null && !name.isBlank() && !names.contains(name.strip())) {
+                names.add(name.strip());
+            }
+        }
+        return names;
     }
 
     private boolean hasTranslationInList(List<TextItem> items, String lang) {

@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -139,6 +140,22 @@ class PageControllerTest {
                 .andExpect(model().attributeExists("sidebarBanners"));
 
         verify(metrics, times(1)).recordPageView(eq(BannerPage.PAGE), any());
+    }
+
+    @Test
+    @DisplayName("A page is filed under the language it was served in, not the one asked for")
+    void headNamesTheServedLanguage() throws Exception {
+        pageExists("about", "en");
+        io.pacod.cms.site.data.HeadMeta english = (io.pacod.cms.site.data.HeadMeta) mockMvc.perform(get("/de/p/about"))
+                .andExpect(status().isOk())
+                .andReturn().getModelAndView().getModel().get("head");
+        assertThat(english.canonical()).isEqualTo("/en/p/about");
+
+        pageExists("about", "bg");
+        io.pacod.cms.site.data.HeadMeta original = (io.pacod.cms.site.data.HeadMeta) mockMvc.perform(get("/p/about").param("lang", "de"))
+                .andReturn().getModelAndView().getModel().get("head");
+        assertThat(original.canonical()).isEqualTo("/p/about");
+        assertThat(original.isArticle()).isFalse();
     }
 
     private static io.pacod.cms.site.render.PageComposer composer() {

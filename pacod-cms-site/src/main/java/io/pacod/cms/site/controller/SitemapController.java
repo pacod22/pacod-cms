@@ -7,6 +7,7 @@ import io.pacod.cms.core.data.Page;
 import io.pacod.cms.core.repository.ArticleRepository;
 import io.pacod.cms.core.repository.CategoryRepository;
 import io.pacod.cms.core.repository.JournalIssueRepository;
+import io.pacod.cms.site.data.SiteOrigin;
 import io.pacod.cms.site.services.PageReader;
 import io.pacod.cms.site.services.SiteChromeReader;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,10 +40,10 @@ import java.util.List;
  *       category with a published article, {@code /issues} and every published journal issue, and
  *       the newest {@link #MAX_ARTICLES} published articles,
  *       through {@code ArticleRepository}'s public queries -- a draft's number is never listed --
- *       and a projection, so no row resolves its {@code @DBRef}s. Bare addresses only: the site
- *       writes no {@code hreflang} either.</li>
+ *       and a projection, so no row resolves its {@code @DBRef}s. Bare addresses only: the pages' own
+ *       heads name their translations ({@code hreflang}, {@code HeadMeta}).</li>
  *   <li>Absolute addresses come from {@code SiteSettings.baseUrl}, or the request's origin while it
- *       is blank, as the pages' {@code og:url} does.</li>
+ *       is blank ({@link SiteOrigin}), as the pages' canonical and {@code og:url} do.</li>
  *   <li>A database that cannot be read is a 503, which a crawler retries, never an empty sitemap,
  *       which it would believe.</li>
  * </ul>
@@ -139,9 +140,7 @@ public class SitemapController {
     }
 
     private String origin(HttpServletRequest request) {
-        String base = chrome.settings().baseUrlOrEmpty();
-        String origin = !base.isEmpty() ? base : SiteChromeAdvice.origin(request);
-        return origin.endsWith("/") ? origin.substring(0, origin.length() - 1) : origin;
+        return SiteOrigin.of(chrome.settings(), request);
     }
 
     static String escape(String text) {

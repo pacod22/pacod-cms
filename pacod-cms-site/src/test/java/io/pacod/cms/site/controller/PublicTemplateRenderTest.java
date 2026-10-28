@@ -646,13 +646,15 @@ class PublicTemplateRenderTest {
     @Test
     @DisplayName("The article page keeps its own title and share image, not the site's")
     void articleHeadIsPerArticle() {
+        ArticleModel article = new ArticleModel(article(7, true, null), "bg", List.of());
         String html = render("article", Map.of(
-                "article", new ArticleModel(article(7, true, null), "bg", List.of()),
-                "lang", "bg"));
+                "article", article,
+                "lang", "bg",
+                "head", io.pacod.cms.site.data.HeadMeta.article(article, null)));
 
         assertThat(html).contains("<title>Заглавие 7</title>");
         assertThat(html).contains("https://www.example.org/assets/img/articles/image-7.jpg");
-        assertThat(html).contains("https://www.example.org/article/7?lang=bg");
+        assertThat(html).contains("<meta property=\"og:url\" content=\"https://www.example.org/article/7\"/>");
         // The article's own image wins over the website's share card.
         assertThat(html).doesNotContain("/media/brand/share.png");
         assertThat(html).doesNotContain("content=\"https://www.example.org\"");
@@ -676,6 +678,188 @@ class PublicTemplateRenderTest {
         assertThat(html).doesNotContain("href=\"\"");
         assertThat(html).doesNotContain("/assets/img/articles/\"");
         assertThat(html).doesNotContain("rel=\"preload\"");
+    }
+
+    /* ---------------------------------------------------------------- the head's address ---------- */
+
+    /** A website written in Bulgarian that offers Bulgarian, English, German and Russian. */
+    private static io.pacod.cms.site.data.SiteChrome multilingual() {
+        List<Language> languages = new java.util.ArrayList<>();
+        for (String code : List.of("bg", "en", "de", "ru")) {
+            languages.add(new Language(code));
+        }
+        return io.pacod.cms.site.data.SiteChrome.of(io.pacod.cms.site.testing.TestSites.settings(),
+                io.pacod.cms.site.testing.TestSites.menus(), "http://localhost", languages, "/de/article/7", null);
+    }
+
+    /** Article 7, translated into English and German, published in Sofia's zone. */
+    private static Map<String, Object> translatedArticleModel(String lang) {
+        Article article = article(7, true, null);
+        article.setTexts(List.of(TextItem.builder().lang("en").text("<p>Body</p>").build(),
+                TextItem.builder().lang("de").text("<p>Text</p>").build()));
+        article.setTitles(List.of(TextItem.builder().lang("de").text("Titel 7").build()));
+        article.setTags(List.of("космос", "наука"));
+        // Last: every setter stamps lastModifiedOn with the clock.
+        article.setLastModifiedOn(LocalDateTime.of(2026, 3, 5, 8, 30));
+        ArticleModel model = new ArticleModel(article, lang, List.of());
+        io.pacod.cms.site.data.SiteChrome site = multilingual();
+        return Map.of("article", model, "lang", lang, "site", site,
+                "head", io.pacod.cms.site.data.HeadMeta.article(model, site, java.time.ZoneId.of("Europe/Sofia"),
+                        java.time.ZoneOffset.UTC));
+    }
+
+    /**
+     * The address a translated article is filed under, the languages it names and what kind of page
+     * it is, on every set: magazine and minimal take editorial's head, so one fragment answers for
+     * all three, and this proves the inheritance as much as the tags.
+     */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"editorial", "minimal", "magazine"})
+    @DisplayName("A translated article names its canonical address, its alternates, its dates and its feed")
+    void articleHeadNamesItsAddress(String set) {
+        engine = io.pacod.cms.site.render.TemplateSets.engine(new io.pacod.cms.core.design.TemplateSetCatalog().chain(set),
+                new io.pacod.cms.site.config.ThymeleafConfig().messageSource(), false, List.of());
+        String html = render("article", translatedArticleModel("de"));
+
+        assertThat(html).as(set).contains(
+                "<link rel=\"canonical\" href=\"https://www.example.org/de/article/7\"/>",
+                "<meta property=\"og:url\" content=\"https://www.example.org/de/article/7\"/>",
+                "<link rel=\"alternate\" hreflang=\"bg\" href=\"https://www.example.org/article/7\"/>",
+                "<link rel=\"alternate\" hreflang=\"en\" href=\"https://www.example.org/en/article/7\"/>",
+                "<link rel=\"alternate\" hreflang=\"de\" href=\"https://www.example.org/de/article/7\"/>",
+                "<link rel=\"alternate\" hreflang=\"x-default\" href=\"https://www.example.org/article/7\"/>",
+                "<meta property=\"og:type\" content=\"article\"/>",
+                "<meta property=\"article:published_time\" content=\"2026-03-04T12:00:00+02:00\"/>",
+                "<meta property=\"article:modified_time\" content=\"2026-03-05T10:30:00+02:00\"/>",
+                "<meta property=\"article:section\" content=\"Култура\"/>",
+                "<meta property=\"article:tag\" content=\"космос\"/>",
+                "<meta property=\"article:tag\" content=\"наука\"/>",
+                "<meta property=\"og:locale\" content=\"de_DE\"/>",
+                "<meta property=\"og:locale:alternate\" content=\"bg_BG\"/>",
+                "<meta property=\"og:locale:alternate\" content=\"en_US\"/>",
+                "<meta name=\"twitter:card\" content=\"summary_large_image\"/>",
+                "<meta name=\"twitter:title\" content=\"Titel 7\"/>",
+                "<meta name=\"twitter:image\" content=\"https://www.example.org/assets/img/articles/image-7.jpg\"/>",
+                "<link rel=\"alternate\" type=\"application/atom+xml\" title=\"Example Gazette\" href=\"https://www.example.org/feed.xml?lang=de\"/>");
+        // Russian is offered and not written; the reader's own language is no alternate of itself.
+        // (The switcher's own links carry hreflang too, Russian among them.)
+        assertThat(html).as(set).doesNotContain("rel=\"alternate\" hreflang=\"ru\"", "og:locale:alternate\" content=\"de_DE\"");
+        assertThat(count(html, "rel=\"canonical\"")).as(set).isEqualTo(1);
+
+        tools.jackson.databind.JsonNode posting = jsonLd(html, "BlogPosting");
+        assertThat(posting.get("headline").asString()).isEqualTo("Titel 7");
+        assertThat(posting.get("datePublished").asString()).isEqualTo("2026-03-04T12:00:00+02:00");
+        assertThat(posting.get("dateModified").asString()).isEqualTo("2026-03-05T10:30:00+02:00");
+        assertThat(posting.get("image").asString()).isEqualTo("https://www.example.org/assets/img/articles/image-7.jpg");
+        assertThat(posting.get("author").get(0).get("name").asString()).isEqualTo("Иван Петров");
+        assertThat(posting.get("mainEntityOfPage").get("@id").asString()).isEqualTo("https://www.example.org/de/article/7");
+        assertThat(posting.get("publisher").get("name").asString()).isEqualTo("Example Gazette");
+        assertThat(posting.get("publisher").get("logo").get("url").asString())
+                .isEqualTo("https://www.example.org/media/brand/logo.svg");
+        // The website's own block is still there beside it.
+        assertThat(jsonLd(html, "WebSite").get("url").asString()).isEqualTo("https://www.example.org/");
+    }
+
+    /** The original-language page is filed under the bare route; one with no picture gets the small card. */
+    @Test
+    @DisplayName("The original's page is the bare route, and a page with no picture at all the small card")
+    void originalArticleHead() {
+        String html = render("article", translatedArticleModel("bg"));
+        assertThat(html).contains("<link rel=\"canonical\" href=\"https://www.example.org/article/7\"/>",
+                "<meta property=\"og:url\" content=\"https://www.example.org/article/7\"/>",
+                "href=\"https://www.example.org/feed.xml\"/>");
+
+        io.pacod.cms.core.data.SiteSettings settings = io.pacod.cms.site.testing.TestSites.settings();
+        settings.setOgImage(null);
+        ArticleModel bare = new ArticleModel(article(8, false, null), "bg", List.of());
+        String small = render("article", Map.of("article", bare, "lang", "bg",
+                "site", io.pacod.cms.site.data.SiteChrome.of(settings, io.pacod.cms.site.testing.TestSites.menus(), "http://localhost"),
+                "head", io.pacod.cms.site.data.HeadMeta.article(bare, null)));
+        assertThat(small).contains("<meta name=\"twitter:card\" content=\"summary\"/>").doesNotContain("twitter:image");
+    }
+
+    /**
+     * The structured data is JSON however hostile the title: the inlining escapes what would close
+     * the script element or break the string, and the headline is the title without its markup.
+     */
+    @Test
+    @DisplayName("The BlogPosting is valid JSON whatever the title holds, and closes no script early")
+    void jsonLdSurvivesAHostileTitle() {
+        Article article = article(7, true, null);
+        article.setTitle("Lune's <em>\"night\"</em> </script><script>alert(1)</script> & co \\ é");
+        ArticleModel model = new ArticleModel(article, "bg", List.of());
+        String html = render("article", Map.of("article", model, "lang", "bg",
+                "head", io.pacod.cms.site.data.HeadMeta.article(model, null)));
+
+        // The body renders the title's markup as it always has; the head is where it must not escape.
+        assertThat(html.substring(0, html.indexOf("</head>"))).doesNotContain("<script>alert(1)", "</script><script>");
+        assertThat(jsonLd(html, "BlogPosting").get("headline").asString())
+                .isEqualTo("Lune's \"night\" alert(1) & co \\ é");
+    }
+
+    /**
+     * Pages rendered without a {@code head} keep what they had: the error page above all, which no
+     * controller renders, and whose og:url names the home page -- a canonical there would tell a
+     * crawler a missing page is the home page.
+     */
+    @Test
+    @DisplayName("A page without a head -- the error page, an issue -- names no canonical, alternate or feed")
+    void noHeadNoAddress() {
+        for (String html : List.of(renderBare("error", Map.of("status", 404, "lang", "bg")),
+                render("error", Map.of("status", 404, "lang", "bg")), render("issue", issueModel("bg")),
+                render("index", Map.of("article", new ArticleModel(article(7, true, null), "bg", List.of()),
+                        "lang", "bg", "tags", List.of())))) {
+            assertThat(html).doesNotContain("rel=\"canonical\"", "rel=\"alternate\" hreflang", "application/atom+xml", "article:",
+                            "BlogPosting", "og:locale:alternate")
+                    .contains("<meta property=\"og:type\" content=\"website\"/>", "name=\"twitter:card\"");
+        }
+    }
+
+    @Test
+    @DisplayName("A category list names its page, its languages and both feeds; the latest list its own address")
+    void listAndLatestHeads() {
+        io.pacod.cms.site.data.SiteChrome site = multilingual();
+        String html = render("list", Map.of("list", list(45), "lang", "de", "site", site,
+                "head", io.pacod.cms.site.data.HeadMeta.list("9", 1, true, "de", site)));
+        assertThat(html).contains("<link rel=\"canonical\" href=\"https://www.example.org/de/list/9?page=1\"/>",
+                "<link rel=\"alternate\" hreflang=\"ru\" href=\"https://www.example.org/ru/list/9?page=1\"/>",
+                "<link rel=\"alternate\" hreflang=\"x-default\" href=\"https://www.example.org/list/9?page=1\"/>",
+                "type=\"application/atom+xml\" title=\"Example Gazette\" href=\"https://www.example.org/feed.xml?lang=de\"/>",
+                "type=\"application/atom+xml\" title=\"Култура | Example Gazette\" href=\"https://www.example.org/list/9/feed.xml?lang=de\"/>",
+                "<meta property=\"og:type\" content=\"website\"/>");
+
+        String latest = render("index", Map.of("article", new ArticleModel(article(7, true, null), "en", List.of()),
+                "lang", "en", "tags", List.of(), "site", site, "head", io.pacod.cms.site.data.HeadMeta.latest("en", site)));
+        assertThat(latest).contains("<link rel=\"canonical\" href=\"https://www.example.org/latest?lang=en\"/>",
+                "<meta property=\"og:url\" content=\"https://www.example.org/latest?lang=en\"/>",
+                "<meta property=\"og:type\" content=\"website\"/>").doesNotContain("article:published_time", "BlogPosting");
+    }
+
+    @Test
+    @DisplayName("Search results name no canonical and no alternates, only the feed")
+    void searchHead() {
+        io.pacod.cms.site.data.SiteChrome site = multilingual();
+        String html = render("search", Map.of("lang", "de", "q", "x", "searched", true, "site", site,
+                "results", ArticleListPageable.builder().page(org.springframework.data.domain.Page.empty()).build(),
+                "head", io.pacod.cms.site.data.HeadMeta.minimal("de", site)));
+        assertThat(html).doesNotContain("rel=\"canonical\"", "rel=\"alternate\" hreflang")
+                .contains("<meta property=\"og:url\" content=\"https://www.example.org/search\"/>",
+                        "href=\"https://www.example.org/feed.xml?lang=de\"/>");
+    }
+
+    /** The JSON-LD block of {@code type}, parsed: what a crawler reads. */
+    private static tools.jackson.databind.JsonNode jsonLd(String html, String type) {
+        java.util.regex.Matcher blocks = java.util.regex.Pattern
+                .compile("<script type=\"application/ld\\+json\"[^>]*>(.*?)</script>", java.util.regex.Pattern.DOTALL)
+                .matcher(html);
+        tools.jackson.databind.ObjectMapper json = tools.jackson.databind.json.JsonMapper.builder().build();
+        while (blocks.find()) {
+            tools.jackson.databind.JsonNode node = json.readTree(blocks.group(1));
+            if (type.equals(node.get("@type").asString())) {
+                return node;
+            }
+        }
+        throw new AssertionError("No " + type + " JSON-LD in the page");
     }
 
     /**
