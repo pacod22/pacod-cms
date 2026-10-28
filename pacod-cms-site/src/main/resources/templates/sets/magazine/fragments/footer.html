@@ -45,6 +45,12 @@
     <div class="site-footer__bottom" th:if="${site != null}">
         <div class="shell site-footer__bottom-inner">
             <span th:text="${site.footerNote(lang) ?: site.name(lang)}">©</span>
+            <!--/* Back to the consent banner (fragments/consent), for a website with a tag manager.
+                   Hidden until site.js reveals it, which it does only on a page that carries the
+                   banner: without JavaScript there is nothing to manage, and on the error page
+                   nothing to open. */-->
+            <a class="site-footer__consent" href="#cookie-preferences" hidden th:if="${site.gtmId() != null}"
+               th:text="#{consent.manage}">Manage cookie preferences</a>
         </div>
     </div>
 </footer>

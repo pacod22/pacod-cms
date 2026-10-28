@@ -177,6 +177,16 @@ Further reading: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (how the parts f
   and the third-party ids — Google Tag Manager, Programmable Search, Facebook app, search-console
   verification. **Every third-party id renders only when it is set and has its vendor's shape**; a
   fresh website loads no tracking at all.
+- **A website with a Tag Manager container asks before loading it.** Its pages carry the container
+  id as data and a consent banner in the reader's language (accept all, necessary only, or choose
+  analytics and marketing), linking the website's `cookies` page, else its `privacy` page. Nothing
+  from Google loads until the reader allows analytics or marketing; Google's consent signals start
+  denied and follow the choice. The choice is one first-party cookie, `cookie_consent` (180 days);
+  "Manage cookie preferences" in the footer, or any link to `#cookie-preferences` on a page, reopens
+  the banner, and withdrawing a choice clears the Google cookies the page can reach and reloads.
+  Previews, print and PDF views, error pages and the `/social` page never load the container. The
+  site's own `Content-Security-Policy` names only who may frame it; one you add in front must allow
+  `https://www.googletagmanager.com`.
 - `menu` (ids `main` and `footer`): navigation trees whose items name their target by kind — home,
   latest, a category id, a page slug, search, the social page, or a URL — so the site builds every
   address itself.

@@ -70,7 +70,7 @@ class SearchControllerTest {
                 // The advice puts ${site} in the model, as it does for every page in production;
                 // the Google screen reads its engine id from it.
                 .setControllerAdvice(new SiteChromeAdvice(siteChrome, mock(io.pacod.cms.site.services.LanguageReader.class),
-                        mock(io.pacod.cms.site.render.ThemeReader.class)))
+                        mock(io.pacod.cms.site.render.ThemeReader.class), mock(io.pacod.cms.site.services.PageService.class)))
                 // Required here and nowhere else in these tests, and not decoration: standalone
                 // setup resolves a view name to a forward of the same string, so view "search" at
                 // request path "/search" is refused as a circular dispatch before any assertion

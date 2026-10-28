@@ -69,6 +69,26 @@ class SiteChromeTest {
     }
 
     @Test
+    @DisplayName("the consent banner's policy link: the page given, in the reader's language, only beside a container")
+    void cookiePolicyLink() {
+        SiteChrome chrome = TestSites.chrome();
+        assertThat(chrome.cookiePolicyHref("bg")).isNull();
+        assertThat(chrome.withCookiePolicy("cookies").cookiePolicyHref("bg")).isEqualTo("/p/cookies?lang=bg");
+        assertThat(chrome.withCookiePolicy("privacy").cookiePolicyHref(null)).isEqualTo("/p/privacy");
+        assertThat(chrome.withCookiePolicy("../x").cookiePolicyHref("en")).isNull();
+        // No container, no banner to link from: a preview's, or a website's without one.
+        assertThat(chrome.withCookiePolicy("cookies").withoutTracking().cookiePolicyHref("en")).isNull();
+        assertThat(chrome.withoutTracking().withCookiePolicy("cookies").cookiePolicyHref("en")).isNull();
+        SiteSettings none = TestSites.settings();
+        none.setGtmId(null);
+        assertThat(SiteChrome.of(none, Map.of(), "http://localhost").withCookiePolicy("cookies").cookiePolicyHref("en"))
+                .isNull();
+        // The rest of the chrome is the same chrome.
+        assertThat(chrome.withCookiePolicy("cookies").gtmId()).isEqualTo(TestSites.GTM_ID);
+        assertThat(chrome.withCookiePolicy("cookies").name("en")).isEqualTo(TestSites.NAME_EN);
+    }
+
+    @Test
     @DisplayName("absolute URLs use the configured base URL, else the request's origin")
     void urlsAreAbsolute() {
         assertThat(TestSites.chrome().url("/article/7?lang=en"))

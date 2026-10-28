@@ -5,6 +5,7 @@ import io.pacod.cms.site.data.SiteOrigin;
 import io.pacod.cms.site.render.SitePreview;
 import io.pacod.cms.site.render.SitePrint;
 import io.pacod.cms.site.services.LanguageReader;
+import io.pacod.cms.site.services.PageService;
 import io.pacod.cms.site.services.SiteChromeReader;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +13,7 @@ import org.springframework.boot.webmvc.autoconfigure.error.BasicErrorController;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -33,15 +35,23 @@ import java.util.Optional;
         BasicErrorController.class})
 public class SiteChromeAdvice {
 
+    /**
+     * The standing pages the consent banner may link, in order: the website's cookie policy, else
+     * its privacy policy. The first one published is linked; with neither, the banner links none.
+     */
+    static final List<String> COOKIE_POLICY_PAGES = List.of("cookies", "privacy");
+
     private final SiteChromeReader reader;
     private final LanguageReader languageReader;
     private final io.pacod.cms.site.render.ThemeReader themes;
+    private final PageService pages;
 
     public SiteChromeAdvice(SiteChromeReader reader, LanguageReader languageReader,
-                            io.pacod.cms.site.render.ThemeReader themes) {
+                            io.pacod.cms.site.render.ThemeReader themes, PageService pages) {
         this.reader = reader;
         this.languageReader = languageReader;
         this.themes = themes;
+        this.pages = pages;
     }
 
     /** The website's theme sheet, for the head's link; error pages need it as much as any. */
@@ -80,10 +90,26 @@ public class SiteChromeAdvice {
             SiteChrome chrome = SiteChrome.of(reader.settings(), reader.menus(), origin, languageReader.findAll(),
                     request.getRequestURI(), request.getQueryString());
             // The PDF renderer reads what is published, and tells no third party either.
-            return SitePrint.is(request) ? chrome.withoutTracking() : chrome;
+            if (SitePrint.is(request)) {
+                return chrome.withoutTracking();
+            }
+            return chrome.gtmId() != null ? chrome.withCookiePolicy(cookiePolicy()) : chrome;
         } catch (RuntimeException e) {
             log.error("Could not build the site chrome; rendering it empty: {}", e.getMessage());
             return SiteChrome.empty(origin);
+        }
+    }
+
+    /**
+     * The first of {@link #COOKIE_POLICY_PAGES} the website has published, or null. Read through
+     * the pages' own cache; a failure costs the banner its link, never the page its chrome.
+     */
+    private String cookiePolicy() {
+        try {
+            return COOKIE_POLICY_PAGES.stream().filter(slug -> pages.bySlug(slug).isPresent()).findFirst().orElse(null);
+        } catch (RuntimeException e) {
+            log.error("Could not read the standing pages for the consent banner's link: {}", e.getMessage());
+            return null;
         }
     }
 }

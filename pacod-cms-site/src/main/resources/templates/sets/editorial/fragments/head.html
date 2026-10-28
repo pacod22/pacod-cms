@@ -3,7 +3,7 @@
 <!--/*
   Shared <head> for every public page.
 
-  Site-level identity -- the name, the share image, the tracking and verification ids -- comes
+  Site-level identity -- the name, the share image, the verification ids -- comes
   from ${site} (SiteChrome, put in the model by SiteChromeAdvice); everything that varies per
   page is a parameter, or ${head}.
 
@@ -42,17 +42,9 @@
     <!--/* Also included on its own, as fragments/head :: theme, by social.html -- which has a head of
            its own for the reason given there. th:fragment renders in place here unchanged. */-->
     <script th:fragment="theme">(function(){try{if(localStorage.getItem('pacod-theme')==='night'){document.documentElement.classList.add('night');}}catch(e){}})();</script>
-    <!--/* Google Tag Manager, only for a website that has configured a container. The id is
-           validated by SiteChrome and written through JavaScript inlining, so it is escaped as a
-           string literal as well. fragments/head :: gtm, so a page with its own head
-           (social.html) carries the same container. */-->
-    <th:block th:fragment="gtm">
-    <script th:if="${site != null and site.gtmId() != null}" th:inline="javascript">(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer',/*[[${site.gtmId()}]]*/ 'GTM-XXXXXXX');</script>
-    </th:block>
+    <!--/* No Google Tag Manager here, nor a preconnect to it: either would reach Google before the
+           reader had agreed to anything. A website's container loads only after consent, from
+           site.js, which reads its id off the banner (fragments/consent). */-->
     <!--/* The studio's draft preview (SitePreview), and only that: the token for preview.js, which
            keeps every same-origin link and search inside the preview, and the label it shows.
            fragments/head :: preview, so social.html carries it too. */-->
@@ -131,10 +123,6 @@
           th:title="${pageTitle}" th:href="${site.url(head.sectionFeed())}"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <th:block th:if="${site?.gtmId() != null}">
-        <link rel="preconnect" href="https://www.googletagmanager.com">
-        <link rel="dns-prefetch" href="https://www.google-analytics.com">
-    </th:block>
     <link rel="preconnect" href="https://connect.facebook.net" th:if="${site?.facebookAppId() != null}">
     <link rel="icon" type="image/svg+xml" th:href="${site?.favicon() ?: '/site-assets/favicon.svg'}"
           href="/site-assets/favicon.svg"/>

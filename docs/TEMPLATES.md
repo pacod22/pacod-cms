@@ -56,14 +56,14 @@ themes:
 Each set gets its own template engine, whose resolvers look in the set, then each parent in turn,
 then the shared `_base`. A set therefore overrides only what it changes: `minimal` provides its
 page templates, `sections.html` and `fragments/stylesheets.html`, and takes the article view, the
-navbar, the footer, the social page, the print views, the issue pages' content and the error page
+navbar, the footer, the consent banner, the social page, the print views, the issue pages' content and the error page
 from `editorial`.
 
 `magazine` overrides more: the home, article, latest and list pages, `sections.html`, and the
 fragments `navbar` (one sticky bar), `footer`, `widgets` (each article-list style, and `cover`) and
 `article-view` (split into `articleHead`, the headline and lead picture across the page, and
 `articleView`, the body, gallery, keywords and author box where the primary section stands). It
-keeps editorial's head, advertising boxes, standing page, search, issues, error, social and print
+keeps editorial's head, consent banner, advertising boxes, standing page, search, issues, error, social and print
 views, restyled by `magazine.css`. A set whose `widgets.html` replaces editorial's must still define
 every fragment the inherited templates call (`metaLine`, `authors`). Its home page has a fourth
 region, `top`: a hero placed there renders as the full-width cover story.
@@ -209,8 +209,14 @@ expressions. Compute anything a template would construct in Java. And:
 - Fragment inclusion runs before `th:each`, `th:if` and `th:case` on the same element: wrap the
   `th:replace` in a block of its own.
 - `map[k]` with a bare identifier means the key `"k"`; write `map.get(k)`.
-- Load no tracking a website did not configure: render the tag manager, Facebook and the
-  verification metas only through `site`'s validated values, which are null in a preview.
+- Load no tracking a website did not configure: render Facebook and the verification metas only
+  through `site`'s validated values, which are null in a preview.
+- Never write a tag manager's script, frame or preconnect. A page template includes
+  `fragments/consent :: consent(${lang})` first in its `<body>`, before the navbar, and loads
+  `fragments/scripts :: siteScripts`: the banner carries the container id as data, and `site.js`
+  loads the container only after the reader consents. A set that overrides `footer.html` keeps the
+  `site-footer__consent` link (`href="#cookie-preferences"`, `hidden`, for a website with
+  `site.gtmId()`). The error page and the print views leave the banner out.
 - Advertising markup keeps the `partner-` class names; generic ad-blocker rules hide `ad-` ones.
 
 ## Adding a set

@@ -81,6 +81,12 @@ class PreviewIT extends TwoWebsitesIT {
             site.setGtmId(GTM);
             settings.save(site);
 
+            // The cookie policy the reader's consent banner links.
+            io.pacod.cms.core.data.Page cookies = new io.pacod.cms.core.data.Page("cookies");
+            cookies.putTitle("en", "Cookies");
+            cookies.putBody("en", "<p>The cookies of iota.</p>");
+            pages.save(cookies);
+
             Layout home = new Layout(PageType.HOME);
             home.setPublished(Map.of("main", List.of(Section.of(SectionType.RICH_TEXT, Map.of("html", "<p>Published words.</p>")))));
             home.setDraft(Map.of("main", List.of(Section.of(SectionType.RICH_TEXT, Map.of("html", "<p>Draft words.</p>")))));
@@ -158,10 +164,18 @@ class PreviewIT extends TwoWebsitesIT {
     }
 
     @Test
-    @DisplayName("a preview tells no third party: the configured tag manager is left out")
+    @DisplayName("a preview tells no third party: the configured tag manager and its consent banner are left out")
     void noTracking() {
-        assertThat(get(HOST, "/").body()).contains(GTM);
-        assertThat(get(HOST, "/?_preview=" + token()).body()).doesNotContain(GTM, "googletagmanager");
+        // A reader's page carries the container only as the consent banner's data: nothing from Google.
+        assertThat(get(HOST, "/").body()).contains("id=\"consent\"", "data-gtm=\"" + GTM + "\"",
+                        "href=\"/p/cookies?lang=en\"", "href=\"#cookie-preferences\" hidden")
+                .doesNotContain("googletagmanager");
+        assertThat(get(HOST, "/?_preview=" + token()).body())
+                .doesNotContain(GTM, "googletagmanager", "id=\"consent\"", "cookie-preferences");
+        // Nor does the error page ask, in the website's own chrome.
+        HttpResponse<String> missing = get(HOST, "/p/no-such-page");
+        assertThat(missing.statusCode()).isEqualTo(404);
+        assertThat(missing.body()).contains("site-footer").doesNotContain("id=\"consent\"", "data-gtm", "googletagmanager");
     }
 
     @Test

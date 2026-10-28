@@ -8,10 +8,14 @@
 
   ITS OWN <head>, NOT fragments/head: this page is the one opened from inside the social apps'
   in-app browsers, so it carries the least it can -- no site.js, no stylesheet beyond the
-  site's, no script it does not need. The theme snippet and GTM are included from fragments/head
-  by name, so the container id still exists once. Nothing on it may reload or redirect the page:
-  a second request would count the visit twice, and carry THIS page as its Referer, so a visit
-  from Instagram would be recorded as one from the site.
+  site's, no script it does not need. The theme snippet is included from fragments/head by name.
+  Nothing on it may reload or redirect the page: a second request would count the visit twice,
+  and carry THIS page as its Referer, so a visit from Instagram would be recorded as one from the
+  site.
+
+  NO TAG MANAGER, EVEN WITH CONSENT. A website's container loads only after the reader agrees, in
+  the consent banner site.js drives (fragments/consent) -- and a withdrawal reloads the page, which
+  this one must never do. The visits are counted on the server (/mgmt/social/stats) instead.
 
   NO AD COLUMNS. SocialController never calls BannerService.forPage; a booking with an empty page
   list runs everywhere, and nobody bought a bio page.
@@ -32,7 +36,6 @@
 */-->
 <head>
     <script th:replace="~{fragments/head :: theme}"></script>
-    <script th:replace="~{fragments/head :: gtm}"></script>
     <th:block th:replace="~{fragments/head :: preview}"></th:block>
 
     <meta charset="UTF-8"/>
@@ -62,7 +65,6 @@
 </head>
 
 <body class="linkpage-body">
-<th:block th:replace="~{fragments/scripts :: gtmNoscript}"></th:block>
 
 <svg xmlns="http://www.w3.org/2000/svg" class="linkpage-sprite" aria-hidden="true" focusable="false">
     <defs>

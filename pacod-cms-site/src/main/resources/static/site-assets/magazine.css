@@ -903,6 +903,13 @@ a.mz-kicker:hover { color: var(--ink); }
     .issue-contents__media { grid-column: 1 / -1; grid-row: 1; width: 100%; }
 }
 
+/* The consent banner (site.css), rounded like the rest of the set. */
+.consent { border-radius: 18px; }
+.consent__button { border-radius: 999px; }
+@media (max-width: 560px) {
+    .consent { border-radius: 18px 18px 0 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .mz-cover__media img { animation: none; }
     .mz-card:hover .mz-card__media img,

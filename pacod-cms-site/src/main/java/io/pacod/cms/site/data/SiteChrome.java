@@ -25,8 +25,8 @@ import java.util.regex.Pattern;
  * {@link SiteSettings#getBaseUrl()} ({@link SiteOrigin}).
  *
  * <p><b>Every third-party identifier is validated here, not in the template.</b> The tracking
- * container id is written into a script; an id that is not the shape its vendor issues renders
- * nothing at all rather than whatever was stored.
+ * container id is written into the page, and from there into a script by {@code site.js}; an id
+ * that is not the shape its vendor issues renders nothing at all rather than whatever was stored.
  */
 public final class SiteChrome {
 
@@ -57,6 +57,7 @@ public final class SiteChrome {
     private final String path;
     private final String query;
     private final boolean tracking;
+    private final String cookiePolicy;
 
     private SiteChrome(SiteSettings settings, Map<String, Menu> menus, String origin,
                        List<Language> languages, String path, String query) {
@@ -67,9 +68,10 @@ public final class SiteChrome {
         this.path = path != null && path.startsWith("/") ? path : "/";
         this.query = query;
         this.tracking = true;
+        this.cookiePolicy = null;
     }
 
-    private SiteChrome(SiteChrome chrome, boolean tracking) {
+    private SiteChrome(SiteChrome chrome, boolean tracking, String cookiePolicy) {
         this.settings = chrome.settings;
         this.menus = chrome.menus;
         this.origin = chrome.origin;
@@ -77,16 +79,27 @@ public final class SiteChrome {
         this.path = chrome.path;
         this.query = chrome.query;
         this.tracking = tracking;
+        this.cookiePolicy = cookiePolicy;
     }
 
     /**
-     * The same chrome with no third party told about the page: no tag manager, no Facebook SDK,
-     * no verification metas. For the studio's draft preview, which reloads on every saved draft
-     * and would otherwise be a stream of page views in the website's analytics. Every template
-     * set asks these methods, so none needs a preview branch of its own.
+     * The same chrome with no third party told about the page: no tag manager -- and so no consent
+     * banner --, no Facebook SDK, no verification metas. For the studio's draft preview, which
+     * reloads on every saved draft and would otherwise be a stream of page views in the website's
+     * analytics, and for the PDF renderer's print views. Every template set asks these methods, so
+     * none needs a preview branch of its own.
      */
     public SiteChrome withoutTracking() {
-        return new SiteChrome(this, false);
+        return new SiteChrome(this, false, cookiePolicy);
+    }
+
+    /**
+     * The same chrome, its consent banner linking the standing page {@code slug}: the website's
+     * cookie policy, or its privacy policy, as {@code SiteChromeAdvice} finds them published. Null
+     * links none.
+     */
+    public SiteChrome withCookiePolicy(String slug) {
+        return new SiteChrome(this, tracking, slug);
     }
 
     /**
@@ -223,8 +236,25 @@ public final class SiteChrome {
 
     /* ------------------------------------------------------------------ third parties */
 
+    /**
+     * The Tag Manager container, or null. Never rendered as a script: {@code fragments/consent}
+     * writes it as data, with the consent banner, and {@code site.js} loads the container only
+     * once the reader has consented. Null -- no container, or a preview or print view -- renders
+     * neither the banner nor the footers' "manage cookie preferences" link.
+     */
     public String gtmId() {
         return tracking ? valid(settings.getGtmId(), SiteSettings.GTM_ID) : null;
+    }
+
+    /**
+     * Where the consent banner's "more about cookies" link goes: the policy page
+     * ({@link #withCookiePolicy}) in {@code lang}, or null when there is no banner or no such page.
+     */
+    public String cookiePolicyHref(String lang) {
+        if (gtmId() == null || cookiePolicy == null || !cookiePolicy.matches("[a-z0-9][a-z0-9-]{0,63}")) {
+            return null;
+        }
+        return withLang("/p/" + cookiePolicy, lang);
     }
 
     public String googleCseCx() {

@@ -1,5 +1,5 @@
 /* =====================================================================================
-   Public-site behaviour. Four things only; everything else in the design is CSS.
+   Public-site behaviour. Five things only; everything else in the design is CSS.
 
    Loaded with `defer`. The theme class is NOT set here -- it is set by the inline snippet
    in fragments/head.html, before first paint. Setting it from a deferred script would show
@@ -437,14 +437,260 @@
         window.addEventListener('pagehide', send);
     }
 
+    /* ---- consent and the tag manager -------------------------------------------------- */
+
+    /* A website with a Tag Manager container renders the consent banner (fragments/consent),
+       hidden, with the container id as data-gtm. This is the ONLY code that loads the container,
+       and it does so only after the reader has agreed to analytics or marketing. Nothing from
+       Google is in the page the server sends.
+
+       The choice is one first-party cookie, cookie_consent: URI-encoded JSON,
+       {"v":1,"analytics":true,"marketing":false}. Any other value -- another version, a
+       cookie of that name another application on the same host left behind, anything that
+       does not parse -- counts as no choice, and the banner asks again. Raise CONSENT_VERSION
+       when what a category covers changes, and every reader is asked again.
+
+       Google's own consent signals start denied before the container loads, then follow the
+       choice: analytics grants analytics_storage, marketing the three ad signals. With neither
+       granted the container is never loaded at all.
+
+       A withdrawal cannot unload a tag already running in the page: tags already loaded stay
+       until the next page. So a withdrawal clears the cookies of what was withdrawn that the
+       page can reach and reloads at once, and the reloaded page loads only what is still
+       allowed. Granting needs no reload. */
+
+    var CONSENT_COOKIE = 'cookie_consent';
+    var CONSENT_VERSION = 1;
+    var CONSENT_MAX_AGE = 15552000;                  /* 180 days, in seconds */
+    var PREFERENCES = 'a[href="#cookie-preferences"]';
+
+    /* Google's first-party cookies, by the choice that allowed them. */
+    var OPTIONAL_COOKIES = {
+        analytics: /^(_ga|_ga_.+|_gid|_gat.*)$/,
+        marketing: /^(_gcl_.+|_gac_.+)$/
+    };
+
+    function readConsent() {
+        var match = document.cookie.match(/(?:^|;\s*)cookie_consent=([^;]*)/);
+        if (!match) {
+            return null;
+        }
+        try {
+            var stored = JSON.parse(decodeURIComponent(match[1]));
+            if (!stored || stored.v !== CONSENT_VERSION
+                    || typeof stored.analytics !== 'boolean' || typeof stored.marketing !== 'boolean') {
+                return null;
+            }
+            return { analytics: stored.analytics, marketing: stored.marketing };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function secure() {
+        return window.location.protocol === 'https:' ? '; Secure' : '';
+    }
+
+    function writeConsent(choice) {
+        var value = encodeURIComponent(JSON.stringify(
+                { v: CONSENT_VERSION, analytics: choice.analytics, marketing: choice.marketing }));
+        document.cookie = CONSENT_COOKIE + '=' + value + '; Path=/; Max-Age=' + CONSENT_MAX_AGE
+                + '; SameSite=Lax' + secure();
+    }
+
+    /* Deletes the readable cookies of each withdrawn choice, on this host and on every domain
+       above it: Google sets them on the registrable domain (.example.com from www.example.com),
+       and a browser simply ignores a delete aimed at a public suffix, so no list of suffixes is
+       needed. A cookie a provider keeps on its own domain is beyond any page's reach. */
+    function clearCookies(withdrawn) {
+        var host = window.location.hostname;
+        var domains = [''];
+        if (!/^[\d.]+$/.test(host) && host.indexOf(':') < 0) {
+            var labels = host.split('.');
+            for (var i = 0; i < labels.length - 1; i++) {
+                domains.push('; Domain=' + labels.slice(i).join('.'));
+            }
+        }
+        document.cookie.split(';').forEach(function (pair) {
+            var name = pair.split('=')[0].trim();
+            var optional = withdrawn.some(function (category) {
+                return OPTIONAL_COOKIES[category].test(name);
+            });
+            if (optional) {
+                domains.forEach(function (domain) {
+                    document.cookie = name + '=; Path=/; Max-Age=0; SameSite=Lax' + domain + secure();
+                });
+            }
+        });
+    }
+
+    /* Google's own queue. gtag() must push the arguments object itself, not an array made of
+       it: the consent commands are read off it as gtag.js writes them. */
+    function gtag() {
+        window.dataLayer.push(arguments);
+    }
+
+    function initConsent() {
+        var banner = document.getElementById('consent');
+        var container = banner ? banner.getAttribute('data-gtm') : null;
+        if (!container) {
+            return;                                  /* no container: nothing to ask about */
+        }
+
+        var choices = document.getElementById('consent-choices');
+        var boxes = {
+            analytics: banner.querySelector('[data-consent-category="analytics"]'),
+            marketing: banner.querySelector('[data-consent-category="marketing"]')
+        };
+        var chooseButton = banner.querySelector('[data-consent-action="choose"]');
+        var saveButton = banner.querySelector('[data-consent-action="save"]');
+        if (!choices || !boxes.analytics || !boxes.marketing || !chooseButton || !saveButton) {
+            return;                                  /* a banner without its parts asks nothing */
+        }
+
+        var current = readConsent();                 /* the choice this page runs under */
+        var defaulted = false;
+        var loaded = false;
+        var opener = null;
+
+        function apply(choice) {
+            var granted = choice.analytics || choice.marketing;
+            if (!granted && !loaded) {
+                return;                              /* nothing to tell and nothing to load */
+            }
+            window.dataLayer = window.dataLayer || [];
+            if (!defaulted) {
+                gtag('consent', 'default', {
+                    ad_storage: 'denied',
+                    ad_user_data: 'denied',
+                    ad_personalization: 'denied',
+                    analytics_storage: 'denied',
+                    functionality_storage: 'granted',
+                    security_storage: 'granted',
+                    wait_for_update: 500
+                });
+                defaulted = true;
+            }
+            var ads = choice.marketing ? 'granted' : 'denied';
+            gtag('consent', 'update', {
+                ad_storage: ads,
+                ad_user_data: ads,
+                ad_personalization: ads,
+                analytics_storage: choice.analytics ? 'granted' : 'denied'
+            });
+            if (granted && !loaded) {
+                window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+                var script = document.createElement('script');
+                script.async = true;
+                script.src = 'https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(container);
+                document.head.appendChild(script);
+                loaded = true;
+            }
+        }
+
+        function expand(open) {
+            choices.hidden = !open;
+            saveButton.hidden = !open;
+            chooseButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+
+        /* A reader coming back (the footer's link, a policy page's button) finds the choices
+           open, set as they stand, and the focus on the first; a first visit finds the banner
+           closed, the boxes unticked, and the focus left where it was. */
+        function show(link) {
+            var stored = current || { analytics: false, marketing: false };
+            boxes.analytics.checked = stored.analytics;
+            boxes.marketing.checked = stored.marketing;
+            expand(!!link);
+            banner.hidden = false;
+            if (link) {
+                opener = link;
+                boxes.analytics.focus();
+            }
+        }
+
+        function hide() {
+            banner.hidden = true;
+            if (opener) {
+                opener.focus();
+                opener = null;
+            }
+        }
+
+        function decide(choice) {
+            var withdrawn = [];
+            if (current && current.analytics && !choice.analytics) {
+                withdrawn.push('analytics');
+            }
+            if (current && current.marketing && !choice.marketing) {
+                withdrawn.push('marketing');
+            }
+            writeConsent(choice);
+            current = choice;
+            apply(choice);                           /* tags running now stop writing at once */
+            if (withdrawn.length) {
+                clearCookies(withdrawn);
+                window.location.reload();
+                return;
+            }
+            hide();
+        }
+
+        banner.addEventListener('click', function (event) {
+            var button = event.target.closest ? event.target.closest('[data-consent-action]') : null;
+            if (!button) {
+                return;
+            }
+            var action = button.getAttribute('data-consent-action');
+            if (action === 'all') {
+                decide({ analytics: true, marketing: true });
+            } else if (action === 'necessary') {
+                decide({ analytics: false, marketing: false });
+            } else if (action === 'save') {
+                decide({ analytics: boxes.analytics.checked, marketing: boxes.marketing.checked });
+            } else if (action === 'choose') {
+                expand(choices.hidden);
+            }
+        });
+
+        /* Escape puts the banner away unchanged -- once there is a choice to keep. */
+        banner.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && current) {
+                event.preventDefault();
+                hide();
+            }
+        });
+
+        /* The footers' link and any link to #cookie-preferences in a page's body, added later
+           or not. The footers' is hidden until here: without this code it would do nothing. */
+        Array.prototype.forEach.call(document.querySelectorAll(PREFERENCES), function (link) {
+            link.hidden = false;
+        });
+        document.addEventListener('click', function (event) {
+            var link = event.target.closest ? event.target.closest(PREFERENCES) : null;
+            if (link) {
+                event.preventDefault();
+                show(link);
+            }
+        });
+
+        if (current) {
+            apply(current);
+        } else {
+            show(null);
+        }
+    }
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function () {
+            initConsent();
             initTheme();
             initNav();
             initGallery();
             initPartners();
         });
     } else {
+        initConsent();
         initTheme();
         initNav();
         initGallery();

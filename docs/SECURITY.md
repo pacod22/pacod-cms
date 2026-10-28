@@ -120,6 +120,12 @@ Every answer from the gateway is treated as hostile input:
   running title, stripped of markup. The article's body is never sent back to the site changed.
 - **No third-party script runs unless the website configured it**, and every third-party id is
   checked against its vendor's shape before it is rendered.
+- **A website's tag manager loads only after the reader consents.** The page the server sends
+  carries its container id as data and nothing from Google; the reader's browser loads the
+  container once analytics or marketing is allowed in the consent banner, with Google's consent
+  signals denied until then. The choice is one first-party cookie, `cookie_consent`; withdrawing
+  it clears the Google cookies the page can reach and reloads. Previews, print views, the error
+  page and `/social` never load it.
 - **The site never sends `X-Frame-Options: DENY`** (it would blank the website's own banners), but
   says who may frame it: itself, and the studio for previews and banner folders.
 - Redirects through `/b/{id}` and the link page are validated twice — when saved and before the

@@ -386,6 +386,13 @@ Caddy's environment, so their defaults apply. Its hosts still need a certificate
 Caddy one comes on demand only for a website's own hosts, so a host that only redirects is either
 one of the website's addresses or covered by a supplied certificate pair.
 
+The site's own `Content-Security-Policy` is `frame-ancestors` alone, which restricts no script. If
+that file adds a policy for a website with a Tag Manager container, allow what the container needs
+once the reader consents: `https://www.googletagmanager.com` in `script-src`, and the addresses its
+tags report to (for Google Analytics 4, `https://*.google-analytics.com` and
+`https://*.analytics.google.com` in `connect-src` and `img-src`). Nothing from Google is loaded
+before consent, whatever the policy says.
+
 The existing Caddyfile needs `import sites/*.caddy` (or `import /etc/caddy/sites/*.caddy`) once,
 with the folder mounted. Without it, paste the file in. Where that Caddy's admin API is off,
 `caddy reload` fails; `make caddy-reload RESTART=1` restarts the container instead, which

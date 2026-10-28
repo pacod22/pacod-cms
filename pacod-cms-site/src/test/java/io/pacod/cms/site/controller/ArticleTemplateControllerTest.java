@@ -426,7 +426,8 @@ class ArticleTemplateControllerTest {
         io.pacod.cms.site.services.LanguageReader languages = mock(io.pacod.cms.site.services.LanguageReader.class);
         when(languages.findAll()).thenReturn(java.util.stream.Stream.of("bg", "en", "de", "ru")
                 .map(io.pacod.cms.core.data.Language::new).toList());
-        return new SiteChromeAdvice(chrome, languages, mock(io.pacod.cms.site.render.ThemeReader.class));
+        return new SiteChromeAdvice(chrome, languages, mock(io.pacod.cms.site.render.ThemeReader.class),
+                mock(io.pacod.cms.site.services.PageService.class));
     }
 
     private static io.pacod.cms.site.data.HeadMeta head(org.springframework.test.web.servlet.ResultActions result) {

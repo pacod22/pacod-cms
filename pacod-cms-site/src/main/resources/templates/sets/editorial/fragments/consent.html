@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*
+  The consent banner, for a website with a Tag Manager container (SiteSettings.gtmId) and for no
+  other: a website without one gets no banner, no cookie and no script.
+
+  NOTHING FROM GOOGLE IS IN THIS MARKUP. The container id is data, data-gtm on the banner, and
+  site.js loads Tag Manager from it only once the reader has agreed to analytics or marketing; the
+  choice is the cookie_consent cookie, read in the browser on every page. The server renders the
+  same page for every reader, so it stays cacheable, and decides nothing about consent.
+
+  HIDDEN UNTIL site.js SHOWS IT. Without JavaScript nothing shows and nothing loads -- a banner that
+  rendered without the code to drive it would offer buttons that do nothing. The same goes for the
+  footers' "manage cookie preferences" link, which site.js reveals only where this banner exists.
+
+  Included first in <body> by every reader's page -- the first thing a keyboard or a screen reader
+  meets -- and fixed to the foot of the window by site.css, so it covers rather than moves the page.
+  The error page, /social and the print views leave it out; a preview or a print render has no
+  container (SiteChrome.withoutTracking), so it renders nothing there either.
+
+  The class names were checked against EasyList, EasyPrivacy, Fanboy's Annoyance and Cookie
+  Monster lists and Fanboy's Social list: the cookie lists hide many generic banner names (.consent-bar,
+  #cookie-consent ...), and a hidden banner is a reader who can never consent. Check them again
+  before renaming anything here, in site.css or in site.js, which finds the parts by these ids and
+  data- attributes.
+*/-->
+<th:block th:fragment="consent(lang)">
+<section th:if="${site != null and site.gtmId() != null}" id="consent" class="consent" hidden
+         th:data-gtm="${site.gtmId()}" aria-labelledby="consent-title">
+    <div class="consent__inner">
+        <p class="consent__title" id="consent-title" th:text="#{consent.title}">Cookies on this website</p>
+        <p class="consent__text">
+            <span th:text="#{consent.text}">Until you allow more, this website uses only the cookies it needs.</span>
+            <a th:if="${site.cookiePolicyHref(lang) != null}" th:href="${site.cookiePolicyHref(lang)}"
+               th:text="#{consent.policy}">More about cookies</a>
+        </p>
+
+        <!--/* The two choices, opened by "choose" and when the reader comes back to change one.
+               Each is a real checkbox, named by its label and described by its line. */-->
+        <div class="consent__choices" id="consent-choices" hidden>
+            <div class="consent__choice">
+                <div class="consent__about">
+                    <span class="consent__name" th:text="#{consent.necessaryName}">Necessary</span>
+                    <span class="consent__desc" th:text="#{consent.necessaryText}">What the website needs to work.</span>
+                </div>
+                <span class="consent__always" th:text="#{consent.always}">Always on</span>
+            </div>
+            <div class="consent__choice">
+                <div class="consent__about">
+                    <label class="consent__name" for="consent-analytics" th:text="#{consent.analyticsName}">Analytics</label>
+                    <span class="consent__desc" id="consent-analytics-desc" th:text="#{consent.analyticsText}">Visits counted.</span>
+                </div>
+                <input class="consent__switch" type="checkbox" id="consent-analytics" data-consent-category="analytics"
+                       aria-describedby="consent-analytics-desc"/>
+            </div>
+            <div class="consent__choice">
+                <div class="consent__about">
+                    <label class="consent__name" for="consent-marketing" th:text="#{consent.marketingName}">Marketing</label>
+                    <span class="consent__desc" id="consent-marketing-desc" th:text="#{consent.marketingText}">Advertising measured.</span>
+                </div>
+                <input class="consent__switch" type="checkbox" id="consent-marketing" data-consent-category="marketing"
+                       aria-describedby="consent-marketing-desc"/>
+            </div>
+        </div>
+
+        <div class="consent__actions">
+            <button type="button" class="consent__button" data-consent-action="choose"
+                    aria-controls="consent-choices" aria-expanded="false" th:text="#{consent.choose}">Choose</button>
+            <button type="button" class="consent__button consent__button--primary" data-consent-action="necessary"
+                    th:text="#{consent.necessary}">Necessary only</button>
+            <button type="button" class="consent__button consent__button--primary" data-consent-action="all"
+                    th:text="#{consent.accept}">Accept all</button>
+            <button type="button" class="consent__button consent__button--primary" data-consent-action="save" hidden
+                    th:text="#{consent.save}">Save choices</button>
+        </div>
+    </div>
+</section>
+</th:block>
+</body>
+</html>

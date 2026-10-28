@@ -267,10 +267,11 @@ its id.
   `${site}` and `${theme}`. It never throws: a failure inside an
   error dispatch re-enters the error dispatch, so it falls back to `SiteChrome.empty(origin)`.
 - **`SiteChrome` validates every third-party id against its vendor's shape** and returns null
-  otherwise; GTM (script and `noscript`), the Facebook SDK and `fb:app_id`, the verification metas
-  and the Google search screen render **only for a non-null value**. A fresh install loads no
-  tracking — a page carrying another website's container is worse than one carrying none.
-  `PublicTemplateRenderTest.thirdPartyIdsRenderOnlyWhenConfigured` pins it.
+  otherwise; the consent banner that carries the GTM container (*Consent before any tag*), the
+  Facebook SDK and `fb:app_id`, the verification metas and the Google search screen render **only
+  for a non-null value**. A fresh install loads no tracking — a page carrying another website's
+  container is worse than one carrying none. `PublicTemplateRenderTest.thirdPartyIdsRenderOnlyWhenConfigured`
+  pins it.
 - **`SiteChrome` builds every menu address** from kind and target — `/list/{id}` only for a numeric
   id, `/p/{slug}` only for a slug, a `URL` only if `SocialTargets.isValidTarget` — and adds
   `?lang=`. An item whose label resolves to nothing or whose address is refused is dropped. Absolute
@@ -285,6 +286,73 @@ its id.
   website without demo content has none, and the old "Sections" group pointed every new website at
   the retired sample data's ids. Menus are edited at `/mgmt/design/menus/{main,footer}`
   (*The design screens*); **no studio screen edits the settings yet**: use `make mongo SITE=<id>`.
+
+### Consent before any tag
+
+A website's Tag Manager container (`SiteSettings.gtmId`) loads **only after the reader consents**,
+on every website that has one — no setting turns it off — and a website without one gets nothing
+new: no banner, no cookie, no script.
+
+- **The server's HTML holds nothing from Google**: no `gtm.js` snippet, no `<noscript>` frame (it
+  loaded Google with no consent asked), no preconnect. `fragments/consent :: consent(lang)`,
+  included **first in `<body>`** by every reader's page on every set, renders the banner `hidden`
+  with the container as `data-gtm` on `<section id="consent" class="consent">`. Every reader gets
+  the same page, so it stays cacheable: **`site.js` (`initConsent`) shows the banner and applies the
+  choice**, and without JavaScript nothing shows and nothing loads.
+- **The choice is one first-party cookie, `cookie_consent`**: URI-encoded JSON
+  `{"v":1,"analytics":bool,"marketing":bool}`, `Path=/`, `Max-Age=15552000` (180 days),
+  `SameSite=Lax`, `Secure` on HTTPS. Anything else — another version, the PACOD app's own `v:3`
+  cookie of the same name on www.pacod.io, a value that does not parse — is no choice, and the
+  banner asks again. Raise `CONSENT_VERSION` in `site.js` when what a category covers changes.
+- **What loads when.** On a choice (and on every later page, from the cookie), with analytics or
+  marketing granted: `gtag('consent','default',…)` all denied but `functionality_storage` and
+  `security_storage`, `wait_for_update: 500`; then `gtag('consent','update',…)`, analytics →
+  `analytics_storage`, marketing → `ad_storage`, `ad_user_data`, `ad_personalization`; then
+  `gtm.start` and `gtm.js?id=<data-gtm>`, once. With neither granted, nothing touches `dataLayer`.
+  `gtag()` pushes the `arguments` object itself — an array breaks the consent commands.
+- **A withdrawal reloads.** A tag already running cannot be unloaded, so withdrawing a granted
+  category pushes the update, deletes that category's first-party cookies the page can read
+  (analytics `_ga`, `_ga_*`, `_gid`, `_gat*`; marketing `_gcl_*`, `_gac_*`) host-only and with
+  `Domain=` every suffix of the host (a browser ignores a public suffix, so no list is needed;
+  GA writes on the registrable domain), and reloads. Granting needs no reload. This is the promise
+  the PACOD website's cookie policy makes ("clears the optional cookies we can reach and reloads").
+- **"Manage cookie preferences"**: `a.site-footer__consent[href="#cookie-preferences"]` in
+  editorial's footer (minimal's) and magazine's, rendered `hidden` for a website with a container;
+  `site.js` reveals it only on a page that has the banner, and any `a[href="#cookie-preferences"]`
+  (a policy page's button) reopens the banner with the choices open, set as they stand, focus on
+  the first box; Escape closes it unchanged and returns the focus.
+- **The banner links the website's policy**: `SiteChromeAdvice.COOKIE_POLICY_PAGES`, the standing
+  page `cookies` if published, else `privacy`, else none, through `PageService` (cached; a failure
+  costs the link only) and `SiteChrome.withCookiePolicy`/`cookiePolicyHref(lang)` (`/p/<slug>?lang=`).
+- **Never in a preview, a print render, a print view, the error page or `/social`.** Preview and
+  `SitePrint` chrome is `withoutTracking()` (no container, so no banner and no footer link);
+  `article-print*`, `issue-print-front` and `error.html` do not include the fragment (the error
+  page's footer link stays hidden); `/social` loads no `site.js` and must never reload, so it carries
+  **no tag manager at all**, consent or not — its visits are counted on the server.
+- **Accessible and themed**: a labelled region (`aria-labelledby="consent-title"`), "Choose" with
+  `aria-expanded`/`aria-controls`, real checkboxes named by their labels and described by their
+  lines, "Accept all" and "Necessary only" styled alike (refusing is as easy as agreeing); fixed to
+  the window's foot, so the page never moves; `site.css` from theme tokens only (magazine rounds it
+  in `magazine.css`), night mode through the tokens, no animation under reduced motion, hidden in
+  print. `.consent [hidden]` is restated `display: none`, or the parts' own `display` would show
+  them before `site.js` decided. The names (`consent`, `consent__*`, `site-footer__consent`) were
+  checked against EasyList, EasyPrivacy, Fanboy's Annoyance, Cookie Monster and Social lists, which
+  hide many generic banner names (`.consent__banner`, `.consent-bar`): grep them before a rename.
+- **The site's CSP is `frame-ancestors` only** (`FramingHeaders`), which governs no script. A CSP
+  added in front (`CMS_PUBLIC_EXTRA_FILE`) must allow `https://www.googletagmanager.com` in
+  `script-src` and what the container's tags reach (GA4: `*.google-analytics.com`,
+  `*.analytics.google.com`).
+- **Still loading from third parties without consent** (out of this rule's scope so far): Google
+  Fonts on every page (`fragments/head`), the CSE script on `/search-google`, the Facebook SDK where
+  `facebookAppId` is set, and an HTML5 booking whose own folder loads a tag manager.
+- Tests: `PublicTemplateRenderTest.consentBannerOnEverySet` (every set, seven languages),
+  `consentBannerLinksThePolicy`, `noConsentBannerWithoutAContainer` (no container, preview/print
+  chrome, the print views, the error page), `siteJsDrivesTheConsentBanner` (what `site.js` and the
+  fragment must agree on, and the consent rule), `thirdPartyIdsRenderOnlyWhenConfigured`,
+  `everyViewRendersOnEverySet`, `socialPageIsStandalone`; `SiteChromeTest.cookiePolicyLink`,
+  `SiteChromeAdviceTest`, `PreviewIT.noTracking`. **There is no committed JS test**: the behaviour
+  (nothing before a choice, the `dataLayer` order, the cookie, reopening, focus, withdrawal clearing
+  domain cookies and reloading, no JavaScript) was checked in headless Chromium.
 
 ### The content's original language
 
@@ -1392,7 +1460,8 @@ profiles, unpublished. Until saved and published, `/social` is 404.
 
 - **`social.html` has its own `<head>`, and nothing on it may reload or redirect**: a second
   request would count twice and carry `/social` as its referrer. It takes `fragments/head :: theme`
-  and `:: gtm` by name and loads no `site.js` (in-app browsers). Pinned by `PublicTemplateRenderTest`.
+  by name and loads no `site.js` (in-app browsers) — and so **no tag manager**, which loads only
+  through `site.js`'s consent banner (*Consent before any tag*). Pinned by `PublicTemplateRenderTest`.
 - **The network is decided when `/social` renders and carried in `?src=`** on every href, because
   the tap arrives with `/social` as its referrer. No cookie, no session; `SocialView` builds the URLs.
 - **`SocialSourceClassifier` is a pure function whose order is the design**: `?src=`;
@@ -1597,8 +1666,9 @@ own origin** with `?_preview=<token>`, never from the studio's: the page runs th
   - `PageComposer` and `ThemeCssController` branch on `SitePreview.current()`.
   - The draft theme is linked by the token (`Stylesheet.href()`) and served `no-store`, never by
     `?v=`, which is cached for a year.
-- **No third party in a preview.** `SiteChrome.withoutTracking()` answers null for GTM, Facebook
-  and the verification ids, so no template set needs a branch.
+- **No third party in a preview.** `SiteChrome.withoutTracking()` answers null for GTM — so no
+  consent banner and no footer link —, Facebook and the verification ids, so no template set needs
+  a branch.
 - **The address is the only carrier**, because third-party cookies are blocked in the studio's
   frame.
   - `preview.js` is loaded only for a preview, by `fragments/head :: preview` (`social.html`
@@ -1613,7 +1683,8 @@ own origin** with `?_preview=<token>`, never from the studio's: the page runs th
   - the draft appears only with a token;
   - the headers are on the page and on its 404;
   - nothing is counted, while a reader's request is;
-  - no GTM, the refusals, the draft theme, and a template set.
+  - no GTM and no consent banner (a reader's page has both, the error page neither), the
+    refusals, the draft theme, and a template set.
 
 ### The demo content
 
@@ -2593,6 +2664,9 @@ rendered from the bundles; `site.js` keeps only English fallbacks.
 Night mode is `.night` on `<html>`, set synchronously by `fragments/head :: theme` (key `pacod-theme`),
 toggled by `site.js`. `article-print.html`, the print view, omits it so it always prints light.
 
+`site.js` is also the **only code that loads a website's tag manager**, after the reader consents in
+the banner it drives (*Consent before any tag*); no template writes a tag manager's script.
+
 ### The chrome is translated on the server
 
 Every word of public chrome is a `#{key}` from the site's `messages*.properties` — **English base,
@@ -2632,9 +2706,10 @@ Every word of public chrome is a `#{key}` from the site's `messages*.properties`
 
 ### Fragments and the error page
 
-`templates/sets/editorial/fragments/` — `head`, `navbar`, `ad-sidebar`, `footer`, `widgets`, `article-view`,
+`templates/sets/editorial/fragments/` — `head`, `consent`, `navbar`, `ad-sidebar`, `footer`, `widgets`, `article-view`,
 `scripts` — serves `landing`, `article`, `index`, `list`, `page`, `search`, `search-google` and
-`error`; `social` takes `head :: theme` and `:: gtm` by name. `head` is parameterised (`lang`,
+`error`; `social` takes `head :: theme` by name. `consent :: consent(lang)` comes first in every
+reader's page's `<body>` (not `error`, `social` or the print views; *Consent before any tag*). `head` is parameterised (`lang`,
 `pageTitle`, `pageDesc`, `ogUrl`, `ogImagePath`, `ogImageType`, passed by name) and reads
 **`${head}`** (`HeadMeta`, *Routes*) for the canonical, `hreflang`, `og:type article` and its
 `article:*` tags, the `BlogPosting` JSON-LD and the feed links — all absent without it, so the

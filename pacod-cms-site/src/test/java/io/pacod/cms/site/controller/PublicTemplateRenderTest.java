@@ -480,6 +480,13 @@ class PublicTemplateRenderTest {
                 "issue", render("issue", issueModel("en")));
         views.forEach((view, html) -> {
             assertThat(html).as("%s on %s", view, set).doesNotContain("??").contains("/site-assets/site.css");
+            // Every reader's page carries the consent banner, first in the body; the error page none.
+            if (view.equals("error")) {
+                assertThat(html).as("%s on %s", view, set).doesNotContain("id=\"consent\"", "data-gtm");
+            } else {
+                assertThat(html).as("%s on %s", view, set).containsSubsequence("<body", "id=\"consent\"",
+                        "class=\"site-footer", "href=\"#cookie-preferences\" hidden");
+            }
             if (!view.equals("error") && !view.equals("search-google")) {
                 if (set.equals("minimal")) {
                     assertThat(html).as("%s on %s", view, set).contains("/site-assets/minimal.css").doesNotContain("layout__aside");
@@ -1222,7 +1229,8 @@ class PublicTemplateRenderTest {
     /**
      * Every third-party identifier on a page is the website's own setting, and renders nothing at
      * all when unset -- a page carrying another website's tracking container is worse than one
-     * carrying none, so no template writes one in.
+     * carrying none, so no template writes one in. The tag manager's container is data even when
+     * set: the server's page loads nothing from Google, and site.js loads it after consent.
      */
     @Test
     @DisplayName("Tracking, verification and the Facebook SDK render only when configured")
@@ -1233,9 +1241,9 @@ class PublicTemplateRenderTest {
 
         String configured = render("article", article);
         assertThat(configured)
-                // Written through JavaScript inlining, so as an escaped string literal.
-                .contains("'dataLayer',\"" + io.pacod.cms.site.testing.TestSites.GTM_ID + "\")")
-                .contains("ns.html?id=" + io.pacod.cms.site.testing.TestSites.GTM_ID)
+                .contains("data-gtm=\"" + io.pacod.cms.site.testing.TestSites.GTM_ID + "\"")
+                // No script, no frame and no connection to Google before the reader agrees.
+                .doesNotContain("googletagmanager", "google-analytics", "ns.html", "dataLayer", "gtm.js")
                 .contains("name=\"google-site-verification\" content=\"google-token-0123\"")
                 .contains("name=\"msvalidate.01\" content=\"bing-token-0123\"")
                 .contains("property=\"fb:app_id\" content=\"" + io.pacod.cms.site.testing.TestSites.FB_APP_ID + "\"")
@@ -1246,9 +1254,181 @@ class PublicTemplateRenderTest {
         bare.put("site", io.pacod.cms.site.data.SiteChrome.empty("http://localhost"));
         String unconfigured = render("article", bare);
         assertThat(unconfigured).doesNotContain("googletagmanager", "google-site-verification",
-                "msvalidate", "fb:app_id", "connect.facebook.net", "fb-share-button", "GTM-");
+                "msvalidate", "fb:app_id", "connect.facebook.net", "fb-share-button", "GTM-",
+                "data-gtm", "id=\"consent\"", "cookie-preferences");
         // The page itself still renders in full.
         assertThat(unconfigured).contains("Заглавие 7", "class=\"site-footer\"");
+    }
+
+    /* ---------------------------------------------------------------- consent -------- */
+
+    /** The consent banner {@code fragments/consent} rendered into {@code html}, or "" when there is none. */
+    private static String consentBanner(String html) {
+        int at = html.indexOf("id=\"consent\"");
+        return at < 0 ? "" : html.substring(html.lastIndexOf("<section", at), html.indexOf("</section>", at));
+    }
+
+    private static String message(String key, String lang) {
+        return new io.pacod.cms.site.config.ThymeleafConfig().messageSource()
+                .getMessage(key, null, java.util.Locale.forLanguageTag(lang));
+    }
+
+    /**
+     * A website with a tag manager gets the consent banner on every set, in the reader's language:
+     * hidden until site.js shows it -- so without JavaScript nothing shows, and nothing loads --
+     * named by its title, with three choices and two unticked boxes each named by its label, and the
+     * footer's way back to it, hidden as well. Every id and data- attribute here is one site.js finds
+     * the parts by ({@link #siteJsDrivesTheConsentBanner}).
+     */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"editorial", "minimal", "magazine"})
+    @DisplayName("The consent banner on every set, in every bundled language: hidden, labelled, three choices, two boxes")
+    void consentBannerOnEverySet(String set) {
+        engine = io.pacod.cms.site.render.TemplateSets.engine(new io.pacod.cms.core.design.TemplateSetCatalog().chain(set),
+                new io.pacod.cms.site.config.ThymeleafConfig().messageSource(), false, List.of());
+        for (String lang : List.of("en", "bg", "de", "ru", "es", "fr", "it")) {
+            String as = set + " in " + lang;
+            String html = render("article", Map.of("article", new ArticleModel(article(7, true, null), lang, List.of()),
+                    "lang", lang));
+            String banner = consentBanner(html);
+
+            assertThat(banner).as(as)
+                    .startsWith("<section id=\"consent\" class=\"consent\" hidden")
+                    .containsPattern("^<section[^>]*\\sdata-gtm=\"" + io.pacod.cms.site.testing.TestSites.GTM_ID
+                            + "\"[^>]*\\saria-labelledby=\"consent-title\">")
+                    .contains("id=\"consent-title\">" + message("consent.title", lang) + "<",
+                            message("consent.text", lang),
+                            "data-consent-action=\"all\">" + message("consent.accept", lang) + "<",
+                            "data-consent-action=\"necessary\">" + message("consent.necessary", lang) + "<",
+                            "aria-controls=\"consent-choices\" aria-expanded=\"false\">" + message("consent.choose", lang) + "<",
+                            // Saving, and the choices it saves, wait for "choose".
+                            "data-consent-action=\"save\" hidden>" + message("consent.save", lang) + "<",
+                            "class=\"consent__choices\" id=\"consent-choices\" hidden>",
+                            message("consent.necessaryName", lang), message("consent.always", lang),
+                            "<label class=\"consent__name\" for=\"consent-analytics\">" + message("consent.analyticsName", lang) + "<",
+                            "id=\"consent-analytics-desc\">" + message("consent.analyticsText", lang) + "<",
+                            "<label class=\"consent__name\" for=\"consent-marketing\">" + message("consent.marketingName", lang) + "<",
+                            "id=\"consent-marketing-desc\">" + message("consent.marketingText", lang) + "<")
+                    .containsPattern("<input class=\"consent__switch\" type=\"checkbox\" id=\"consent-analytics\""
+                            + " data-consent-category=\"analytics\"\\s+aria-describedby=\"consent-analytics-desc\"/>")
+                    .containsPattern("<input class=\"consent__switch\" type=\"checkbox\" id=\"consent-marketing\""
+                            + " data-consent-category=\"marketing\"\\s+aria-describedby=\"consent-marketing-desc\"/>")
+                    // Nothing is ticked for the reader, and nothing from Google is in the markup.
+                    .doesNotContain("checked", "googletagmanager", "<script", "<iframe", "??");
+            // First in the body, ahead of the masthead: the first thing a keyboard reaches.
+            assertThat(html).as(as).containsSubsequence("<body", "id=\"consent\"", "<header");
+            assertThat(html).as(as).contains("<a class=\"site-footer__consent\" href=\"#cookie-preferences\" hidden>"
+                    + message("consent.manage", lang) + "</a>");
+        }
+    }
+
+    /**
+     * The banner's "more about cookies" goes to the page SiteChromeAdvice chose -- the cookie policy,
+     * else the privacy policy -- in the reader's language, the way the menus link a standing page.
+     */
+    @Test
+    @DisplayName("The banner links the policy page it is given, in the reader's language; with none, no link")
+    void consentBannerLinksThePolicy() {
+        io.pacod.cms.site.data.SiteChrome chrome = io.pacod.cms.site.testing.TestSites.chrome();
+        Map<String, Object> article = Map.of("article", new ArticleModel(article(7, true, null), "bg", List.of()));
+
+        Map<String, Object> cookies = new java.util.HashMap<>(article);
+        cookies.putAll(Map.of("lang", "bg", "site", chrome.withCookiePolicy("cookies")));
+        assertThat(consentBanner(render("article", cookies)))
+                .contains("<a href=\"/p/cookies?lang=bg\">" + message("consent.policy", "bg") + "</a>");
+
+        Map<String, Object> privacy = new java.util.HashMap<>(article);
+        privacy.putAll(Map.of("lang", "de", "site", chrome.withCookiePolicy("privacy")));
+        assertThat(consentBanner(render("article", privacy)))
+                .contains("<a href=\"/p/privacy?lang=de\">" + message("consent.policy", "de") + "</a>");
+
+        Map<String, Object> none = new java.util.HashMap<>(article);
+        none.put("lang", "en");
+        assertThat(consentBanner(render("article", none))).isNotEmpty().doesNotContain("<a ");
+    }
+
+    /**
+     * No container, no consent to ask for: a website without a tag manager gets nothing new -- no
+     * banner, no footer link, no data -- and neither does a preview or a print render, whose chrome
+     * is {@code withoutTracking()} (SiteChromeAdvice), on any set. The print views and the error page
+     * leave the banner out even with a container: the PDF renderer runs no script, and an error page
+     * is no place to ask.
+     */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"editorial", "minimal", "magazine"})
+    @DisplayName("No banner without a container, in a preview or print render, on a print view or the error page")
+    void noConsentBannerWithoutAContainer(String set) {
+        engine = io.pacod.cms.site.render.TemplateSets.engine(new io.pacod.cms.core.design.TemplateSetCatalog().chain(set),
+                new io.pacod.cms.site.config.ThymeleafConfig().messageSource(), false, List.of());
+        io.pacod.cms.core.data.SiteSettings settings = io.pacod.cms.site.testing.TestSites.settings();
+        settings.setGtmId(null);
+        Map<String, io.pacod.cms.site.data.SiteChrome> chromes = Map.of(
+                "no container", io.pacod.cms.site.data.SiteChrome.of(settings, io.pacod.cms.site.testing.TestSites.menus(),
+                        "http://localhost"),
+                "a preview or print render", io.pacod.cms.site.testing.TestSites.chrome().withoutTracking().withCookiePolicy("cookies"));
+        chromes.forEach((why, chrome) -> {
+            for (String view : List.of("landing", "article")) {
+                Map<String, Object> model = new java.util.HashMap<>(Map.of("lang", "en", "site", chrome,
+                        "article", new ArticleModel(article(7, true, null), "en", List.of())));
+                String html = render(view, model);
+                assertThat(html).as("%s on %s, %s", view, set, why).contains("class=\"site-footer")
+                        .doesNotContain("id=\"consent\"", "data-gtm", "cookie-preferences", "GTM-", "googletagmanager");
+            }
+        });
+
+        String error = renderBare("error", Map.of("status", 404, "lang", "en",
+                "site", io.pacod.cms.site.testing.TestSites.chrome()));
+        // The footer's link is there and stays hidden: site.js reveals it only beside a banner.
+        assertThat(error).as("error on %s", set).doesNotContain("id=\"consent\"", "data-gtm", "googletagmanager")
+                .contains("href=\"#cookie-preferences\" hidden");
+        for (String view : List.of("article-print", "article-print-scientific")) {
+            String html = render(view, Map.of("article", new ArticleModel(article(7, true, null), "bg"), "lang", "bg",
+                    "printMeta", new io.pacod.cms.site.services.PrintExtras.PrintMeta(null, List.of())));
+            assertThat(html).as("%s on %s", view, set).doesNotContain("id=\"consent\"", "data-gtm", "cookie-preferences",
+                    "googletagmanager");
+        }
+    }
+
+    /**
+     * site.js is the one code that loads a website's tag manager, and it finds the banner's parts
+     * by the ids and data- attributes fragments/consent writes. There is no JavaScript test
+     * toolchain here (the behaviour was checked in a browser), so this pins what the two files must
+     * agree on and the consent rule itself: Google's signals start denied before anything loads,
+     * the container loads from data-gtm only, and the choice is the one first-party cookie.
+     */
+    @Test
+    @DisplayName("site.js and the consent banner name the same parts, and site.js keeps the consent rule")
+    void siteJsDrivesTheConsentBanner() throws java.io.IOException {
+        String script = new org.springframework.core.io.ClassPathResource("static/site-assets/site.js")
+                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        String banner = consentBanner(render("article", Map.of(
+                "article", new ArticleModel(article(7, true, null), "en", List.of()), "lang", "en")));
+
+        assertThat(banner).contains("id=\"consent\"", "data-gtm=\"", "id=\"consent-choices\"");
+        assertThat(script).contains("getElementById('consent')", "getAttribute('data-gtm')",
+                "getElementById('consent-choices')");
+        for (String part : List.of("data-consent-category=\"analytics\"", "data-consent-category=\"marketing\"",
+                "data-consent-action=\"choose\"", "data-consent-action=\"save\"")) {
+            assertThat(banner).contains(part);
+            assertThat(script).contains("'[" + part + "]'");
+        }
+        assertThat(banner).contains("data-consent-action=\"all\"", "data-consent-action=\"necessary\"");
+        assertThat(script).contains("action === 'all'", "action === 'necessary'",
+                        "'a[href=\"#cookie-preferences\"]'", "initConsent();")
+                // The cookie: one name, a version, path, Lax, Secure on HTTPS, 180 days.
+                .contains("var CONSENT_COOKIE = 'cookie_consent';", "var CONSENT_VERSION = 1;",
+                        "var CONSENT_MAX_AGE = 15552000;", "'; Path=/; Max-Age='", "'; SameSite=Lax'", "'; Secure'")
+                // Google's defaults, all denied but the two it needs, before the update and the load.
+                .containsSubsequence("gtag('consent', 'default', {", "ad_storage: 'denied'", "ad_user_data: 'denied'",
+                        "ad_personalization: 'denied'", "analytics_storage: 'denied'", "functionality_storage: 'granted'",
+                        "security_storage: 'granted'", "wait_for_update: 500",
+                        "gtag('consent', 'update', {", "'gtm.start'",
+                        "'https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(container)")
+                // A withdrawal clears what it withdrew and reloads; the queue gets arguments itself.
+                .contains("window.dataLayer.push(arguments);", "clearCookies(withdrawn);", "window.location.reload();",
+                        "analytics: /^(_ga|_ga_.+|_gid|_gat.*)$/", "marketing: /^(_gcl_.+|_gac_.+)$/");
+        // The only address of Google's in the site's own script.
+        assertThat(count(script, "googletagmanager.com")).isEqualTo(1);
     }
 
     @Test
@@ -1655,13 +1835,16 @@ class PublicTemplateRenderTest {
         String html = renderSocial(Map.of("social",
                 socialView("bg", SocialSource.INSTAGRAM, List.of())));
 
-        // No script is loaded by address at all; the theme snippet and GTM are inline.
+        // No script is loaded by address at all; the theme snippet is inline.
         assertThat(html).doesNotContainPattern("<script[^>]*\\ssrc=");
         assertThat(html).doesNotContain("/site-assets/site.js", "masthead", "partner-card",
                 "partner-row");
-        // The theme snippet and GTM come from fragments/head by name, exactly once each.
+        // The theme snippet comes from fragments/head by name, once.
         assertThat(count(html, "pacod-theme")).isEqualTo(1);
-        assertThat(count(html, "GTM-TEST4321")).isEqualTo(2);  // the script and the noscript frame
+        // No tag manager, even for a website with one: its consent banner needs site.js, and a
+        // withdrawal reloads the page, which this one must never do.
+        assertThat(html).doesNotContain(io.pacod.cms.site.testing.TestSites.GTM_ID, "googletagmanager",
+                "id=\"consent\"", "cookie-preferences");
         assertThat(html).contains("/site-assets/site.css", "<html lang=\"bg\"");
     }
 
