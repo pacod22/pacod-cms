@@ -8,7 +8,7 @@ stack hosts every website. Both applications are built from the root `Dockerfile
 
 | Service | File | Image built from | Listens on (inside) | Published as | Log file |
 |---|---|---|---|---|---|
-| `cms-mongo` | app | `mongo:8.3.13` | 27017 | `${MONGO_PORT:-27017}` | — |
+| `cms-mongo` | app | `${MONGO_IMAGE:-mongo:8.3.13}` | 27017 | `${MONGO_PORT:-27017}` | — |
 | `cms-site` | app | `pacod-cms-site` | 8443 | `${WEB_PORT:-8080}` | `cms-site.log` |
 | `cms-studio` | app | `pacod-cms-studio` | 7443 | `${MGMT_PORT:-7070}` | `cms-studio.log` |
 | `cms-gotenberg` | app | `gotenberg/gotenberg:8.38.1` | 3000 | — (the studio's PDF export only) | — |
@@ -62,6 +62,11 @@ make up           # make check first; builds pacod-id's image if missing; starts
   was created with `PID_DB_PASSWORD`, and pacod-id seals what it stores under `PID_KEK`. So
   **`make init` refuses to write a new value for any of them while that data exists**, and writes
   nothing then. Compose refuses to start without MongoDB's and pacod-id's ("run make init").
+- **MongoDB 8 and the host's kernel.** Every MongoDB 8 stops at startup ("Linux kernel versions
+  6.19 and newer has a known incompatibility") on a kernel `uname -r` names 6.19 up to 7.0.13,
+  Ubuntu 26.04's `7.0.0-N` included whatever it carries (SERVER-136848). There, set
+  `MONGO_IMAGE=mongo:7.0.45` in `.env` before `cms-mongo`'s first start: 7.0 cannot open data that
+  8.x wrote.
 - **The draft-preview key, `PACOD_PREVIEW_SECRET`**, is read by both `cms-site` and `cms-studio`: the studio
   signs a preview's address with it and the site checks it, and PDF export signs the renderer's
   requests to the site with it too. It needs at least 32 characters. Blank, the studio offers no
