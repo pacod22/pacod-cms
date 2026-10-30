@@ -327,6 +327,16 @@ RESTART_STUDIO = $(MAKE) --no-print-directory restart-studio
 NODE = $(if $(shell command -v node),node,docker run --rm --user $$(id -u):$$(id -g) -v "$(CURDIR):$(CURDIR)" \
 	-w "$(CURDIR)" $(if $(EXTERNAL),,--add-host "$(ID_HOST):host-gateway") $(NODE_IMAGE) node)
 id-provisioner: ## The studio's provisioner account in pacod-id (ROTATE=1: a new token); recreates the studio when it writes one
+	@# A cms-studio of another compose project (pacod-demo's) signs in through that stack's pacod-id,
+	@# whose admin is not this checkout's ID_ADMIN_*, and reads its token from that stack's files.
+	@project=$$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' cms-studio 2>/dev/null); \
+	own=$$(echo "$(or $(COMPOSE_PROJECT_NAME),$(notdir $(CURDIR)))" | tr A-Z a-z); \
+	if [ -n "$$project" ] && [ "$$project" != "$$own" ]; then \
+		echo "id-provisioner: cms-studio runs in the $$project stack, not this checkout's:" \
+			"$$( [ "$$project" = pacod-demo ] && echo 'make bootstrap in pacod-demo makes its provisioner' \
+				|| echo "make its provisioner from $$project's own checkout")" >&2; \
+		exit 1; \
+	fi
 	@out=$$($(NODE) scripts/id-provisioner.mjs "$(CURDIR)" "$(ID_ISSUER)" "$(STUDIO_ORIGIN)" $(if $(ROTATE),rotate)) || exit 1; \
 	if [ -n "$$out" ]; then echo "$$out"; $(RESTART_STUDIO); fi
 

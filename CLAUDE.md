@@ -694,7 +694,8 @@ checks first only so its screens offer what would succeed.
   and open to nobody.
 - **The provisioner** is a pacod-id service account holding `cms.provisioner` at the platform, made
   by `make id-provisioner` (`scripts/id-provisioner.mjs`, run by `make up`; with this machine's Node,
-  else in a `NODE_IMAGE` container that reaches `ID_HOST` through host-gateway): it signs in as the
+  else in a `NODE_IMAGE` container that reaches `ID_HOST` through host-gateway; refused while
+  `cms-studio` belongs to another compose project, as pacod-demo's, whose `make bootstrap` makes it): it signs in as the
   bootstrap admin through the hosted pages' API, uses `/ui-api/v1/admin` (writes need the issuer's
   `Origin`), and writes `PACOD_ID_PROVISIONER_TOKEN`/`_ACCOUNT` into whichever of `.env-local` and
   `.env` already names the token, else `.env` (a new token beside an old one in the later file
