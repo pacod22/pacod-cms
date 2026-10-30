@@ -64,6 +64,8 @@ PACOD_ID_IMAGE ?= pacod-id:dev
 PACOD_GW_SRC ?= ../pacod-gw
 PACOD_GW_LITE_IMAGE ?= pacod-gw-lite:dev
 PACOD_GW_MOCK_IMAGE ?= pacod-gw-mock:dev
+# The Node that runs the provisioner script when this machine has none on its PATH (make id-provisioner).
+NODE_IMAGE ?= node:24.21.0-alpine3.24
 JAVA_HOME ?= $(shell /usr/libexec/java_home -v 25 2>/dev/null || echo /Library/Java/JavaVirtualMachines/jdk-25.jdk/Contents/Home)
 MVN := JAVA_HOME=$(JAVA_HOME) PATH=$(JAVA_HOME)/bin:$$PATH ./mvnw
 
@@ -75,7 +77,7 @@ unexport ENV MONGO_ROOT_PASSWORD MONGO_PASSWORD PID_PG_SUPERUSER_PASSWORD PID_DB
 	PID_TOKEN_PEPPER CMS_ID_STUDIO_SECRET CMS_ID_SERVICE_SECRET ID_ADMIN_PASSWORD PACOD_PREVIEW_SECRET \
 	METRICS_VISITOR_SALT PACOD_GW_API_KEY PACOD_ID_PROVISIONER_TOKEN PID_SMTP_USERNAME PID_SMTP_PASSWORD
 # The helpers below are make functions: exported, they would be expanded -- and fire -- on every recipe.
-unexport confirm need STUDIO_CLI MONGO_ROOT MVN comma RESTART_STUDIO
+unexport confirm need STUDIO_CLI MONGO_ROOT MVN comma RESTART_STUDIO NODE
 PACOD_ENV := $(ENV)
 # PROXY_MODE=bundled (the default): cms's own services (docker-compose.yml, the app file) and its
 # copies of the shared components (docker-compose.standalone.yml) -- its Caddy, pacod-id and
@@ -318,8 +320,14 @@ images: ## Build pacod-id's image (and the mock gateway's, dev/stage) from their
 # $(MAKE) behind a variable: named directly, make would run this line -- node included -- even
 # under `make -n`.
 RESTART_STUDIO = $(MAKE) --no-print-directory restart-studio
+# This machine's Node, else -- none on make's PATH (nvm puts it there in an interactive shell only)
+# -- NODE_IMAGE's, on the checkout at its own path and as this user, so the token's file stays
+# theirs. Its sign-in reaches pacod-id through this machine's Caddy (host-gateway), as from here;
+# behind an existing Caddy, wherever ID_ISSUER's name resolves.
+NODE = $(if $(shell command -v node),node,docker run --rm --user $$(id -u):$$(id -g) -v "$(CURDIR):$(CURDIR)" \
+	-w "$(CURDIR)" $(if $(EXTERNAL),,--add-host "$(ID_HOST):host-gateway") $(NODE_IMAGE) node)
 id-provisioner: ## The studio's provisioner account in pacod-id (ROTATE=1: a new token); recreates the studio when it writes one
-	@out=$$(node scripts/id-provisioner.mjs "$(CURDIR)" "$(ID_ISSUER)" "$(STUDIO_ORIGIN)" $(if $(ROTATE),rotate)) || exit 1; \
+	@out=$$($(NODE) scripts/id-provisioner.mjs "$(CURDIR)" "$(ID_ISSUER)" "$(STUDIO_ORIGIN)" $(if $(ROTATE),rotate)) || exit 1; \
 	if [ -n "$$out" ]; then echo "$$out"; $(RESTART_STUDIO); fi
 
 dev-cert: ## A self-signed certificate pair, to try SSL_CERT_FILE/SSL_KEY_FILE locally (docker/caddy/tls/)

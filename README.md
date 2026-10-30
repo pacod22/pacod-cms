@@ -18,8 +18,9 @@ people to work on them; a platform admin sets the limits. See
 
 ## Quick start
 
-Requires Docker (Compose v2.20 or later), `make`, `curl`, `openssl`, Node 20 or later (`make up`
-uses it to set up the studio's account in pacod-id), and **pacod-id**, the sign-in service: either an
+Requires Docker (Compose v2.20 or later), `make`, `curl`, `openssl` (Node 20 or later, for `make e2e`;
+`make up` sets up the studio's account in pacod-id with it, or in a Node container without it), and
+**pacod-id**, the sign-in service: either an
 image `pacod-id:dev` (`PACOD_ID_IMAGE`) or a checkout of its sources next to this one (`../pacod-id`,
 or set `PACOD_ID_SRC`), from which `make up` builds the image once — a Rust build, slow the first
 time. Development and staging also run **pacod-gw**'s mock AI gateway, so they need its two images

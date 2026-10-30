@@ -51,8 +51,9 @@ containers and its addresses.
 
 ### What a machine needs
 
-- **Docker** with Compose v2.20 or later (`docker compose version`), **make**, **curl**, **openssl** and
-  **Node** 20 or later. `make up` uses Node to set up the studio's provisioner account in pacod-id.
+- **Docker** with Compose v2.20 or later (`docker compose version`), **make**, **curl** and **openssl**.
+  `make up` sets up the studio's provisioner account in pacod-id with this machine's **Node** (20 or
+  later), or, with none on make's `PATH`, in a container of `NODE_IMAGE`. `make e2e` needs Node itself.
 - **pacod-id**: an image `pacod-id:dev` (`PACOD_ID_IMAGE`), or its sources at `../pacod-id`
   (`PACOD_ID_SRC`). `make up` builds the image from the sources once, a slow Rust build.
 - **dev and stage**: the mock AI gateway's images, or pacod-gw's sources at `../pacod-gw`
