@@ -43,15 +43,7 @@
 			<artifactId>spring-boot-starter-thymeleaf</artifactId>
 		</dependency>
 
-		<!--
-			HTML parsing for what the AI gateway answers: a translated body must keep its source's
-			skeleton exactly (studio.ai.HtmlTranslation). MIT.
-		-->
-		<dependency>
-			<groupId>org.jsoup</groupId>
-			<artifactId>jsoup</artifactId>
-			<version>1.23.2</version>
-		</dependency>
+		<!-- jsoup (HTML parsing, studio.ai.HtmlTranslation and the rest) comes with pacod-cms-core. -->
 
 		<!--
 			A journal issue's PDF: each article's page count, the merge of cover, contents and

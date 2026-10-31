@@ -21,7 +21,7 @@ import java.time.Instant;
  *
  * <p>pacod does this in its outermost SvelteKit hook; a servlet filter is the same position here.
  * It is ahead of Spring Security (see {@code CrawlerTrafficConfig}), so it sees what the controllers
- * never do: {@code robots.txt} and {@code sitemap.xml}, every 404, {@code /b/{id}} and
+ * never do: {@code robots.txt}, {@code sitemap.xml} and the llms files, every 404, {@code /b/{id}} and
  * {@code /social/go} redirects, and the firewall's 400s.
  *
  * <h2>The status is read after the chain, and a throw is a 500</h2>

@@ -134,6 +134,11 @@ Every answer from the gateway is treated as hostile input:
 - **Only published articles reach a reader**, on every route, list, feed, sitemap and PDF; only
   published journal issues are listed, and a draft issue's PDF is kept outside every public folder
   and downloaded only through the studio, as an attachment.
+- **The crawler files** (`robots.txt`, `sitemap.xml`, `llms.txt`, `llms-full.txt`) list only what
+  a reader may see. A website's own text for one is checked when saved (a sitemap must be
+  well-formed XML without a DOCTYPE, its additions name only the website's own hosts), served as
+  plain text or XML with `nosniff`, never as HTML, and shown in the studio as text. A database that
+  cannot be read answers 503, never an allow-all `robots.txt`.
 - **What an AI gateway writes for a PDF is text**, checked as if typed: an abstract, keywords and a
   running title, stripped of markup. The article's body is never sent back to the site changed.
 - **No third-party script runs unless the website configured it**, and every third-party id is

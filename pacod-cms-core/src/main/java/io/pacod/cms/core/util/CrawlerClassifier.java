@@ -123,6 +123,8 @@ public final class CrawlerClassifier {
             rule("gptbot", "gptbot", CrawlerCategory.AI, null),
             rule("claudebot", "claudebot", CrawlerCategory.AI, null),
             rule("claude-web", "claude-web", CrawlerCategory.AI, null),
+            rule("claude-searchbot", "claude-searchbot", CrawlerCategory.AI, null),
+            rule("claude-user", "claude-user", CrawlerCategory.AI, null),
             rule("anthropic-ai", "anthropic-ai", CrawlerCategory.AI, null),
             rule("perplexitybot", "perplexitybot", CrawlerCategory.AI, null),
             rule("perplexity-user", "perplexity-user", CrawlerCategory.AI, null),

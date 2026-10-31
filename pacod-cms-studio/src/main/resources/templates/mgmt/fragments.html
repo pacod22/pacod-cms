@@ -481,6 +481,11 @@
                     <svg class="i"><use href="#i-settings"></use></svg>
                     <span class="nav-text" th:text="#{chrome.nav.settings}">settings</span>
                 </a>
+                <!--/* robots.txt, sitemap.xml, llms.txt (MgmtSiteFilesController); readers of the website see them. */-->
+                <a th:href="@{/mgmt/site-files}" th:classappend="${active == 'site-files'} ? 'active'" th:title="#{chrome.nav.siteFiles}">
+                    <svg class="i"><use href="#i-globe"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.siteFiles}">site files</span>
+                </a>
                 <a th:href="@{/mgmt/members}" th:classappend="${active == 'members'} ? 'active'" th:title="#{chrome.nav.members}">
                     <svg class="i"><use href="#i-users"></use></svg>
                     <span class="nav-text" th:text="#{chrome.nav.members}">members</span>

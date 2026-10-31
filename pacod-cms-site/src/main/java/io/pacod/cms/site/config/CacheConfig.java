@@ -49,6 +49,12 @@ public class CacheConfig {
     /** {@code SiteChromeReader}: the settings and the menus, one key each. */
     public static final String SITE = "site";
 
+    /**
+     * {@code SiteFilesReader}: a website's generated crawler files, one key per file, origin and
+     * settings. Weighed by length, not counted: one llms-full.txt may be 5 MB.
+     */
+    public static final String SITE_FILES = "siteFiles";
+
     /** {@code LayoutReader}: a website's published layouts, one key per page type. */
     public static final String DESIGN = "design";
 
@@ -102,6 +108,9 @@ public class CacheConfig {
     private static final Duration LANGUAGE_TTL = Duration.ofSeconds(60);
     private static final Duration SOCIAL_TTL = Duration.ofSeconds(60);
     private static final Duration SITE_TTL = Duration.ofSeconds(60);
+    private static final Duration SITE_FILES_TTL = Duration.ofSeconds(60);
+    /** About 128 MB of generated files in all (a char is two bytes), whatever the number of websites. */
+    private static final long SITE_FILES_MAX_CHARS = 64L * 1024 * 1024;
 
     /**
      * Caffeine underneath, behind {@link TenantScopedCacheManager}: every key is qualified by the
@@ -173,6 +182,12 @@ public class CacheConfig {
         manager.registerCustomCache(SITE, Caffeine.newBuilder()
                 .maximumSize(2000)
                 .expireAfterWrite(SITE_TTL)
+                .build());
+
+        manager.registerCustomCache(SITE_FILES, Caffeine.newBuilder()
+                .maximumWeight(SITE_FILES_MAX_CHARS)
+                .weigher((Object key, Object value) -> value instanceof String text ? Math.max(1, text.length()) : 1)
+                .expireAfterWrite(SITE_FILES_TTL)
                 .build());
 
         return new TenantScopedCacheManager(manager);

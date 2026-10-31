@@ -83,6 +83,16 @@
             <version>2.9</version>
         </dependency>
 
+        <!--
+          HTML parsing: llms-full.txt's bodies as Markdown (services.sitefiles.HtmlMarkdown), and in
+          the studio what the AI gateway answers (studio.ai.HtmlTranslation). MIT.
+        -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.23.2</version>
+        </dependency>
+
         <!-- Jackson 3: the seed steps read their JSON with the application's ObjectMapper. -->
         <dependency>
             <groupId>tools.jackson.core</groupId>

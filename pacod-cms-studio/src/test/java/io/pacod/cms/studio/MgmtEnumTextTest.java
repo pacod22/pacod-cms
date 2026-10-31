@@ -58,7 +58,8 @@ class MgmtEnumTextTest {
             Map.entry(io.pacod.cms.core.control.data.WebsiteStatus.class, Set.of("label")),
             Map.entry(io.pacod.cms.core.control.data.OrgCreation.class, Set.of("label")),
             Map.entry(io.pacod.cms.core.design.PageType.class, Set.of("label")),
-            Map.entry(io.pacod.cms.core.data.MenuLinkKind.class, Set.of("label")));
+            Map.entry(io.pacod.cms.core.data.MenuLinkKind.class, Set.of("label")),
+            Map.entry(io.pacod.cms.core.data.SiteFileMode.class, Set.of("label")));
 
     @Test
     @DisplayName("every constant of every console enum has its texts")

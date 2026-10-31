@@ -369,6 +369,19 @@ class MgmtSecurityTest {
     }
 
     @Test
+    @DisplayName("the crawler files' screens are not readable anonymously, and every write requires CSRF")
+    @WithAnonymousUser
+    void siteFilesRequireAuthentication() throws Exception {
+        for (String path : List.of("/mgmt/site-files", "/mgmt/site-files/robots", "/mgmt/site-files/llms-full")) {
+            mockMvc.perform(get(path)).andExpect(redirectedUrl("/mgmt/login"));
+        }
+        for (String path : List.of("/mgmt/site-files/robots", "/mgmt/site-files/sitemap/customise")) {
+            mockMvc.perform(post(path).with(csrf())).andExpect(redirectedUrl("/mgmt/login"));
+            mockMvc.perform(post(path)).andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
     @DisplayName("the PDF settings and the issue screens are not readable anonymously, every route of them")
     @WithAnonymousUser
     void pdfAndIssueScreensRequireAuthentication() throws Exception {

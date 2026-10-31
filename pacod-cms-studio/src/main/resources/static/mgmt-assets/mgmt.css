@@ -2145,6 +2145,21 @@ td .path-row .path { max-width: 320px; }
  * below -- the element is server-rendered with the stored log and mgmt.js only appends to its
  * text. That is what makes the screen work with scripting off.
  */
+/* A crawler file as the site answers it (site-files.html): text, never markup -- th:text writes it. */
+.file-preview {
+    max-height: 60vh;
+    overflow: auto;
+    margin: 0;
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 #job-log {
     max-height: 60vh;
     overflow: auto;

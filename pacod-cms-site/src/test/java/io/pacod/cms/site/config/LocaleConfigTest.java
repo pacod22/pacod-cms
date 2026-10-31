@@ -63,19 +63,20 @@ class LocaleConfigTest {
 
     /**
      * {@code ?lang} on a feed picks the feed's language; the interceptor that would also store it in
-     * a cookie -- on a response every cache may hand to everyone -- is kept off the feeds' paths,
-     * and only theirs.
+     * a cookie -- on a response every cache may hand to everyone -- is kept off the feeds' paths
+     * and the crawler files', and only theirs.
      */
     @Test
-    @DisplayName("the ?lang interceptor, which writes the cookie, runs on every page but the feeds")
+    @DisplayName("the ?lang interceptor, which writes the cookie, runs on every page but the feeds and crawler files")
     void feedsSetNoLanguageCookie() {
         Registry registry = new Registry();
         config.addInterceptors(registry);
 
-        for (String feed : java.util.List.of("/feed.xml", "/list/9/feed.xml")) {
+        for (String feed : java.util.List.of("/feed.xml", "/list/9/feed.xml", "/robots.txt", "/sitemap.xml",
+                "/llms.txt", "/llms-full.txt")) {
             assertThat(changesLanguageOn(registry, feed)).as(feed).isFalse();
         }
-        for (String page : java.util.List.of("/", "/article/5", "/de/list/9", "/list/9", "/sitemap.xml", "/p/about")) {
+        for (String page : java.util.List.of("/", "/article/5", "/de/list/9", "/list/9", "/p/about")) {
             assertThat(changesLanguageOn(registry, page)).as(page).isTrue();
         }
     }

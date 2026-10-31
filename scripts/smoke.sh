@@ -115,6 +115,8 @@ if [ -n "$SITE_HOST" ]; then
   row "/search.html" 404 "$SITE_HOST" /search.html
   row "/robots.txt" 200 "$SITE_HOST" /robots.txt
   row "/sitemap.xml" 200 "$SITE_HOST" /sitemap.xml
+  row "/llms.txt" 200 "$SITE_HOST" /llms.txt
+  row "/llms-full.txt" 200 "$SITE_HOST" /llms-full.txt
   row "/feed.xml" 200 "$SITE_HOST" /feed.xml
   row "/issues" 200 "$SITE_HOST" /issues
   row "/issues/999999 (no such issue)" 404 "$SITE_HOST" /issues/999999

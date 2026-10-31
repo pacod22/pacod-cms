@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * a draft, a new article and one without a status are 404 or absent, a published one is there.
  * Mocked repositories would pass for the wrong reason -- the predicate lives in the queries.
  *
- * <p>Then the per-host {@code sitemap.xml}, {@code robots.txt} and Atom feeds: each website lists
+ * <p>Then the per-host {@code sitemap.xml}, {@code robots.txt}, llms files and Atom feeds: each website lists
  * its own published articles and nobody else's, by its own address.
  */
 class PublicArticlesIT extends TwoWebsitesIT {
@@ -40,6 +40,9 @@ class PublicArticlesIT extends TwoWebsitesIT {
 
     @Autowired
     org.springframework.cache.CacheManager cacheManager;
+
+    @Autowired
+    io.pacod.cms.core.repository.SiteFilesRepository siteFiles;
 
     @BeforeAll
     void seed() {
@@ -149,6 +152,57 @@ class PublicArticlesIT extends TwoWebsitesIT {
         String betaMap = get(BETA_HOST, "/sitemap.xml", "application/xml").body();
         assertThat(betaMap).contains("<loc>http://" + BETA_HOST + "/article/505</loc>")
                 .doesNotContain("/article/502<", ALPHA_HOST);
+    }
+
+    @Test
+    @DisplayName("each website's llms.txt and llms-full.txt carry its own published articles and pages, never a draft")
+    void llmsPerWebsite() {
+        String origin = "http://" + ALPHA_HOST;
+        HttpResponse<String> index = get(ALPHA_HOST, "/llms.txt", "text/plain");
+        assertThat(index.statusCode()).isEqualTo(200);
+        assertThat(index.headers().firstValue("X-Content-Type-Options")).contains("nosniff");
+        assertThat(index.body()).startsWith("# ").contains("## Articles",
+                "[" + PUBLISHED + "](" + origin + "/article/502)", "(" + origin + "/list/40)",
+                "(" + origin + "/llms-full.txt)");
+        String full = get(ALPHA_HOST, "/llms-full.txt", "text/plain").body();
+        assertThat(full).contains("### " + PUBLISHED, "Source: " + origin + "/article/502", PUBLISHED + " body, zephyrword.");
+        for (String hidden : HIDDEN) {
+            assertThat(index.body()).doesNotContain(hidden);
+            assertThat(full).doesNotContain(hidden);
+        }
+        assertThat(index.body()).doesNotContain("/list/41)");
+        assertThat(get(BETA_HOST, "/llms-full.txt", "text/plain").body())
+                .contains("Beta only headline").doesNotContain(PUBLISHED, ALPHA_HOST);
+    }
+
+    @Test
+    @DisplayName("a website's own robots.txt is served as written, an llms.txt switched off is a 404, on that website alone")
+    void customAndOffFiles() {
+        setFiles(files -> {
+            files.getRobots().setMode(io.pacod.cms.core.data.SiteFileMode.CUSTOM);
+            files.getRobots().setCustom("User-agent: *\nDisallow: /alpha-only/\n");
+            files.getLlms().setMode(io.pacod.cms.core.data.SiteFileMode.OFF);
+        });
+        try {
+            assertThat(get(ALPHA_HOST, "/robots.txt", "text/plain").body()).isEqualTo("User-agent: *\nDisallow: /alpha-only/\n");
+            assertThat(get(ALPHA_HOST, "/llms.txt", "text/plain").statusCode()).isEqualTo(404);
+            assertThat(get(BETA_HOST, "/robots.txt", "text/plain").body()).doesNotContain("alpha-only");
+            assertThat(get(BETA_HOST, "/llms.txt", "text/plain").statusCode()).isEqualTo(200);
+        } finally {
+            TenantContext.runAs(alpha, () -> {
+                siteFiles.deleteAll();
+                cacheManager.getCacheNames().forEach(name -> cacheManager.getCache(name).clear());
+            });
+        }
+    }
+
+    private void setFiles(java.util.function.Consumer<io.pacod.cms.core.data.SiteFiles> change) {
+        TenantContext.runAs(alpha, () -> {
+            io.pacod.cms.core.data.SiteFiles files = new io.pacod.cms.core.data.SiteFiles();
+            change.accept(files);
+            siteFiles.save(files);
+            cacheManager.getCacheNames().forEach(name -> cacheManager.getCache(name).clear());
+        });
     }
 
     @Test

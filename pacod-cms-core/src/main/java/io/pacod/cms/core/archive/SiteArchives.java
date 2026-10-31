@@ -13,6 +13,7 @@ import io.pacod.cms.core.data.PdfEnrichment;
 import io.pacod.cms.core.data.PdfSettings;
 import io.pacod.cms.core.data.SiteMetricDay;
 import io.pacod.cms.core.data.SiteMetricHour;
+import io.pacod.cms.core.data.SiteFiles;
 import io.pacod.cms.core.data.SiteSettings;
 import io.pacod.cms.core.data.SiteVisitor;
 import io.pacod.cms.core.data.SocialPage;
@@ -102,7 +103,7 @@ public class SiteArchives {
     public static final List<String> COLLECTIONS = List.of("article", "author", "category", "image", "tag",
             Page.COLLECTION, Language.COLLECTION, SiteSettings.COLLECTION, Menu.COLLECTION, "layout", "theme",
             "banner", "bannerLayout", "bannerSkeleton", SocialPage.COLLECTION, PdfSettings.COLLECTION,
-            PdfEnrichment.COLLECTION, JournalIssue.COLLECTION);
+            PdfEnrichment.COLLECTION, JournalIssue.COLLECTION, SiteFiles.COLLECTION);
 
     /** The website collections it leaves out: analytics, which expire and are another website's traffic. */
     public static final List<String> SKIPPED = List.of(SiteMetricHour.COLLECTION, SiteMetricDay.COLLECTION,

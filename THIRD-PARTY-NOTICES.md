@@ -7,7 +7,7 @@ not the Apache License.
 Maven dependencies are not listed: they are not in the repository, Maven fetches them, and each
 carries its own licence in its jar. Nearly all that reach a runtime classpath are Apache-2.0 (among
 them Guava, which the studio reads the Public Suffix List through, snakeyaml-engine, which reads
-the role manifest, and PDFBox, which the studio assembles journal issues with); the rest are MIT (SLF4J; jsoup, which the studio parses AI answers with),
+the role manifest, and PDFBox, which the studio assembles journal issues with); the rest are MIT (SLF4J; jsoup, which both applications parse HTML with: AI answers in the studio, llms-full.txt's Markdown in the site),
 EPL-2.0 (AspectJ Weaver), EPL-2.0 or GPL-2.0 with the Classpath Exception (Jakarta Annotations) and
 EPL-2.0 or LGPL-2.1 (Logback). The Public Suffix List data inside Guava is MPL-2.0. None of them
 restricts the licence of this project. Regenerate the list with:

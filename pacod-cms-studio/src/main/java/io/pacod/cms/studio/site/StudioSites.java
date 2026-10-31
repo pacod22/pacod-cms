@@ -114,7 +114,14 @@ public class StudioSites {
                 publicUrl);
     }
 
+    /**
+     * The scheme's default port is left out, as browsers and the site write an origin: with it, the
+     * crawler files' preview and "start from the generated file" would differ from what the site
+     * serves ({@code demo.localhost:80} against {@code demo.localhost}).
+     */
     String originOf(String host) {
-        return publicScheme + "://" + host + (publicPort.isEmpty() ? "" : ":" + publicPort);
+        boolean defaultPort = publicPort.isEmpty() || ("http".equals(publicScheme) && "80".equals(publicPort))
+                || ("https".equals(publicScheme) && "443".equals(publicPort));
+        return publicScheme + "://" + host + (defaultPort ? "" : ":" + publicPort);
     }
 }

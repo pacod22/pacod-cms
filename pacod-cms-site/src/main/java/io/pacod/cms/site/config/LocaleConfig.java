@@ -2,6 +2,7 @@ package io.pacod.cms.site.config;
 
 import io.pacod.cms.core.data.LanguageChain;
 import io.pacod.cms.site.controller.FeedController;
+import io.pacod.cms.site.controller.SiteFilesController;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
@@ -75,9 +76,10 @@ public class LocaleConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // Not on the feeds: ?lang there picks the feed's language, and a cookie on a publicly cached
-        // response would be handed to every client of the cache.
-        registry.addInterceptor(localeChangeInterceptor()).excludePathPatterns(FeedController.PATHS);
+        // Not on the feeds or the crawler files: ?lang on a feed picks its language, and a cookie on a
+        // publicly cached response would be handed to every client of the cache.
+        registry.addInterceptor(localeChangeInterceptor()).excludePathPatterns(FeedController.PATHS)
+                .excludePathPatterns(SiteFilesController.PATHS);
         registry.addInterceptor(chromeFollowsContent());
     }
 }

@@ -277,7 +277,7 @@ its id.
   `?lang=`. An item whose label resolves to nothing or whose address is refused is dropped. Absolute
   URLs (canonical, `og:url`, `og:image`, JSON-LD, sitemap, feed) come from `baseUrl`, or the
   request's origin while it is blank — one rule, **`SiteOrigin`** (site), which `SiteChrome`,
-  `SitemapController` and `FeedController` share. **`SiteSettings.ownHosts()`** is `baseUrl`'s host with and without
+  `SiteFilesController` and `FeedController` share. **`SiteSettings.ownHosts()`** is `baseUrl`'s host with and without
   `www.` — what an absolute link must name to count as the website's own.
 - **`SiteBootstrap` seeds both from `seed/site.json`**, which describes the demo: **a website whose
   name is not one of the seed's names gets its own name and a "© name" footer note** (in its default
@@ -820,7 +820,7 @@ website, never over one** (`studio.archive.PortalRestore`, routes in `MgmtArchiv
   fill)`**: `fill` writes the archive after the indexes and **before the seed steps**, which then add
   only what it lacked, and before the website turns `ACTIVE`. `SiteSettings.baseUrl` is unset (it
   names the source's host); **nothing else is rewritten**: bookings' targets and absolute links in
-  bodies still name the source's origin. **The name readers see is `SiteSettings.names`**, which came
+  bodies still name the source's origin, and so do a custom `robots.txt` or `sitemap.xml` (additions heal: generation re-checks the own hosts). **The name readers see is `SiteSettings.names`**, which came
   with the archive, so a website restored under another name gets it written there in its original
   language (`PortalRestore.rename`); the control plane's `name` alone would show only in the studio. A `fill` that fails removes the website again (`retire` + `erase`) --
   **only one still `PROVISIONING`**, never another of the same id; its id is free after
@@ -1215,7 +1215,8 @@ MongoDB via Spring Data. No JPA, no JDBC.
   `status` altogether: every draft was served at `/article/{id}` and listed on `/latest`.
   - **The public site reads articles only through `ArticleRepository`'s public queries** — the
     block at its top: `findPublished`, `…AndStatus(…, PUBLIC)`, `fulltextSearchPublished`,
-    `findPublishedCoversByIdIn`, `findPublishedForSitemap`. The queries below that block are the
+    `findPublishedCoversByIdIn`, `findPublishedForSitemap`, `findPublishedForLlms`,
+    `findPublishedIndexForLlms`. The queries below that block are the
     studio's and see drafts. **A new public query carries the predicate**, or the IT below fails.
   - `WebArticleService.getArticleById` answers empty for an unpublished article **before** the view
     counter. `ArticleReader` caches it either way, so publishing shows within the 60 s TTL; the
@@ -2860,18 +2861,60 @@ renders `message`.
     (`Tenant.timezone()`; `lastModifiedOn` is read in the JVM's zone and never precedes the date).
   - **No top-level route may be two or three lowercase letters**, and identifier-less routes get no
     prefix (`/{lang}` alone would swallow every single-segment path).
-- **`/robots.txt` and `/sitemap.xml` are answered per website** (`SitemapController`), from its own
-  database — no file in any folder, so no website's list names another's.
-  - robots disallows `/article-print/`, `/issue-print/`, `/b/`, `/social/go/`, `/social/read/`,
-    `/search` (and so `/search-google`) and `/web/v1/`, and names the sitemap absolutely.
-  - The sitemap lists `/`, `/latest`, every published standing page, every category with a
-    published article (`existsByCategoriesAndStatus`), `/issues` and every published journal issue
-    while there is one, and the newest 45,000 published articles,
-    through a projection (`findPublishedForSitemap`: no row resolves its `@DBRef`s). Bare
-    addresses, `lastmod` a date alone.
-  - Absolute addresses come from `baseUrl`, else the request's origin (`SiteOrigin`), like `og:url`.
-    A database that cannot be read is a **503** with `Retry-After`, never an empty sitemap a crawler
-    would believe. Both cache an hour; `make smoke` probes both.
+- **The crawler files — `/robots.txt`, `/sitemap.xml`, `/llms.txt`, `/llms-full.txt` — are answered
+  per website** (`SiteFilesController`), from its own database — no file in any folder, so no
+  website's list names another's. Each is generated, generated with the operator's additions and
+  exclusions, the operator's own text served verbatim, or off (a 404), as chosen at
+  **`/mgmt/site-files/{robots,sitemap,llms,llms-full}`** (`MgmtSiteFilesController`, `website.read`
+  to see, `website.manage` to change; the sidebar's Website group).
+  - **One `SiteFiles` document** (`siteFiles`, id `files`; absent = all automatic), one
+    `SiteFileSetting` per file plus the generated files' options. **The studio `$set`s the posted
+    file's setting and its own options alone** (`MgmtSiteFilesService`), so saving one file never
+    puts back another's from a stale tab; a field the form did not carry keeps what is stored, and
+    the custom text survives a switch away from custom. Options are posted (`options`) only while the
+    file is generated, so a custom file's save leaves them as they were. In the export
+    (`SiteArchives.COLLECTIONS`).
+  - **The generators are core's** (`core.services.sitefiles`), behind **`SiteFileService`**, which
+    both applications ask: the studio's preview and "start a custom text from the generated file"
+    are exactly what the site serves. The studio's origin is the website's (`baseUrl`, else its
+    primary host's public address), never its own.
+  - **robots** (`RobotsBuilder`): a group per AI switch that is on (`AiCrawlers.TRAINING`, which
+    costs no reader, and `ANSWERING`, which removes the website from assistants' answers; every
+    token is one `CrawlerClassifier` files as AI, `AiCrawlersTest`), then `User-agent: *` disallowing
+    `/article-print/`, `/issue-print/`, `/b/`, `/social/go/`, `/social/read/`, `/search` (and so
+    `/search-google`) and `/web/v1/`, then the additions — **after** the `*` group, so a rule without
+    its own `User-agent` belongs to every crawler (RFC 9309) — then `Sitemap:` absolutely unless the
+    sitemap is off.
+  - **sitemap** (`SitemapBuilder`): `/`, `/latest`, every published standing page, every category
+    with a published article (`existsByCategoriesAndStatus`), `/issues` and every published journal
+    issue while there is one, and the newest 45,000 published articles, through a projection
+    (`findPublishedForSitemap`: no row resolves its `@DBRef`s). Bare addresses, `lastmod` a date
+    alone. Additions are paths or absolute addresses **on the website's own hosts only**
+    (`SiteFileService.ownHosts`, checked on save and again when generated).
+  - **llms.txt / llms-full.txt** (`LlmsBuilder`, llmstxt.org) in `original()`'s language: name,
+    tagline, description, then links to pages, sections, issues and the newest articles
+    (`findPublishedIndexForLlms`); the full file carries every published standing page and the newest
+    articles whole, bodies as Markdown (`HtmlMarkdown`, jsoup — now core's dependency), cut at 5 MB
+    and saying so. `llms-full.txt` has no custom mode.
+  - **A custom text is checked when saved** (`SiteFileRules`, the one set of refusals, each a
+    `siteFiles.error.*` key): robots lines must look like rules; a sitemap must be well-formed XML, no
+    DOCTYPE, a `urlset`/`sitemapindex` in the sitemaps namespace with absolute http(s) `loc`s; size
+    caps per file (`SiteFileKind.customLimit`) under the 4 MB multipart ceiling — **the form is
+    multipart** because an url-encoded sitemap triples and meets Tomcat's 2 MB form limit first.
+  - Every answer is its type in UTF-8 with `nosniff` (a custom text must never be read as HTML), and
+    the screen's preview is `th:text`. Absolute addresses come from `baseUrl`, else the request's
+    origin (`SiteOrigin`), like `og:url`. **A database that cannot be read is a 503** with
+    `Retry-After` (`SiteFilesReader` propagates, unlike `SiteChromeReader`): a fallback would serve an
+    allow-all robots.txt, or addresses the operator left out, to crawlers that keep it a day. Cached an
+    hour publicly; in the site `SiteFiles` in `CacheConfig.SITE` and the generated text in
+    **`SITE_FILES`, weighed by length** (one llms-full may be 5 MB), keyed by the settings' hash so a
+    change is never answered with the file before it. No `lang` cookie (`LocaleConfig` keeps
+    `LocaleChangeInterceptor` off `SiteFileKind.PATHS`). `make smoke` probes all four.
+  - Tests: core's `RobotsBuilderTest`, `SitemapBuilderTest`, `LlmsBuilderTest`, `HtmlMarkdownTest`,
+    `SiteFileRulesTest`, `AiCrawlersTest`; `SiteFilesControllerTest`; `MgmtSiteFilesServiceTest` (one
+    file per `$set`, refusals), `SiteFilesScreensTest` (both languages, readers refused, the multipart
+    form), `MgmtSecurityTest.siteFilesRequireAuthentication`; `PublicArticlesIT.llmsPerWebsite`/
+    `customAndOffFiles`.
 - **`/feed.xml` and `/list/{id}/feed.xml` are Atom 1.0** (`FeedController`, `XMLStreamWriter`), per
   website like the sitemap: the newest 20 through the lists' own public queries (`findPublished`;
   `findArticleByCategoriesAndStatus`, in the category list's order), a non-public status dropped

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  The website's crawler files (MgmtSiteFilesController): robots.txt, sitemap.xml, llms.txt and
+  llms-full.txt, one per screen behind plain links -- so a form posts one file's values and never
+  another's. Each is automatic, automatic with additions, custom or off; the preview shows what the
+  site answers now. Readers of the website see it all; website.manage saves.
+
+  The form is multipart (see the controller): an url-encoded sitemap triples in size and meets
+  Tomcat's form limit long before its own cap.
+*/-->
+
+<head th:replace="~{mgmt/fragments :: head(#{siteFiles.title})}"></head>
+
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('site-files')}"></th:block>
+
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{siteFiles.title})}"></header>
+
+        <main class="content" th:with="mayEdit=${can != null and can.site('website.manage')}">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+            <p class="muted" th:text="#{siteFiles.intro}">The files crawlers and AI assistants read at the website's root.</p>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="chart-legend" style="margin:0">
+                        <a th:each="k : ${kinds}" class="btn btn-sm"
+                           th:classappend="${k == kind} ? 'btn-primary' : 'btn-ghost'"
+                           th:href="@{/mgmt/site-files/{k}(k=${k.param()})}"
+                           th:aria-current="${k == kind} ? 'page'">
+                            <span th:text="${k.path().substring(1)}">robots.txt</span>
+                            <span class="badge plain" th:classappend="${files.modeOf(k).name() == 'OFF'} ? 'off'"
+                                  th:text="${mgmtText.label(files.modeOf(k))}">Automatic</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <form class="form-page" method="post" enctype="multipart/form-data"
+                  th:action="@{/mgmt/site-files/{k}(k=${kind.param()})}">
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-file-text"></use></svg>
+                        <span th:text="${kind.path().substring(1)}">robots.txt</span></h2>
+                    <div class="card-body">
+                        <p class="muted" style="margin-top:0" th:text="#{'siteFiles.about.' + ${kind.param()}}">What this file is.</p>
+                        <fieldset class="field">
+                            <legend th:text="#{siteFiles.mode}">The site answers with</legend>
+                            <div class="checkline" th:each="m : ${modes}">
+                                <input type="radio" name="mode" th:id="'mode-' + ${m}" th:value="${m}"
+                                       th:checked="${m == mode}" th:disabled="${!mayEdit}">
+                                <label th:for="'mode-' + ${m}">
+                                    <span th:text="${mgmtText.label(m)}">Automatic</span>
+                                    <span class="hint" th:text="#{'siteFiles.mode.' + ${m} + '.hint'}">Generated from the content.</span>
+                                </label>
+                            </div>
+                        </fieldset>
+                    </div>
+                </div>
+
+                <!--/* The options of the generated file. Only rendered as controls while it is generated, and
+                    applied only when `options` is posted, so a custom file's save keeps them as they are. */-->
+                <div class="card" th:if="${kind.name() == 'ROBOTS' or kind.name() == 'LLMS' or kind.name() == 'LLMS_FULL'}">
+                    <h2><svg class="i"><use href="#i-settings"></use></svg> <span th:text="#{siteFiles.options}">The generated file</span></h2>
+                    <div class="card-body" th:with="generated=${mode.name() == 'AUTO' or mode.name() == 'AUTO_PLUS'}">
+                        <input type="hidden" name="options" value="1" th:if="${generated and mayEdit}">
+                        <span class="hint" th:unless="${generated}" th:text="#{siteFiles.options.inactive}">These apply while the file is generated.</span>
+                        <th:block th:if="${kind.name() == 'ROBOTS'}">
+                            <div class="checkline">
+                                <input type="checkbox" id="blockAiTraining" name="blockAiTraining" value="true"
+                                       th:checked="${files.blockAiTraining}" th:disabled="${!mayEdit or !generated}">
+                                <label for="blockAiTraining">
+                                    <span th:text="#{siteFiles.robots.blockTraining}">Shut out AI training crawlers</span>
+                                    <span class="hint" th:text="${trainingAgents}">GPTBot, ClaudeBot</span>
+                                </label>
+                            </div>
+                            <div class="checkline">
+                                <input type="checkbox" id="blockAiAnswering" name="blockAiAnswering" value="true"
+                                       th:checked="${files.blockAiAnswering}" th:disabled="${!mayEdit or !generated}">
+                                <label for="blockAiAnswering">
+                                    <span th:text="#{siteFiles.robots.blockAnswering}">Shut out AI search and assistants</span>
+                                    <span class="hint" th:text="${answeringAgents}">OAI-SearchBot, PerplexityBot</span>
+                                </label>
+                            </div>
+                            <span class="hint" th:text="#{siteFiles.robots.answeringHint}">Shutting these out removes the website from their answers.</span>
+                        </th:block>
+                        <div class="field" th:if="${kind.name() == 'LLMS' or kind.name() == 'LLMS_FULL'}">
+                            <label for="articles" th:text="#{'siteFiles.articles.' + ${kind.param()}}">Newest articles listed</label>
+                            <input type="number" id="articles" name="articles" min="0" th:max="${maxArticles}"
+                                   th:value="${articles}" required th:disabled="${!mayEdit or !generated}">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><svg class="i"><use href="#i-plus"></use></svg> <span th:text="#{siteFiles.additions}">Additions</span></h2>
+                    <div class="card-body">
+                        <span class="hint" th:text="#{siteFiles.additionsInactive}" th:unless="${mode.name() == 'AUTO_PLUS'}">Used while the mode is automatic with additions.</span>
+                        <div class="field">
+                            <label for="additions" th:text="#{'siteFiles.additions.' + ${kind.param()}}">Lines added</label>
+                            <textarea id="additions" name="additions" class="code" rows="8" spellcheck="false"
+                                      th:text="${setting.additions}" th:disabled="${!mayEdit}"></textarea>
+                            <span class="hint" th:if="${kind.name() == 'SITEMAP'}"
+                                  th:text="#{siteFiles.additions.sitemap.hosts(${ownHosts.isEmpty() ? '—' : ownHosts})}">Paths, or addresses on these hosts.</span>
+                        </div>
+                        <div class="field" th:if="${kind.excludes()}">
+                            <label for="exclusions" th:text="#{siteFiles.exclusions}">Left out</label>
+                            <textarea id="exclusions" name="exclusions" class="code" rows="5" spellcheck="false"
+                                      th:text="${setting.exclusions}" th:disabled="${!mayEdit}"></textarea>
+                            <span class="hint" th:text="#{siteFiles.exclusions.hint}">One path per line; end it with * for everything below.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" th:if="${kind.customisable()}">
+                    <h2><svg class="i"><use href="#i-code"></use></svg> <span th:text="#{siteFiles.custom}">Custom text</span></h2>
+                    <div class="card-body">
+                        <span class="hint" th:text="#{siteFiles.custom.hint(${customKilobytes})}">Served verbatim while the mode is custom.</span>
+                        <div class="field">
+                            <label for="custom" th:text="#{siteFiles.custom.text}">Text</label>
+                            <textarea id="custom" name="custom" class="code" rows="16" spellcheck="false"
+                                      th:text="${setting.custom}" th:disabled="${!mayEdit}"></textarea>
+                        </div>
+                        <div class="field" th:if="${mayEdit}">
+                            <label for="customFile" th:text="#{siteFiles.custom.file}">Or upload a file</label>
+                            <input type="file" id="customFile" name="customFile" data-no-dirty
+                                   th:accept="${kind.name() == 'SITEMAP'} ? '.xml,application/xml,text/xml' : '.txt,.md,text/plain,text/markdown'">
+                            <span class="hint" th:text="#{siteFiles.custom.file.hint}">A file replaces the text above.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" th:if="${mayEdit}">
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{siteFiles.action.save}">Save</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-eye"></use></svg> <span th:text="#{siteFiles.preview}">What the site answers</span></h2>
+                <div class="card-body">
+                    <p class="muted" style="margin-top:0" th:if="${preview.off()}" th:text="#{siteFiles.preview.off}">Not found (404).</p>
+                    <p class="muted" style="margin-top:0" th:if="${preview.failed()}" th:text="#{siteFiles.preview.failed}">It cannot be generated right now.</p>
+                    <th:block th:unless="${preview.off() or preview.failed()}">
+                        <p class="muted" style="margin-top:0">
+                            <span th:text="#{siteFiles.preview.size(${preview.lines()}, ${#numbers.formatDecimal(preview.bytes() / 1024.0, 1, 1)})}">12 lines, 0.4 KB</span>
+                            <span th:if="${preview.truncated()}" th:text="#{siteFiles.preview.truncated(${previewLines})}">The first 300 lines.</span>
+                        </p>
+                        <pre class="file-preview" th:text="${preview.text()}">User-agent: *</pre>
+                    </th:block>
+                    <p class="muted" th:if="${origin.isEmpty()}" th:text="#{siteFiles.preview.noOrigin}">The website has no address yet.</p>
+                </div>
+                <div class="card-foot">
+                    <a class="btn btn-ghost" th:if="${publicUrl != null}" th:href="${publicUrl}" target="_blank" rel="noopener">
+                        <svg class="i"><use href="#i-external"></use></svg> <span th:text="#{siteFiles.action.open}">Open on the site</span>
+                    </a>
+                    <form method="post" th:if="${mayEdit and kind.customisable()}"
+                          th:action="@{/mgmt/site-files/{k}/customise(k=${kind.param()})}">
+                        <button class="btn" type="submit" th:title="#{siteFiles.action.customise.hint}">
+                            <svg class="i"><use href="#i-copy"></use></svg> <span th:text="#{siteFiles.action.customise}">Start a custom text from the generated file</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

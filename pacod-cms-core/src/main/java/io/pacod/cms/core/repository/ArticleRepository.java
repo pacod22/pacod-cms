@@ -72,6 +72,22 @@ public interface ArticleRepository extends MongoRepository<Article, Integer> {
     List<Article> findPublishedForSitemap(Pageable pageable);
 
     /**
+     * {@code llms.txt}'s and {@code llms-full.txt}'s rows, newest first: the original's title,
+     * description and body and the dates -- and nothing eager, for {@link #findPublishedForSitemap}'s
+     * reason. {@code llms.txt} has no use for the body, so it asks {@link #findPublishedIndexForLlms}.
+     */
+    @Query(value = "{status: 'PUBLISHED'}",
+           fields = "{ '_id': 1, 'title': 1, 'description': 1, 'text': 1, 'date': 1, 'lastModifiedOn': 1 }",
+           sort = "{ _id : -1 }")
+    List<Article> findPublishedForLlms(Pageable pageable);
+
+    /** {@link #findPublishedForLlms} without the body. */
+    @Query(value = "{status: 'PUBLISHED'}",
+           fields = "{ '_id': 1, 'title': 1, 'description': 1, 'date': 1, 'lastModifiedOn': 1 }",
+           sort = "{ _id : -1 }")
+    List<Article> findPublishedIndexForLlms(Pageable pageable);
+
+    /**
      * The outline of published articles -- id, titles, authors, date -- for an issue's table of
      * contents; the body and the images stay unread.
      */
