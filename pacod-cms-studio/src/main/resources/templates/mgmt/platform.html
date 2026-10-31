@@ -78,7 +78,19 @@
 
             <div class="card">
                 <h2><svg class="i"><use href="#i-globe"></use></svg> <span th:text="#{portal.platform.ai.title}">AI gateway</span></h2>
-                <p class="card-body muted" th:unless="${aiConfigured}" th:text="${mgmtText.label(aiNotSetUp)}">AI is not set up.</p>
+                <div class="card-body">
+                    <p th:unless="${aiConfigured}" class="muted" th:text="${mgmtText.label(aiNotSetUp)}">AI is not set up.</p>
+                    <dl class="kv" th:if="${aiGateway.source().name() != 'NONE'}">
+                        <dt th:text="#{portal.platform.ai.gateway.url}">Address</dt>
+                        <dd><code th:text="${aiGateway.url().isEmpty()} ? '—' : ${aiGateway.url()}">http://pacod-gw:8080</code></dd>
+                        <dt th:text="#{portal.platform.ai.gateway.key}">Key</dt>
+                        <dd th:text="${aiGateway.key().isEmpty()} ? #{portal.platform.ai.gateway.key.none} : #{portal.platform.ai.gateway.key.set(${aiGateway.keyHint()})}">set, ending in …abcd</dd>
+                        <dt th:text="#{portal.platform.ai.gateway.source}">Comes from</dt>
+                        <dd th:text="${aiGateway.source().name() == 'STORED'} ? #{portal.platform.ai.gateway.source.stored} : #{portal.platform.ai.gateway.source.environment}">the environment</dd>
+                    </dl>
+                    <p class="hint" th:if="${aiGatewayUpdated != null}"
+                       th:text="#{portal.platform.ai.gateway.updated(${aiGatewayUpdated}, ${aiGateway.updatedBy() == null ? '—' : aiGateway.updatedBy()})}">Set 2026-10-31 by usr_…</p>
+                </div>
                 <form method="post" th:if="${aiConfigured}" th:action="${studioRoot} + '/mgmt/platform/ai-test'">
                     <div class="card-body">
                         <p th:text="#{portal.platform.ai.model(${aiModel})}">Model: @fast</p>
@@ -88,6 +100,104 @@
                         <button class="btn" type="submit">
                             <svg class="i"><use href="#i-play"></use></svg> <span th:text="#{portal.platform.ai.test}">Test the connection</span>
                         </button>
+                    </div>
+                </form>
+                <form method="post" th:action="${studioRoot} + '/mgmt/platform/ai-gateway'">
+                    <div class="card-body">
+                        <h3 th:text="#{portal.platform.ai.gateway.change}">Change the gateway</h3>
+                        <div class="field">
+                            <label for="gatewayUrl" th:text="#{portal.platform.ai.gateway.url}">Address</label>
+                            <input type="url" id="gatewayUrl" name="url" maxlength="500" placeholder="http://pacod-gw:8080"
+                                   th:value="${aiGateway.url()}">
+                        </div>
+                        <div class="field">
+                            <label for="gatewayKey" th:text="#{portal.platform.ai.gateway.key}">Key</label>
+                            <input type="password" id="gatewayKey" name="apiKey" maxlength="512" autocomplete="off" spellcheck="false">
+                            <span class="hint" th:text="#{portal.platform.ai.gateway.key.hint}">Enter the key each time you save.</span>
+                        </div>
+                        <div class="checkline">
+                            <input type="checkbox" id="gatewayTest" name="test" value="true" checked>
+                            <div><label for="gatewayTest" th:text="#{portal.platform.ai.gateway.test}">Test after saving</label></div>
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{portal.action.save}">Save</span>
+                        </button>
+                    </div>
+                </form>
+                <form method="post" th:if="${aiGateway.source().name() == 'STORED'}" th:action="${studioRoot} + '/mgmt/platform/ai-gateway/reset'"
+                      th:data-confirm="#{portal.platform.ai.gateway.reset.confirm}">
+                    <div class="card-foot">
+                        <span class="hint" th:text="#{portal.platform.ai.gateway.reset.hint}">The environment's address and key apply again.</span>
+                        <button class="btn" type="submit" th:text="#{portal.platform.ai.gateway.reset}">Use the environment's</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2><svg class="i"><use href="#i-globe"></use></svg> <span th:text="#{portal.platform.ai.models.title}">AI models</span></h2>
+                <div class="card-body">
+                    <p class="hint" th:text="#{portal.platform.ai.models.intro}">Chosen from what the gateway offers this installation's key.</p>
+                    <p class="muted" th:if="${aiCatalog == null and aiCatalogError != null}"
+                       th:text="#{portal.platform.ai.models.unavailable(${aiCatalogError})}">The gateway's list cannot be read.</p>
+                    <p class="muted" th:if="${aiCatalog == null and aiCatalogError == null}"
+                       th:text="#{portal.platform.ai.models.noGateway}">Set up the gateway to choose models.</p>
+                    <dl class="kv">
+                        <th:block th:each="row : ${aiFeatures}">
+                            <dt th:text="${mgmtText.label(row.feature())}">Translation</dt>
+                            <dd><code th:text="${row.inUse().model()}">@fast</code>
+                                <span class="hint" th:text="${row.inUse().source().name() == 'STORED_FEATURE'} ? #{portal.platform.ai.models.source.feature}
+                                      : (${row.inUse().source().name() == 'STORED_DEFAULT'} ? #{portal.platform.ai.models.source.default} : #{portal.platform.ai.models.source.environment})">the default</span></dd>
+                        </th:block>
+                    </dl>
+                    <p class="hint" th:if="${aiModelsUpdated != null}"
+                       th:text="#{portal.platform.ai.gateway.updated(${aiModelsUpdated}, ${aiModelsUpdatedBy == null ? '—' : aiModelsUpdatedBy})}">Set on …</p>
+                </div>
+                <form method="post" th:if="${aiCatalog != null}" th:action="${studioRoot} + '/mgmt/platform/ai-models'">
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="aiDefault" th:text="#{portal.platform.ai.models.default}">Default</label>
+                            <select id="aiDefault" name="default">
+                                <option value="" th:text="#{portal.platform.ai.models.environment(${aiEnvironmentDefault})}">The environment's (@fast)</option>
+                                <option th:if="${!aiStoredDefaultOffered}" th:value="${aiStoredDefault}" selected
+                                        th:text="#{portal.platform.ai.models.notOffered(${aiStoredDefault})}">@old (not offered)</option>
+                                <optgroup th:label="#{portal.platform.ai.models.templates}">
+                                    <option th:each="ch : ${aiDefaultChoices}" th:if="${ch.template()}" th:value="${ch.id()}"
+                                            th:selected="${ch.id() == aiStoredDefault}" th:text="${ch.label()}">@fast</option>
+                                </optgroup>
+                                <optgroup th:label="#{portal.platform.ai.models.models}">
+                                    <option th:each="ch : ${aiDefaultChoices}" th:if="${!ch.template()}" th:value="${ch.id()}"
+                                            th:selected="${ch.id() == aiStoredDefault}"
+                                            th:text="${ch.deprecated()} ? #{portal.platform.ai.models.deprecated(${ch.label()})} : ${ch.label()}">openai/gpt</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="grid-2">
+                            <div class="field" th:each="row : ${aiFeatures}">
+                                <label th:for="'aiFeature_' + ${row.feature().key()}" th:text="${mgmtText.label(row.feature())}">Translation</label>
+                                <select th:id="'aiFeature_' + ${row.feature().key()}" th:name="'feature_' + ${row.feature().key()}">
+                                    <option value="" th:text="#{portal.platform.ai.models.useDefault}">Use the default</option>
+                                    <option th:if="${!row.overrideOffered()}" th:value="${row.override()}" selected
+                                            th:text="#{portal.platform.ai.models.notOffered(${row.override()})}">@old (not offered)</option>
+                                    <option th:each="ch : ${row.choices()}" th:value="${ch.id()}" th:selected="${ch.id() == row.override()}"
+                                            th:text="${ch.deprecated()} ? #{portal.platform.ai.models.deprecated(${ch.label()})} : ${ch.label()}">@fast</option>
+                                </select>
+                                <span class="hint" th:text="${mgmtText.text(row.feature(), 'hint')}">Which features use it.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{portal.action.save}">Save</span>
+                        </button>
+                    </div>
+                </form>
+                <form method="post" th:if="${aiModelsStored}" th:action="${studioRoot} + '/mgmt/platform/ai-models/reset'"
+                      th:data-confirm="#{portal.platform.ai.models.reset.confirm}">
+                    <div class="card-foot">
+                        <span class="hint" th:text="#{portal.platform.ai.models.reset.hint}">The properties apply again.</span>
+                        <button class="btn" type="submit" th:text="#{portal.platform.ai.models.reset}">Use the environment's</button>
                     </div>
                 </form>
             </div>

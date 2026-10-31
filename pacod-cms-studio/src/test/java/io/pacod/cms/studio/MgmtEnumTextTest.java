@@ -49,6 +49,7 @@ class MgmtEnumTextTest {
             Map.entry(io.pacod.cms.core.control.data.JobType.class, Set.of("label")),
             Map.entry(io.pacod.cms.core.control.data.JobStatus.class, Set.of("label")),
             Map.entry(io.pacod.cms.studio.ai.AiRefusal.class, Set.of("label")),
+            Map.entry(io.pacod.cms.studio.ai.AiFeature.class, Set.of("label", "hint")),
             Map.entry(io.pacod.cms.core.data.PdfFormat.class, Set.of("label")),
             Map.entry(io.pacod.cms.core.data.PdfMode.class, Set.of("label")),
             Map.entry(io.pacod.cms.core.data.PaperSize.class, Set.of("label")),

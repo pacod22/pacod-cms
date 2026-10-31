@@ -15,6 +15,8 @@
 #     which take an archive as the body, up to CMS_ARCHIVE_MAX_SIZE (2 GiB);
 #   - / on the studio's host answers 302 to /mgmt/sites;
 #   - /_internal/ answers 404: those questions are asked on pacod-net only;
+#   - /internal/ on the studio's host answers 404: the studio's API for scripts (a pacod-id service
+#     token as bearer) is called on pacod-net, at cms-studio:7443;
 #   - each request is logged to stdout with sign-in codes and state, tokens, keys, Referer and the
 #     response's Location removed (CMS_CADDY_LOG_FORMAT below).
 #
@@ -99,6 +101,10 @@
 	request_body @cms-upload {
 		max_size 4MiB
 	}
+	# Scripts call the studio's internal API on pacod-net; its token check is the guard, this a
+	# second layer.
+	@cms-internal path /internal/*
+	respond @cms-internal 404
 	# Relative: the browser keeps the host and port it asked with.
 	redir / /mgmt/sites 302
 	reverse_proxy cms-studio:7443 {

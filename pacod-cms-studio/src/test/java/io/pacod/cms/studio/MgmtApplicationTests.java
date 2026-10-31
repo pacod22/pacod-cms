@@ -62,18 +62,18 @@ class MgmtApplicationTests {
     }
 
     @Test
-    @DisplayName("exactly two security chains")
+    @DisplayName("exactly three security chains")
     void securityChainsArePresent() {
         List<SecurityFilterChain> chains = context.getBeansOfType(SecurityFilterChain.class)
                 .values().stream().toList();
 
-        // Two: the /mgmt/** form-login chain and the permit-all chain covering /mgmt-assets/**,
-        // /mgmt-health and /error.
+        // Three: the /mgmt/** sign-in chain, the /internal/** bearer-token chain for scripts, and
+        // the permit-all chain covering /mgmt-assets/**, /mgmt-health and /error.
         //
         // Exactly, not "at least". A chain with no securityMatcher arriving from a scanned
         // package would match EVERY request ahead of the permit-all one, and nothing logs a
         // warning when that happens, which is the entire reason this assertion is exact.
-        assertThat(chains).hasSize(2);
+        assertThat(chains).hasSize(3);
     }
 
     @Test

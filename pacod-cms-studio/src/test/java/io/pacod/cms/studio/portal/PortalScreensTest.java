@@ -83,6 +83,12 @@ class PortalScreensTest {
     @MockitoBean
     private io.pacod.cms.studio.ai.AiGateway gateway;
     @MockitoBean
+    private io.pacod.cms.studio.ai.AiGatewayConfig gatewayConfig;
+    @MockitoBean
+    private io.pacod.cms.studio.ai.AiModels aiModels;
+    @MockitoBean
+    private io.pacod.cms.studio.ai.AiCatalog aiCatalog;
+    @MockitoBean
     private io.pacod.cms.core.archive.SiteArchives archives;
     @MockitoBean
     private io.pacod.cms.studio.archive.PortalRestore restore;
@@ -92,8 +98,22 @@ class PortalScreensTest {
     private static final Organisation ALPHA = org("org_alpha", "Alpha Media");
     private static final Organisation BETA = org("org_beta", "Beta Press");
 
+    private static final String SECRET_KEY = "pgw_cms_0123456789abcdefWXYZ";
+
+    private static io.pacod.cms.studio.ai.AiGatewayConfig.Effective gatewayOf(
+            String url, String key, io.pacod.cms.studio.ai.AiGatewayConfig.Source source) {
+        return new io.pacod.cms.studio.ai.AiGatewayConfig.Effective(url, key, source, null, null);
+    }
+
     @BeforeEach
     void setUp() {
+        when(gatewayConfig.effective()).thenReturn(gatewayOf("", "", io.pacod.cms.studio.ai.AiGatewayConfig.Source.NONE));
+        when(aiModels.stored()).thenReturn(new io.pacod.cms.studio.ai.AiModels.Stored(null, java.util.Map.of(), null, null));
+        when(aiModels.defaultModel()).thenReturn("@fast");
+        when(aiModels.environmentDefault()).thenReturn("@fast");
+        when(aiModels.resolve(any())).thenReturn(new io.pacod.cms.studio.ai.AiModels.Resolved("@fast",
+                io.pacod.cms.studio.ai.AiModels.Source.ENVIRONMENT));
+        when(aiCatalog.lookup()).thenReturn(new io.pacod.cms.studio.ai.AiCatalog.Lookup(null, null));
         when(directory.bySite(anyString())).thenReturn(Optional.empty());
         when(directory.bySite("alpha")).thenReturn(Optional.of(new Tenant("alpha", "org_alpha", "site_alpha", "en", ZoneId.of("UTC"))));
         when(directory.bySite("beta")).thenReturn(Optional.of(new Tenant("beta", "org_beta", "site_beta", "en", ZoneId.of("UTC"))));
@@ -416,7 +436,8 @@ class PortalScreensTest {
         TestSubjects.use(TestSubjects.platformAdmin());
         assertThat(render(get("/mgmt/platform"))).doesNotContain("/mgmt/platform/ai-test").contains("PACOD_GW_URL");
 
-        when(gateway.configured()).thenReturn(true);
+        when(gatewayConfig.effective()).thenReturn(gatewayOf("http://pacod-gw:8080", SECRET_KEY,
+                io.pacod.cms.studio.ai.AiGatewayConfig.Source.ENVIRONMENT));
         assertThat(renderEnglish("/mgmt/platform")).contains("/mgmt/platform/ai-test", "Test the connection", "@fast");
         when(gateway.ping("@fast")).thenReturn(new io.pacod.cms.studio.ai.AiGateway.Answer(null, 0, "req_1"));
         mockMvc.perform(postCsrf("/mgmt/platform/ai-test").with(oidcLogin()))
@@ -430,6 +451,108 @@ class PortalScreensTest {
         TestSubjects.use(orgAdminOfAlpha());
         mockMvc.perform(postCsrf("/mgmt/platform/ai-test").with(oidcLogin())).andExpect(status().isForbidden());
         verify(gateway, org.mockito.Mockito.times(2)).ping(anyString());
+    }
+
+    @Test
+    @DisplayName("the installation screen sets the gateway's address and key, never shows the key, and resets to the environment")
+    void aiGatewaySettings() throws Exception {
+        TestSubjects.use(TestSubjects.platformAdmin());
+        when(gatewayConfig.effective()).thenReturn(gatewayOf("http://gw.example:8080", SECRET_KEY,
+                io.pacod.cms.studio.ai.AiGatewayConfig.Source.STORED));
+        String english = renderEnglish("/mgmt/platform");
+        assertThat(english).contains("http://gw.example:8080", "…WXYZ", "set here", "/mgmt/platform/ai-gateway/reset")
+                .doesNotContain(SECRET_KEY);
+        assertThat(render(get("/mgmt/platform"))).doesNotContain(SECRET_KEY);
+
+        when(gatewayConfig.set(eq("http://gw2.example"), eq("pgw_new"), any())).thenReturn(
+                gatewayOf("http://gw2.example", "pgw_new", io.pacod.cms.studio.ai.AiGatewayConfig.Source.STORED));
+        mockMvc.perform(postCsrf("/mgmt/platform/ai-gateway").param("url", "http://gw2.example").param("apiKey", "pgw_new")
+                        .with(oidcLogin()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash().attributeExists("message"));
+        verify(gatewayConfig).set(eq("http://gw2.example"), eq("pgw_new"), any());
+        verify(gateway, org.mockito.Mockito.never()).ping(anyString());
+
+        // A refusal is a flash, in words.
+        when(gatewayConfig.set(eq("http://gw3.example"), eq(""), any()))
+                .thenThrow(new io.pacod.cms.studio.ai.AiGatewayConfig.Refused("key_required_with_url", "apiKey"));
+        mockMvc.perform(postCsrf("/mgmt/platform/ai-gateway").param("url", "http://gw3.example").with(oidcLogin())
+                        .cookie(new jakarta.servlet.http.Cookie("mgmt-lang", "en")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash()
+                        .attribute("error", org.hamcrest.Matchers.containsString("needs its key")));
+
+        // Saving the prefilled address with no key changes nothing, said as such.
+        when(gatewayConfig.set(eq("http://gw.example:8080"), eq(""), any()))
+                .thenThrow(new io.pacod.cms.studio.ai.AiGatewayConfig.Refused("unchanged", "apiKey"));
+        mockMvc.perform(postCsrf("/mgmt/platform/ai-gateway").param("url", "http://gw.example:8080").with(oidcLogin())
+                        .cookie(new jakarta.servlet.http.Cookie("mgmt-lang", "en")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash()
+                        .attribute("error", org.hamcrest.Matchers.containsString("Nothing to save")));
+
+        mockMvc.perform(postCsrf("/mgmt/platform/ai-gateway/reset").with(oidcLogin()))
+                .andExpect(status().is3xxRedirection());
+        verify(gatewayConfig).clear();
+
+        // Not for an organisation's admin.
+        TestSubjects.use(orgAdminOfAlpha());
+        mockMvc.perform(postCsrf("/mgmt/platform/ai-gateway").param("url", "http://evil.example").param("apiKey", "k")
+                .with(oidcLogin())).andExpect(status().isForbidden());
+        mockMvc.perform(postCsrf("/mgmt/platform/ai-gateway/reset").with(oidcLogin())).andExpect(status().isForbidden());
+        verify(gatewayConfig, org.mockito.Mockito.never()).set(eq("http://evil.example"), any(), any());
+        verify(gatewayConfig, org.mockito.Mockito.times(1)).clear();
+    }
+
+    @Test
+    @DisplayName("the installation screen chooses the models from the gateway's list, labels a stale choice, and resets")
+    void aiModelsCard() throws Exception {
+        TestSubjects.use(TestSubjects.platformAdmin());
+        // No gateway: no form, a sentence.
+        assertThat(renderEnglish("/mgmt/platform")).contains("Set up the gateway to choose models")
+                .doesNotContain("name=\"feature_vision\"");
+
+        when(gatewayConfig.effective()).thenReturn(gatewayOf("http://pacod-gw:8080", SECRET_KEY,
+                io.pacod.cms.studio.ai.AiGatewayConfig.Source.ENVIRONMENT));
+        when(aiCatalog.lookup()).thenReturn(new io.pacod.cms.studio.ai.AiCatalog.Lookup(
+                io.pacod.cms.studio.ai.AiCatalog.parse(io.pacod.cms.studio.ai.AiCatalogTest.fixture()), null));
+        when(aiModels.stored()).thenReturn(new io.pacod.cms.studio.ai.AiModels.Stored(null,
+                java.util.Map.of(io.pacod.cms.studio.ai.AiFeature.PDF, "gone/model"), null, null));
+        String english = renderEnglish("/mgmt/platform");
+        assertThat(english).contains("name=\"default\"", "name=\"feature_vision\"", "@fast", "anthropic/claude-dev",
+                "Alt text", "gone/model (not offered by the gateway)", "/mgmt/platform/ai-models/reset");
+        // Alt text is offered only what takes images.
+        String vision = english.substring(english.indexOf("name=\"feature_vision\""));
+        vision = vision.substring(0, vision.indexOf("</select>"));
+        assertThat(vision).contains("openai/gpt-dev").doesNotContain("local/text-only", "@cheap", "local/no-json");
+        assertThat(render(get("/mgmt/platform"))).contains("name=\"feature_vision\"");
+
+        mockMvc.perform(postCsrf("/mgmt/platform/ai-models").param("default", "@fast").param("feature_vision", "openai/gpt-dev")
+                        .param("feature_pdf", "gone/model").with(oidcLogin()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash().attributeExists("message"));
+        verify(aiModels).set(org.mockito.ArgumentMatchers.argThat(c -> "@fast".equals(c.defaultModel())
+                && "openai/gpt-dev".equals(c.features().get(io.pacod.cms.studio.ai.AiFeature.VISION))
+                && "gone/model".equals(c.features().get(io.pacod.cms.studio.ai.AiFeature.PDF))), any());
+
+        // A refusal names the feature.
+        when(aiModels.set(org.mockito.ArgumentMatchers.argThat(c -> "local/text-only".equals(c.defaultModel())), any()))
+                .thenThrow(new io.pacod.cms.studio.ai.AiGatewayConfig.Refused("not_suitable", "vision"));
+        mockMvc.perform(postCsrf("/mgmt/platform/ai-models").param("default", "local/text-only").with(oidcLogin())
+                        .cookie(new jakarta.servlet.http.Cookie("mgmt-lang", "en")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash()
+                        .attribute("error", org.hamcrest.Matchers.containsString("Alt text")));
+
+        mockMvc.perform(postCsrf("/mgmt/platform/ai-models/reset").with(oidcLogin())).andExpect(status().is3xxRedirection());
+        verify(aiModels).clear();
+
+        // A list that cannot be read: said, no form.
+        when(aiCatalog.lookup()).thenReturn(new io.pacod.cms.studio.ai.AiCatalog.Lookup(null, "The AI gateway refused the key"));
+        assertThat(renderEnglish("/mgmt/platform")).contains("cannot be read: The AI gateway refused the key")
+                .doesNotContain("name=\"feature_vision\"");
+
+        TestSubjects.use(orgAdminOfAlpha());
+        mockMvc.perform(postCsrf("/mgmt/platform/ai-models").param("default", "@fast").with(oidcLogin())).andExpect(status().isForbidden());
+        mockMvc.perform(postCsrf("/mgmt/platform/ai-models/reset").with(oidcLogin())).andExpect(status().isForbidden());
+        verify(aiModels, org.mockito.Mockito.times(1)).clear();
     }
 
     @Test

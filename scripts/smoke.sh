@@ -154,9 +154,13 @@ row "/mgmt/platform" 302 "$STUDIO_HOST" /mgmt/platform "$STUDIO_URL/mgmt/login"
 # A website's pictures in the studio are its content: behind sign-in.
 row "/assets/img/articles/none.jpg" 302 "$STUDIO_HOST" /assets/img/articles/none.jpg "$STUDIO_URL/mgmt/login"
 row "/resources/banners/x/index.html" 302 "$STUDIO_HOST" /resources/banners/x/index.html "$STUDIO_URL/mgmt/login"
+# The API for scripts is on pacod-net only; on the studio's own port a bearer token is required.
+row "/internal/v1/ai-gateway (not routed)" 404 "$STUDIO_HOST" /internal/v1/ai-gateway
 if [ -n "$SITE" ]; then
   # The polls and data screens one by one: a matcher covering a screen but not its JSON would hand
   # the data to anyone, with nothing on any screen to show it.
+  # The API for scripts has no website prefix (StudioSiteFilter would otherwise strip one past Caddy).
+  row "/sites/$SITE/internal/v1/ai-gateway" 404 "$STUDIO_HOST" "/sites/$SITE/internal/v1/ai-gateway"
   for screen in articles monitoring/live dashboard/live jobs crawlers social/stats banners/layouts design/preview settings members \
       pdf issues issues/1/pdf/en; do
     row "/sites/$SITE/mgmt/$screen" 302 "$STUDIO_HOST" "/sites/$SITE/mgmt/$screen" "$STUDIO_URL/sites/$SITE/mgmt/login"
@@ -172,6 +176,7 @@ direct "site /web/v1/health" 200 "http://$SMOKE_HOST:${WEB_PORT:-8080}/web/v1/he
 direct "site /v1/health" 404 "http://$SMOKE_HOST:${WEB_PORT:-8080}/v1/health"
 [ -z "$SITE_HOST" ] || direct "site $SITE_HOST /" 200 "http://$SMOKE_HOST:${WEB_PORT:-8080}/" -H "Host: $SITE_HOST"
 direct "studio /mgmt-health" 200 "http://$SMOKE_HOST:${MGMT_PORT:-7070}/mgmt-health"
+direct "studio /internal/v1/ai-gateway (no token)" 401 "http://$SMOKE_HOST:${MGMT_PORT:-7070}/internal/v1/ai-gateway"
 
 if [ "$failed" -gt 0 ]; then
   echo "$failed row(s) failed."

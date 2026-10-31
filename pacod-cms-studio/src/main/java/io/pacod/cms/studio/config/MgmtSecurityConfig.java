@@ -1,9 +1,12 @@
 package io.pacod.cms.studio.config;
 
+import io.pacod.cms.studio.access.ServiceTokenCheck;
+import io.pacod.cms.studio.access.ServiceTokenFilter;
 import io.pacod.cms.studio.identity.IdProperties;
 import io.pacod.cms.studio.i18n.MgmtLocaleResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,6 +31,7 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
@@ -157,6 +161,35 @@ public class MgmtSecurityConfig {
                 .logoutUrl("/mgmt/logout")
                 .logoutSuccessHandler(logoutSuccess)
             );
+
+        return http.build();
+    }
+
+    /**
+     * Scripts: {@code /internal/**} (the AI gateway's address and key, {@code InternalAiGatewayController}),
+     * with a pacod-id service token as bearer ({@link ServiceTokenFilter}) and the same per-handler
+     * permissions as the screens. Stateless and without CSRF -- no cookie is read or written here,
+     * so there is nothing a browser could be made to send. Caddy does not route {@code /internal/};
+     * callers use {@code cms-studio} on the compose network. The bearer check is the guard, as the
+     * studio's own port is published too.
+     */
+    @Bean
+    @Order(2)
+    public SecurityFilterChain internalApiFilterChain(HttpSecurity http, ObjectProvider<ServiceTokenCheck> tokens)
+            throws Exception {
+        http
+            .securityMatcher("/internal/**")
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(AbstractHttpConfigurer::disable)
+            .requestCache(AbstractHttpConfigurer::disable)
+            .anonymous(AbstractHttpConfigurer::disable)
+            .addFilterBefore(new ServiceTokenFilter(tokens), AuthorizationFilter.class)
+            .exceptionHandling(e -> e
+                .authenticationEntryPoint((request, response, ex) ->
+                    ServiceTokenFilter.refuse(response, 401, "unauthenticated", "A bearer token is required"))
+                .accessDeniedHandler((request, response, ex) ->
+                    ServiceTokenFilter.refuse(response, 403, "forbidden", "Not allowed")))
+            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated());
 
         return http.build();
     }

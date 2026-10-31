@@ -12,7 +12,6 @@ import io.pacod.cms.core.tenant.TenantContext;
 import io.pacod.cms.studio.access.StudioPrincipals;
 import io.pacod.cms.studio.design.DesignLayouts;
 import io.pacod.cms.studio.design.DesignTheme;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -83,14 +82,13 @@ public class DesignAssist {
     private final AiGateway gateway;
     private final DesignTheme theme;
     private final DesignLayouts layouts;
-    private final String model;
+    private final AiModels models;
 
-    public DesignAssist(AiGateway gateway, DesignTheme theme, DesignLayouts layouts,
-                        @Value("${pacod.ai.models.design:${pacod.ai.model:@fast}}") String model) {
+    public DesignAssist(AiGateway gateway, DesignTheme theme, DesignLayouts layouts, AiModels models) {
         this.gateway = gateway;
         this.theme = theme;
         this.layouts = layouts;
-        this.model = model;
+        this.models = models;
     }
 
     /** A theme draft from a description of the look, refining the current one; its CSS stays. */
@@ -263,7 +261,7 @@ public class DesignAssist {
 
     private AiGateway.Answer call(String feature, String system, String user, Map<String, Object> schema, String name,
                                   Actor actor) {
-        return gateway.complete(new AiGateway.Call(feature, model, system, user, null, name, schema, 4_000,
+        return gateway.complete(new AiGateway.Call(feature, models.modelFor(AiFeature.DESIGN), system, user, null, name, schema, 4_000,
                 TenantContext.current().siteId(), actor.userId(), actor.jobId()));
     }
 

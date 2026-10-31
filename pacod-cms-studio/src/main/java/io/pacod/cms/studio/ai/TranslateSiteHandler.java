@@ -18,7 +18,6 @@ import io.pacod.cms.studio.jobs.ArticleSelection;
 import io.pacod.cms.studio.jobs.JobContext;
 import io.pacod.cms.studio.jobs.JobHandler;
 import org.bson.Document;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
@@ -72,12 +71,11 @@ public class TranslateSiteHandler implements JobHandler {
     private final TagRepository tags;
     private final MenuRepository menus;
     private final TranslationWriter writer;
-    private final String model;
+    private final AiModels models;
 
     public TranslateSiteHandler(AiGateway gateway, AiAccess access, PageRepository pages,
                                 CategoryRepository categories, TagRepository tags, MenuRepository menus,
-                                TranslationWriter writer,
-                                @Value("${pacod.ai.models.translate:${pacod.ai.model:@fast}}") String model) {
+                                TranslationWriter writer, AiModels models) {
         this.gateway = gateway;
         this.access = access;
         this.pages = pages;
@@ -85,7 +83,7 @@ public class TranslateSiteHandler implements JobHandler {
         this.tags = tags;
         this.menus = menus;
         this.writer = writer;
-        this.model = model;
+        this.models = models;
     }
 
     @Override
@@ -384,7 +382,7 @@ public class TranslateSiteHandler implements JobHandler {
                 throw new Exhausted();
             }
             calls++;
-            AiGateway.Answer answer = gateway.complete(new AiGateway.Call(TranslateArticlesHandler.FEATURE, model,
+            AiGateway.Answer answer = gateway.complete(new AiGateway.Call(TranslateArticlesHandler.FEATURE, models.modelFor(AiFeature.TRANSLATE),
                     TranslateArticlesHandler.prompt(from, target, what), text, null, "translation",
                     TranslateArticlesHandler.SCHEMA, TranslateArticlesHandler.maxTokens(text),
                     siteId, null, context.job().getId()));

@@ -56,7 +56,7 @@ class TranslateSiteHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new TranslateSiteHandler(gateway, access, pages, categories, tags, menus, writer, "@fast");
+        handler = new TranslateSiteHandler(gateway, access, pages, categories, tags, menus, writer, io.pacod.cms.studio.ai.AiModels.fixed("@fast"));
         when(access.refusalFor(anyString())).thenReturn(Optional.empty());
         when(writer.putPage(anyString(), anyString(), any(), any(), any())).thenReturn(true);
         when(writer.putCategory(anyInt(), anyString(), any())).thenReturn(true);

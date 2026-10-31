@@ -36,7 +36,7 @@ class DesignAssistTest {
 
     @BeforeEach
     void setUp() {
-        assist = new DesignAssist(gateway, theme, layouts, "@fast");
+        assist = new DesignAssist(gateway, theme, layouts, io.pacod.cms.studio.ai.AiModels.fixed("@fast"));
         when(layouts.currentSet()).thenReturn(new TemplateSetCatalog().find("minimal").orElseThrow());
         when(layouts.draftOf(any())).thenReturn(Map.of());
         Theme current = new Theme();

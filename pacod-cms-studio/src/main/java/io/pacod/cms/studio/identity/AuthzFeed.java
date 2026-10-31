@@ -84,6 +84,8 @@ public class AuthzFeed {
     private volatile Instant lastContact;
     private volatile boolean running;
     private volatile Thread follower;
+    /** Raised on every revoked service token and every snapshot (which may have skipped one). */
+    private final java.util.concurrent.atomic.AtomicLong credentialEpoch = new java.util.concurrent.atomic.AtomicLong();
 
     public AuthzFeed(IdClient client) {
         this(client, Clock.systemUTC(), MIN_REVOKED_SID_RETENTION);
@@ -137,6 +139,15 @@ public class AuthzFeed {
 
     public long seq() {
         return seq;
+    }
+
+    /**
+     * Changes whenever a service token may have been revoked: a {@code credential.revoked} event,
+     * or a snapshot reload, after which events may have been skipped. {@code ServiceTokens} drops
+     * what it cached when this moves.
+     */
+    public long credentialEpoch() {
+        return credentialEpoch.get();
     }
 
     public Collection<Scope> scopes() {
@@ -254,6 +265,7 @@ public class AuthzFeed {
         for (JsonNode s : snapshot.path("scopes")) {
             putScope(s);
         }
+        credentialEpoch.incrementAndGet();
         ready = true;
         contact();
         advance(snapshot.path("seq").asLong());
@@ -287,10 +299,11 @@ public class AuthzFeed {
                 }
             }
             case "session.revoked" -> revokedSids.put(e.path("sid").asString(), clock.instant());
+            case "credential.revoked" -> credentialEpoch.incrementAndGet();
             case "scope.upserted" -> putScope(e);
             // pacod-id removes a scope's bindings with binding.removed first; only the scope goes.
             case "scope.deleted" -> scopes.remove(e.path("type").asString() + ":" + e.path("id").asString());
-            // A new catalogue version, a revoked service token, a renamed account: nothing held
+            // A new catalogue version, a renamed account: nothing held
             // here depends on them.
             default -> log.debug("pacod-id feed: {} at seq {}", kind, e.path("seq").asLong());
         }

@@ -195,7 +195,9 @@ make up
 - **`SITE_DOMAIN`** is where new websites answer first (`<id>.<SITE_DOMAIN>`). Leave it out and each
   website's creator names its address.
 - **Optional, in `.env`**:
-  - a real AI gateway (`PACOD_GW_URL`, `PACOD_GW_API_KEY`); AI stays off without one;
+  - a real AI gateway (`PACOD_GW_URL`, `PACOD_GW_API_KEY`); AI stays off without one. A platform
+    admin can also set it later on the installation screen, and a script can set it through the
+    studio's internal API, without a restart;
   - a certificate pair of your own (`SSL_CERT_FILE`, `SSL_KEY_FILE`), which Caddy serves for every
     name it covers.
 

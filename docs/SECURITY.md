@@ -62,6 +62,19 @@ navigate the studio's page.
   pacod-id ended, or an account it disabled, is signed out at the next request.
 - **No role is implicit**, because an implicit role is held everywhere: one carrying a grant
   permission would grant everywhere.
+- **Scripts use the studio's internal API** (`/internal/**`, today the AI gateway's address and
+  key) with a pacod-id service token (`pidt_…`) as bearer. The studio checks it with pacod-id's
+  introspection as its own service client, caches the answer for at most a minute by the token's
+  hash (and drops the cache when pacod-id's feed reports a revoked token), and then decides what the
+  account may do from its role bindings, exactly as for a person. The same 503 applies when the
+  feed is old. The chain keeps no session and reads no cookie, so it has no CSRF to defend. Caddy
+  does not route `/internal/` (a 404), and the studio refuses the API under a website's
+  `/sites/<id>` prefix (also a 404); callers use the studio on the compose network. **The token
+  check is the guard**, because the studio's own port is published as well (on every interface in
+  development, loopback on stage and production).
+- **Known trade-off**: setting the gateway needs `platform.manage`, which only `cms.platform_admin`
+  holds, and that role holds every permission. A script's service account therefore gets the
+  broadest role. A narrower role would change the manifest and is left for later.
 
 ## Signed, short-lived tokens
 
@@ -100,6 +113,11 @@ Every answer from the gateway is treated as hostile input:
   a draft, which one click restores to what it was.
 - Attribution to the gateway uses opaque ids only: a website's id, a feature, a job, a person's
   pacod-id subject. No names or e-mail addresses.
+- **The gateway's key is never shown back.** Set on the installation screen or through the internal
+  API, it is stored in the control plane as given, not encrypted (whoever reads the control plane
+  already controls the installation). Screens and answers name only its last four characters.
+  **An address and its key are one pair**: a new address is refused unless its key comes in the
+  same change, so a key never goes to a host it was not given for.
 
 ## Archives
 

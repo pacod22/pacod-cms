@@ -21,7 +21,7 @@ import static org.mockito.Mockito.when;
 class WritingAssistTest {
 
     private final AiGateway gateway = mock(AiGateway.class);
-    private final WritingAssist assist = new WritingAssist(gateway, "@fast", "@vision");
+    private final WritingAssist assist = new WritingAssist(gateway, new AiModels("@fast", java.util.Map.of(AiFeature.VISION, "@vision"), null, null, java.time.Clock.systemUTC()));
     private final ObjectMapper json = new ObjectMapper();
 
     private void answer(Map<String, Object> body) {
@@ -239,5 +239,30 @@ class WritingAssistTest {
         assertThatThrownBy(() -> assist.designBody("<p>Watch</p><iframe src=\"https://www.youtube.com/embed/x\"></iframe>"))
                 .isInstanceOf(AiGateway.AiException.class);
         verify(gateway, never()).complete(any());
+    }
+
+    @Test
+    @DisplayName("the models chosen for the installation reach the call, each feature its own, read at the call")
+    void storedChoiceReachesTheCall() throws Exception {
+        AiModels models = mock(AiModels.class);
+        when(models.modelFor(AiFeature.ASSIST)).thenReturn("openai/gpt-dev");
+        when(models.modelFor(AiFeature.VISION)).thenReturn("anthropic/claude-dev");
+        WritingAssist chosen = new WritingAssist(gateway, models);
+        answer(Map.of("html", "<p>Short.</p>", "alt", "A picture."));
+
+        chosen.rewrite(WritingAssist.Action.SHORTEN, "<p>Long text</p>");
+        java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(10, 10, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.io.ByteArrayOutputStream png = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(img, "png", png);
+        chosen.alt(png.toByteArray(), null, "en");
+        ArgumentCaptor<AiGateway.Call> call = ArgumentCaptor.forClass(AiGateway.Call.class);
+        verify(gateway, org.mockito.Mockito.times(2)).complete(call.capture());
+        assertThat(call.getAllValues()).extracting(AiGateway.Call::model).containsExactly("openai/gpt-dev", "anthropic/claude-dev");
+
+        // A change made meanwhile applies to the next call, without a new WritingAssist.
+        when(models.modelFor(AiFeature.ASSIST)).thenReturn("@fast");
+        chosen.rewrite(WritingAssist.Action.SHORTEN, "<p>Long text</p>");
+        verify(gateway, org.mockito.Mockito.times(3)).complete(call.capture());
+        assertThat(call.getValue().model()).isEqualTo("@fast");
     }
 }

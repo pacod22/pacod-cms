@@ -32,7 +32,7 @@ class PdfEnricherTest {
     private final AiGateway gateway = mock(AiGateway.class);
     private final PdfEnrichmentRepository repository = mock(PdfEnrichmentRepository.class);
     private final SiteLiveness liveness = mock(SiteLiveness.class);
-    private final PdfEnricher enricher = new PdfEnricher(gateway, repository, "@fast");
+    private final PdfEnricher enricher = new PdfEnricher(gateway, repository, io.pacod.cms.studio.ai.AiModels.fixed("@fast"));
     private Article article;
     private JobContext context;
 

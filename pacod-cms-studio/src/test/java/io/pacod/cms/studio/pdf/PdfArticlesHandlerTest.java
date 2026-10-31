@@ -68,7 +68,7 @@ class PdfArticlesHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new PdfArticlesHandler(new PdfRenderer(gotenberg, tokens, domains, websites, "http://cms-site:8443/"),
-                articles, settings, new PdfEnricher(gateway, enrichments, "@fast"), access, storage.toString());
+                articles, settings, new PdfEnricher(gateway, enrichments, io.pacod.cms.studio.ai.AiModels.fixed("@fast")), access, storage.toString());
         when(settings.findById(PdfSettings.ID)).thenReturn(Optional.empty());
         when(websites.findById("test")).thenReturn(Optional.of(new Website("test", "org_t", "Demo Journal")));
         when(access.refusalFor("test")).thenReturn(Optional.empty());

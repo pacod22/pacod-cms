@@ -42,6 +42,12 @@ public class IdentityConfig {
             return new AuthzFeed(client, sessionTimeout);
         }
 
+        /** Scripts' {@code pidt_} tokens on {@code /internal/**}. */
+        @Bean
+        ServiceTokens serviceTokens(IdClient client, AuthzFeed feed, IdProperties id) {
+            return new ServiceTokens(client, feed, id.maxStaleness());
+        }
+
         @Bean
         CatalogPusher catalogPusher(IdClient client, StudioAccess access) {
             return new CatalogPusher(client, access.manifest());

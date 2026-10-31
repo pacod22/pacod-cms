@@ -89,7 +89,7 @@ class PdfIssueHandlerTest {
     void setUp() throws IOException {
         handler = new PdfIssueHandler(new PdfRenderer(gotenberg, new PrintTokens(SECRET), domains, websites, "http://cms-site:8443"),
                 issues, articles, settings, issueService,
-                new PdfEnricher(mock(AiGateway.class), mock(PdfEnrichmentRepository.class), "@fast"), access);
+                new PdfEnricher(mock(AiGateway.class), mock(PdfEnrichmentRepository.class), io.pacod.cms.studio.ai.AiModels.fixed("@fast")), access);
         when(domains.findByWebsiteId("test")).thenReturn(List.of(new Domain("www.test.example", "test", true)));
         when(websites.findById("test")).thenReturn(Optional.of(new Website("test", "org_t", "Demo Journal")));
         when(settings.findById(PdfSettings.ID)).thenReturn(Optional.empty());

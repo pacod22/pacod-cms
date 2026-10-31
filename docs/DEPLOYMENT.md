@@ -213,7 +213,23 @@ theme, or switching the template set, needs `design.publish`.
   does as it creates it.
 - **The installation screen** (platform admins) sets who may create organisations, the two limits,
   whether a new organisation starts with AI on (off by default: every AI call spends the
-  installation's one gateway key), and turns AI on or off per organisation.
+  installation's one gateway key), and turns AI on or off per organisation. It also sets **the AI
+  gateway's address and key** without a restart, replacing `PACOD_GW_URL`/`PACOD_GW_API_KEY` until
+  "Use the environment's" resets them. The key is never shown again, only its last four characters,
+  so it is entered with every save.
+- **Choosing the models**: the installation screen's *AI models* card lists what the gateway offers
+  the installation's key (its templates and models). It sets a default and, per feature
+  (translation, PDF front matter, writing help, alt text, design assist), an optional override.
+  Only what can do the feature's work is offered: a JSON answer for all of them, and images for
+  alt text. "Use the environment's" goes back to `PACOD_AI_MODEL`/`pacod.ai.models.*`. A script
+  does the same with `GET`/`PUT`/`DELETE /internal/v1/ai-models` (same token, same rules), for
+  example `{"default": "@fast", "features": {"vision": "openai/gpt-4o", "pdf": null}}`.
+- **Setting the gateway from a script**: `PUT http://cms-studio:7443/internal/v1/ai-gateway` on the
+  compose network, with `Authorization: Bearer <pidt_ token>` of a pacod-id service account holding
+  `cms.platform_admin`, and a body of `{"url": "…", "apiKey": "…"}`. The key is always needed, and
+  the url can be left out to keep the address in effect. `?test=true` also makes one call through
+  it. `GET` shows what is in effect, and `DELETE` goes back to the environment's.
+  Caddy does not route `/internal/`.
 - **Signing out of the studio signs out of pacod-id too.** A session ended in pacod-id (a sign-out
   elsewhere, an administrator, a password change) or a disabled or deleted account signs the person
   out of the studio at their next request, however long its studio session has sat idle.
@@ -505,8 +521,8 @@ Set per service, not globally:
 | `DEMO_HOSTS` (as `PACOD_BOOTSTRAP_DEMO_HOSTS`), `DEMO_MINIMAL_HOSTS` (as `PACOD_BOOTSTRAP_DEMO_MINIMAL_HOSTS`), `DEMO_SPACE_HOSTS` (as `PACOD_BOOTSTRAP_DEMO_SPACE_HOSTS`) | `cms-studio` | the three demo websites' hosts, used only on an empty platform |
 | `PACOD_PDF_GOTENBERG_URL` | `cms-studio` | Gotenberg, for PDF export (compose: `http://cms-gotenberg:3000`); blank switches it off |
 | `PACOD_JOBS_WORKERS`, `PACOD_JOBS_PER_ORGANISATION` | `cms-studio` | jobs run at once (2), and of one organisation (1) |
-| `PACOD_GW_URL`, `PACOD_GW_API_KEY` | `cms-studio` | the AI gateway (pacod-gw, default `http://pacod-gw:8080`) and the studio's key for it; without a key AI is not set up |
-| `PACOD_AI_MODEL` | `cms-studio` | the model or pool each AI feature asks for (default `@fast`) |
+| `PACOD_GW_URL`, `PACOD_GW_API_KEY` | `cms-studio` | the AI gateway (pacod-gw, default `http://pacod-gw:8080`) and the studio's key for it; without a key AI is not set up. Starting values only: a pair set on the installation screen or through `PUT /internal/v1/ai-gateway` replaces them until it is reset |
+| `PACOD_AI_MODEL` | `cms-studio` | the model or pool each AI feature asks for (default `@fast`); a starting value, replaced by the models chosen on the installation screen or through `/internal/v1/ai-models` |
 | `COMPOSE_PROFILES` | compose (the presets) | `dev-gateway,mailpit` on dev and stage: the development gateway and the mail catcher; empty in production |
 | `METRICS_VISITOR_SALT` | `cms-site` | salts the opaque reader key; blank means a new random salt per restart |
 | `CRAWLER_TRACKING`, `CRAWLER_VERIFY` | `cms-site` | crawler log, and its reverse/forward DNS check (needs outbound DNS) |

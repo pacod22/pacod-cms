@@ -5,7 +5,6 @@ import io.pacod.cms.core.data.PdfEnrichment;
 import io.pacod.cms.core.data.PdfSettings;
 import io.pacod.cms.core.repository.PdfEnrichmentRepository;
 import io.pacod.cms.studio.jobs.JobContext;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
@@ -56,13 +55,12 @@ public class PdfEnricher {
 
     private final AiGateway gateway;
     private final PdfEnrichmentRepository repository;
-    private final String model;
+    private final AiModels models;
 
-    public PdfEnricher(AiGateway gateway, PdfEnrichmentRepository repository,
-                       @Value("${pacod.ai.models.pdf:${pacod.ai.model:@fast}}") String model) {
+    public PdfEnricher(AiGateway gateway, PdfEnrichmentRepository repository, AiModels models) {
         this.gateway = gateway;
         this.repository = repository;
-        this.model = model;
+        this.models = models;
     }
 
     /** One job's enrichment, counting its calls. */
@@ -128,6 +126,7 @@ public class PdfEnricher {
             }
             calls++;
             String material = material(title, text);
+            String model = models.modelFor(AiFeature.PDF);
             AiGateway.Answer answer = gateway.complete(new AiGateway.Call(FEATURE, model,
                     prompt(lang, settings), material, null, "pdf_front_matter", SCHEMA,
                     Math.min(4000, 800 + material.length() / 8), siteId, null, context.job().getId()));

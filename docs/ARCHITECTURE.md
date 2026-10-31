@@ -107,7 +107,11 @@ preview is counted or tracked, and drafts are read past every cache.
   (code, or an abstract and keywords written by pacod-gw); a journal issue renders each article,
   has the site lay out its cover and contents with the page numbers the studio computed, and is
   merged and numbered with PDFBox. Translation jobs call pacod-gw, and so does the design job,
-  which drafts a website's theme and every page layout from one description.
+  which drafts a website's theme and every page layout from one description. The gateway's address
+  and key come from the environment until a platform admin (installation screen) or a script
+  (`/internal/v1/ai-gateway`, with a pacod-id service token) stores a pair in the control plane.
+  That pair wins from the next call on. Which model or template each feature calls is chosen the
+  same two ways, from the list the gateway reports for that key.
 - **Export and restore**: a website, or an organisation's websites, downloads as one ZIP (its
   collections as raw BSON and its files, without analytics, members or hosts) and restores from one,
   always as a new website created the way the portal creates one.

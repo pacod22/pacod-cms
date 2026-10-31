@@ -9,7 +9,6 @@ import io.pacod.cms.core.tenant.TenantContext;
 import io.pacod.cms.studio.jobs.ArticleSelection;
 import io.pacod.cms.studio.jobs.JobContext;
 import io.pacod.cms.studio.jobs.JobHandler;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -51,16 +50,15 @@ public class TranslateArticlesHandler implements JobHandler {
     private final AiAccess access;
     private final ArticleRepository articles;
     private final TranslationWriter writer;
-    private final String model;
+    private final AiModels models;
 
     public TranslateArticlesHandler(AiGateway gateway, AiAccess access, ArticleRepository articles,
-                                    TranslationWriter writer,
-                                    @Value("${pacod.ai.models.translate:${pacod.ai.model:@fast}}") String model) {
+                                    TranslationWriter writer, AiModels models) {
         this.gateway = gateway;
         this.access = access;
         this.articles = articles;
         this.writer = writer;
-        this.model = model;
+        this.models = models;
     }
 
     @Override
@@ -130,7 +128,7 @@ public class TranslateArticlesHandler implements JobHandler {
         if (text == null || text.isBlank()) {
             return null;
         }
-        AiGateway.Answer answer = gateway.complete(new AiGateway.Call(FEATURE, model,
+        AiGateway.Answer answer = gateway.complete(new AiGateway.Call(FEATURE, models.modelFor(AiFeature.TRANSLATE),
                 prompt(source, target, what), text, null, "translation", SCHEMA, maxTokens(text),
                 siteId, null, context.job().getId()));
         context.addCostMicros(answer.costMicros());

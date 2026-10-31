@@ -162,4 +162,58 @@ class AiGatewayTest {
         assertThat(off.configured()).isFalse();
         assertThatThrownBy(() -> off.complete(translation())).hasMessageContaining("not set up");
     }
+
+    @Test
+    @DisplayName("a stored address and key apply from the next call on, without a new gateway")
+    void storedPairAppliesLive() throws IOException {
+        serve(false, ok("{\"reply\":\"pong\"}", "stop"));
+        String standIn = "http://127.0.0.1:" + server.getAddress().getPort();
+        java.util.concurrent.atomic.AtomicReference<io.pacod.cms.core.control.data.AiGatewaySettings> held =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        io.pacod.cms.core.control.repository.AiGatewaySettingsRepository repository =
+                org.mockito.Mockito.mock(io.pacod.cms.core.control.repository.AiGatewaySettingsRepository.class);
+        org.mockito.Mockito.when(repository.findById(io.pacod.cms.core.control.data.AiGatewaySettings.ID))
+                .thenAnswer(i -> java.util.Optional.ofNullable(held.get()));
+        org.mockito.Mockito.when(repository.save(org.mockito.ArgumentMatchers.any())).thenAnswer(i -> {
+            held.set(i.getArgument(0));
+            return i.getArgument(0);
+        });
+        AiGatewayConfig config = new AiGatewayConfig("", "", repository, java.time.Clock.systemUTC());
+        AiGateway gateway = new AiGateway(config, Duration.ofSeconds(5), false);
+        assertThat(gateway.configured()).isFalse();
+
+        config.set(standIn, "pgw_stored_key", "usr_admin");
+        assertThat(gateway.configured()).isTrue();
+        assertThat(gateway.ping("@fast").json().path("reply").asString()).isEqualTo("pong");
+        assertThat(requests.getFirst().get("authorization")).isEqualTo("Bearer pgw_stored_key");
+    }
+
+    @Test
+    @DisplayName("the model list is GET /gw/v1/models with the key, nobody attributed")
+    void listModels() throws IOException {
+        AtomicInteger hits = new AtomicInteger();
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/gw/v1/models", exchange -> {
+            hits.incrementAndGet();
+            Map<String, String> seen = new java.util.HashMap<>();
+            exchange.getRequestHeaders().forEach((k, v) -> seen.put(k.toLowerCase(), v.getFirst()));
+            seen.put("method", exchange.getRequestMethod());
+            requests.add(seen);
+            byte[] body = "{\"models\":[],\"templates\":[{\"id\":\"@fast\",\"models\":[]}]}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.start();
+        AiGateway gateway = new AiGateway("http://127.0.0.1:" + server.getAddress().getPort() + "/", "pgw_cms_test", Duration.ofSeconds(5), false);
+        assertThat(gateway.listModels().path("templates").path(0).path("id").asString()).isEqualTo("@fast");
+        Map<String, String> seen = requests.getFirst();
+        assertThat(seen.get("method")).isEqualTo("GET");
+        assertThat(seen.get("authorization")).isEqualTo("Bearer pgw_cms_test");
+        assertThat(seen).doesNotContainKeys("x-gw-end-user", "x-gw-user-id", "x-gw-task");
+
+        AiGateway off = new AiGateway("", "", Duration.ofSeconds(1), false);
+        assertThatThrownBy(off::listModels).hasMessageContaining("not set up");
+    }
 }

@@ -43,7 +43,7 @@ class TranslateArticlesHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new TranslateArticlesHandler(gateway, access, articles, writer, "@fast");
+        handler = new TranslateArticlesHandler(gateway, access, articles, writer, io.pacod.cms.studio.ai.AiModels.fixed("@fast"));
         when(access.refusalFor(anyString())).thenReturn(Optional.empty());
         article = new Article(12);
         article.setTitle("Добро утро");

@@ -20,7 +20,8 @@ import java.util.regex.Pattern;
  * monitoring tab, and a running job's status every couple of seconds for as long as the job
  * runs -- possibly hours. Counting them would keep an operator "active" for as long as they left a
  * tab open, and the tile would answer "who has the console open", which nobody asked. A new
- * timer-driven {@code fetch} in {@code mgmt.js} belongs on this list.
+ * timer-driven {@code fetch} in {@code mgmt.js} belongs on this list. Scripts on
+ * {@code /internal/**} (a service account's token) are skipped too.
  *
  * <p>Reads the {@code SecurityContext} and keys each operator by
  * {@code StudioPrincipals.displayName}, the name the chrome shows them under.
@@ -43,7 +44,8 @@ public class MgmtPresenceInterceptor implements HandlerInterceptor {
         // The path within the website: under /sites/<id>/ that is the context path, and the polls
         // are listed without it.
         String uri = request.getRequestURI().substring(request.getContextPath().length());
-        if (POLLS.contains(uri) || JOB_STATUS_POLL.matcher(uri).matches()) {
+        // Scripts on the internal API are not operators at the console.
+        if (POLLS.contains(uri) || JOB_STATUS_POLL.matcher(uri).matches() || uri.startsWith("/internal/")) {
             return true;
         }
 

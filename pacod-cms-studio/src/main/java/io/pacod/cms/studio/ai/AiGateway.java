@@ -1,6 +1,7 @@
 package io.pacod.cms.studio.ai;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -21,9 +22,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * pacod-gw's chat completions, OpenAI's shape: {@code POST <pacod.ai.gateway-url>/v1/chat/completions}
- * with a gateway key ({@code pacod.ai.api-key}) and a JSON-schema answer. Every AI feature calls
- * through here and nowhere else.
+ * pacod-gw's chat completions, OpenAI's shape: {@code POST <address>/v1/chat/completions} with a
+ * gateway key and a JSON-schema answer, the address and key being {@link AiGatewayConfig}'s -- the
+ * stored pair, else {@code pacod.ai.gateway-url}/{@code pacod.ai.api-key} -- read per call, so a
+ * change applies to the next one. Every AI feature calls through here and nowhere else.
  *
  * <ul>
  *   <li><b>Attribution, opaque ids only</b>: {@code x-gw-end-user} the website (per-website limits
@@ -47,26 +49,36 @@ public class AiGateway {
 
     private static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(30);
 
-    private final String url;
-    private final String key;
+    private final AiGatewayConfig config;
     private final boolean tags;
     private final RestClient client;
+    /** For the model list, which a page render may wait on: seconds, not minutes. */
+    private final RestClient listing;
     private final ObjectMapper json = new ObjectMapper();
 
-    public AiGateway(@Value("${pacod.ai.gateway-url:}") String url, @Value("${pacod.ai.api-key:}") String key,
-                     @Value("${pacod.ai.timeout:180s}") Duration timeout, @Value("${pacod.ai.tags:false}") boolean tags) {
-        this.url = url == null ? "" : url.strip().replaceAll("/+$", "");
-        this.key = key == null ? "" : key.strip();
+    @Autowired
+    public AiGateway(AiGatewayConfig config, @Value("${pacod.ai.timeout:180s}") Duration timeout,
+                     @Value("${pacod.ai.tags:false}") boolean tags) {
+        this.config = config;
         this.tags = tags;
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(5)).build());
         factory.setReadTimeout(timeout);
         this.client = RestClient.builder().requestFactory(factory).build();
+        JdkClientHttpRequestFactory quick = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(2)).build());
+        quick.setReadTimeout(Duration.ofSeconds(4));
+        this.listing = RestClient.builder().requestFactory(quick).build();
     }
 
-    /** Whether there is a gateway to call: an address and a key. */
+    /** A gateway with a fixed address and key, nothing stored: for tests. */
+    public AiGateway(String url, String key, Duration timeout, boolean tags) {
+        this(AiGatewayConfig.fixed(url, key), timeout, tags);
+    }
+
+    /** Whether there is a gateway to call: an address and a key, stored or from the environment. */
     public boolean configured() {
-        return !url.isEmpty() && !key.isEmpty();
+        return config.effective().configured();
     }
 
     /**
@@ -88,6 +100,43 @@ public class AiGateway {
     public record Answer(JsonNode json, long costMicros, String requestId) {
     }
 
+    /**
+     * The gateway's list of what this key may call, {@code GET <address>/gw/v1/models} (the native
+     * interface: models with their kind, state and capabilities, and templates with their pools),
+     * parsed by {@link AiCatalog}. Nobody is attributed. The address and key in effect, the answer
+     * as the gateway wrote it.
+     *
+     * @throws AiException not set up, unreachable, refused, or not JSON
+     */
+    public JsonNode listModels() {
+        AiGatewayConfig.Effective target = config.effective();
+        if (!target.configured()) {
+            throw new AiException("AI is not set up: no gateway address and key");
+        }
+        try {
+            String body = listing.get().uri(target.url() + "/gw/v1/models")
+                    .headers(h -> h.setBearerAuth(target.key()))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve().body(String.class);
+            JsonNode parsed = json.readTree(body == null ? "{}" : body);
+            if (parsed == null || !parsed.isObject()) {
+                throw new AiException("The gateway's model list was not JSON");
+            }
+            return parsed;
+        } catch (RestClientResponseException e) {
+            throw refusal(e);
+        } catch (ResourceAccessException e) {
+            throw new AiException("The AI gateway cannot be reached: " + e.getMessage());
+        } catch (tools.jackson.core.JacksonException e) {
+            throw new AiException("The gateway's model list was not JSON");
+        }
+    }
+
+    /** The address and key calls go to now, for a cache keyed by them. */
+    AiGatewayConfig.Effective target() {
+        return config.effective();
+    }
+
     /** The JSON schema of {@link #ping}'s answer. */
     private static final Map<String, Object> PING_SCHEMA = Map.of(
             "type", "object",
@@ -106,17 +155,18 @@ public class AiGateway {
     }
 
     public Answer complete(Call call) {
-        if (!configured()) {
-            throw new AiException("AI is not set up: pacod.ai.gateway-url and pacod.ai.api-key are blank");
+        AiGatewayConfig.Effective target = config.effective();
+        if (!target.configured()) {
+            throw new AiException("AI is not set up: no gateway address and key");
         }
         Map<String, Object> body = body(call);
         try {
-            return send(call, body);
+            return send(target, call, body);
         } catch (RestClientResponseException e) {
             if (e.getStatusCode().value() == 429) {
                 sleep(retryAfter(e));
                 try {
-                    return send(call, body);
+                    return send(target, call, body);
                 } catch (RestClientResponseException again) {
                     throw refusal(again);
                 }
@@ -141,10 +191,10 @@ public class AiGateway {
         return body;
     }
 
-    private Answer send(Call call, Map<String, Object> body) {
-        var response = client.post().uri(url + "/v1/chat/completions")
+    private Answer send(AiGatewayConfig.Effective target, Call call, Map<String, Object> body) {
+        var response = client.post().uri(target.url() + "/v1/chat/completions")
                 .contentType(MediaType.APPLICATION_JSON)
-                .headers(h -> headers(h, call))
+                .headers(h -> headers(h, target.key(), call))
                 .body(json.writeValueAsString(body))
                 .retrieve().toEntity(String.class);
         JsonNode answer = json.readTree(response.getBody() == null ? "{}" : response.getBody());
@@ -171,7 +221,7 @@ public class AiGateway {
                 response.getHeaders().getFirst("x-gw-request-id"));
     }
 
-    private void headers(HttpHeaders headers, Call call) {
+    private void headers(HttpHeaders headers, String key, Call call) {
         headers.setBearerAuth(key);
         put(headers, "x-gw-end-user", call.siteId());
         put(headers, "x-gw-task", call.feature());

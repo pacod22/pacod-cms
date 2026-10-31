@@ -1,0 +1,14 @@
+{"models":[
+ {"id":"anthropic/claude-dev","display_name":"anthropic/claude-dev","kind":"chat","provider":"anthropic","context_window":null,"max_output_tokens":null,"capabilities":{"vision":true,"documents":true,"tools":true,"structured_output":true},"deprecated":false,"state":"active","modalities":{"input":["text","image","document"],"output":["text"]},"sunset_at":null,"successor":null},
+ {"id":"openai/gpt-dev","display_name":"openai/gpt-dev","kind":"chat","provider":"openai","context_window":null,"max_output_tokens":null,"capabilities":{"vision":true,"documents":true,"tools":true,"structured_output":true},"deprecated":false,"state":"active","modalities":{"input":["text","image","document"],"output":["text"]},"sunset_at":null,"successor":null},
+ {"id":"local/text-only","display_name":"Text only","kind":"chat","provider":"ollama","capabilities":{"vision":false,"structured_output":true},"deprecated":true,"state":"deprecated"},
+ {"id":"local/no-json","display_name":"local/no-json","kind":"chat","provider":"ollama","capabilities":{"vision":true,"structured_output":false},"deprecated":false,"state":"active"},
+ {"id":"openai/embed","kind":"embedding","provider":"openai","capabilities":{"structured_output":false},"state":"active"},
+ {"id":"old/retired","kind":"chat","provider":"openai","capabilities":{"vision":true,"structured_output":true},"state":"retired"},
+ {"id":"evil\"><script>","kind":"chat","capabilities":{"vision":true,"structured_output":true},"state":"active"}
+],
+"templates":[
+ {"id":"@fast","version":1,"model":"openai/gpt-dev","models":[{"model":"openai/gpt-dev","tier":null,"weight":1,"priority":0},{"model":"anthropic/claude-dev","tier":null,"weight":1,"priority":1}],"routing_scheme":"pool-fast","max_output_tokens":null},
+ {"id":"@cheap","version":1,"model":"local/text-only","models":[{"model":"local/text-only"},{"model":"hidden/not-granted"}]},
+ {"id":"no-at","models":[]}
+]}

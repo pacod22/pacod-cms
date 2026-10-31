@@ -122,8 +122,8 @@ server. Consequences:
   host or behind the studio's permit-all chain (core's old `/v1` controllers once reached the public
   site that way). **Only the studio scans `core.seed`**: only the studio provisions websites.
   `WebApplicationTests` asserts exactly **one** filter chain, zero `UserDetailsService` beans and no
-  `/v1/**` pattern while `/web/v1/health` is mapped; `MgmtApplicationTests` asserts exactly **two**
-  chains, that every `io.pacod.cms` `@Controller` is the studio's own, and that the website filter
+  `/v1/**` pattern while `/web/v1/health` is mapped; `MgmtApplicationTests` asserts exactly **three**
+  chains (sign-in, `/internal/**`, permit-all), that every `io.pacod.cms` `@Controller` is the studio's own, and that the website filter
   is ordered before security; `make smoke` expects `/v1/health` to 404 through Caddy and on the site's
   port.
 - **`WebApplication` excludes `UserDetailsServiceAutoConfiguration`**, or Boot invents an in-memory
@@ -773,8 +773,8 @@ checks first only so its screens offer what would succeed.
   whose refresh token is used twice**, so two browsers sharing one, or two requests of one session
   refreshing at once, would sign the person out everywhere. `UserTokens` serialises refreshes per
   session id. A session that holds no usable token asks the person to sign in again.
-- **The installation** (`/mgmt/platform`, `platform.manage`): the settings and every organisation
-  with its AI switch. **The chrome asks `${can}`** (`StudioCan`, a request attribute like
+- **The installation** (`/mgmt/platform`, `platform.manage`): the settings, the AI gateway's address
+  and key and the models from its list (*AI*), and every organisation with its AI switch. **The chrome asks `${can}`** (`StudioCan`, a request attribute like
   `mgmtText`): the Website group (Settings, Members) and the Installation link show only to who may
   open them, and `null`-guarded for the error dispatch.
 - **Tests**: `PortalScreensTest` runs the real filter and chain with people holding real-shaped
@@ -857,10 +857,11 @@ static resource handler can never serve a file under `/mgmt/`.
 - **No real context path.** `server.servlet.context-path=/mgmt/` would re-run the trap under *Spring
   Boot 4 gotchas* across every mapping and `th:href`; the only context path is the virtual
   `/sites/<id>`.
-- **Two filter chains (`MgmtSecurityConfig`).** `@Order(1)` matches `/mgmt/**`, `/assets/**` and
+- **Three filter chains (`MgmtSecurityConfig`).** `@Order(1)` matches `/mgmt/**`, `/assets/**` and
   `/resources/**` (the previews are a website's content): `IF_REQUIRED` sessions, **CSRF on**,
   `oauth2Login`; `/mgmt/login`, `/mgmt/ui-language/*` and the two OAuth bases permit-all, the rest
-  authenticated. `@Order(5)` is permit-all and stateless, with no matcher, for what is left —
+  authenticated. `@Order(2)` is `/internal/**`, scripts with a pacod-id service token (*AI*).
+  `@Order(5)` is permit-all and stateless, with no matcher, for what is left —
   `/mgmt-assets/**`, `/mgmt-health`, `/error` — not `denyAll`, which risks turning every error page
   into a 403; the narrowed scan is what stops anything else being served. `/mgmt/` answers **302**
   to `/mgmt/sites`, which anonymous answers 302 to `/mgmt/login` (two links to pacod-id).
@@ -1995,9 +1996,89 @@ a cover, an editorial and an ordered list of articles, generated into one PDF pe
 ### AI (pacod-gw)
 
 Every AI feature calls **pacod-gw** (OpenAI's chat API, `/v1/chat/completions`) through
-**`AiGateway`** (`studio.ai`) and nowhere else. The address and key are `pacod.ai.gateway-url`
-and `pacod.ai.api-key` (`PACOD_GW_URL`, `PACOD_GW_API_KEY`); without both, AI is "not set up". A
-feature's model is `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, a pool).
+**`AiGateway`** (`studio.ai`) and nowhere else.
+
+- **Which model or template a feature calls is `AiModels`'s, resolved per call.** The features are
+  `AiFeature`: `TRANSLATE` (both translation jobs), `PDF` (`PdfEnricher`), `ASSIST`
+  (`WritingAssist`), `VISION` (its `alt`) and `DESIGN` (`DesignAssist`, and so the design job).
+  - The order is the stored override (`AiModelSettings`, control plane, `aiModelSettings`, id
+    `models`, features keyed in lower case), else the stored default, else
+    `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, a template). The properties
+    are starting values.
+  - Reads are fresh behind a 5 s memo, like `AiGatewayConfig`, and an unreadable control plane
+    falls back to the properties. Consumers take `AiModels` (tests use `AiModels.fixed`), never a
+    `@Value` string. The document is apart from `AiGatewaySettings`, so a gateway reset keeps the
+    choice.
+  - **Chosen from the gateway's own list**: `AiCatalog` reads `GET <gateway>/gw/v1/models` (the
+    native interface, which pacod-gw and lite both answer with exactly what the key may call)
+    through `AiGateway.listModels()`, on a client of its own (2 s connect, 4 s read: a page
+    render waits on it). It is cached 60 s, keyed by the address and a hash of the key, and a
+    failure is kept 10 s with its reason.
+  - Parsing treats the answer as untrusted: only `kind: chat` models in state `active` or
+    `deprecated` (the callable ones), ids matching `[A-Za-z0-9@_./:-]{1,200}`, and templates
+    starting with `@`.
+  - **Suitability, checked in pacod-gw**: every feature asks for a strict JSON schema, and without
+    `structured_output` the gateway drops or refuses it. VISION also needs `vision`, without which
+    an image is refused. A template suits when every pool model the key can see does; one it
+    cannot see is the gateway's to route. `offeredFor(feature)` lists templates, then models.
+  - **`set` checks only what changes**, feature by feature, because the screen posts every
+    select:
+    - a feature whose stored model moves (also indirectly, when a cleared override hands it to
+      the default) needs the new one offered and suitable;
+    - a stale unchanged entry passes;
+    - a refusal (`not_offered`, `not_suitable`, `catalogue_unavailable`, `unchanged`) names the
+      feature, or `default`;
+    - for a feature the default would serve, the refusal is `default_not_offered` or
+      `default_not_suitable`, so the flash says that feature needs a choice of its own rather than
+      blaming a select the admin never touched.
+
+    **`clear()` asks no gateway**: going back must work while it is down.
+  - The installation screen's models card (`POST /mgmt/platform/ai-models` and `…/reset`) has a
+    blank first option on the default ("the environment's") and "Use the default" on each
+    feature. A stored choice the gateway dropped stays selected, labelled. Without a list it
+    says why and shows the models in use. **`/internal/v1/ai-models`**
+    (`InternalAiModelsController`): `GET` includes the catalogue and what each entry suits; `PUT
+    {default?, features?: {vision: "…", pdf: null}}` (absent keeps, `""`/`null` clears, an unknown
+    feature is a 422); `DELETE`. The connection test pings `models.defaultModel()`.
+
+- **The address and key are `AiGatewayConfig`'s, read per call**. The stored
+  `AiGatewaySettings` (control plane, `aiGatewaySettings`, id `gateway`) wins while it exists;
+  otherwise `pacod.ai.gateway-url`/`pacod.ai.api-key` (`PACOD_GW_URL`, `PACOD_GW_API_KEY`) apply.
+  Without both, AI is "not set up".
+  - Reads are fresh behind a 5 s memo, which `set`/`clear` forget. An unreadable control plane
+    falls back to the environment's pair (ERROR), never to none.
+  - **An address and its key are one pair**: the document holds both or nothing. Every `set` needs
+    a key. Without one, a new address is refused (`key_required_with_url`), so a key never goes to
+    a host it was not given for, and the address in effect is refused (`unchanged`), so a Save
+    that changes nothing never copies the environment's pair into storage, where it would outlive
+    a later change to the environment. A key alone keeps the address in effect.
+  - It is kept apart from `PlatformSettings`, which is rendered whole. **The key is never rendered
+    or answered**, only `keyHint()` (the last four characters). It is stored unencrypted.
+  - Two writers. **The installation screen** (`POST /mgmt/platform/ai-gateway` and `…/reset`,
+    `platform.manage`; a password field rendered empty and needed on every save, an optional ping
+    after saving). **`/internal/v1/ai-gateway`** (`studio.internal.InternalAiGatewayController`:
+    `GET`; `PUT {url?, apiKey}`, with `?test=true` to ping; `DELETE`) for scripts.
+- **The internal API is its own chain** (`MgmtSecurityConfig.internalApiFilterChain`, `@Order(2)`,
+  `/internal/**`, stateless, no CSRF, no anonymous).
+  - `ServiceTokenFilter` takes `Authorization: Bearer <pidt_…>` and asks `ServiceTokenCheck`.
+    In production that is `ServiceTokens`: pacod-id's `POST /internal/v1/introspect` through
+    `IdClient.postForm` as `pacod-cms-service`, requiring `active` and `pid_kind: service`.
+  - Answers are cached by the token's SHA-256, 60 s (a refusal 10 s), and dropped when
+    `AuthzFeed.credentialEpoch()` moves (`credential.revoked`, or any snapshot).
+  - It refuses (503) while the feed is not ready or older than `max-staleness`, and refuses a
+    disabled account.
+  - The account's `sub` becomes the authentication's name, so `FeedSubjects` and
+    `PermissionInterceptor` decide `@PlatformPermission` as for a person. A script needs
+    `cms.platform_admin`, a broad grant noted in `docs/SECURITY.md`.
+  - Refusals are JSON (`{error, code}`): the filter's 404/401/503 and `InternalApiAdvice`'s
+    403/503/400, never `error.html`. **The 404 is for a context path**: `StudioSiteFilter` would
+    present `/sites/<id>/internal/…` as `/internal/…`, which Caddy's `/internal/*` rule does not
+    cover. `make smoke` checks it through Caddy.
+  - Its package is `studio.internal`, outside `MgmtControllerAdvice`'s. Presence skips
+    `/internal/`. Caddy answers `/internal/*` with 404 on the studio's host, and `make smoke`
+    checks that and the direct port's 401. The token check is the guard, since the studio's port
+    is published.
+  - Without `pacod.id.enabled` there is no `ServiceTokenCheck` bean: a 503 `identity_off`.
 
 - **The client.** It asks for a strict JSON-schema answer.
   - **Attribution uses opaque ids only**: `x-gw-end-user` (the website), `x-gw-task` (the
@@ -2238,7 +2319,17 @@ feature's model is `pacod.ai.models.<feature>`, else `pacod.ai.model` (`@fast`, 
     sets it empty, and production names its real gateway in `.env`.
 - **Tests:**
   - `AiGatewayTest` runs against a local stand-in: headers, the one 429 retry, 402 and 504,
-    cut-off, refusal, not-JSON, the ping, a refusal's code and request id;
+    cut-off, refusal, not-JSON, the ping, a refusal's code and request id, a stored pair applying
+    live;
+  - `AiModelsTest` (the order, per-feature checks, a stale entry, an indirect move, clear without
+    a list), `AiCatalogTest` (the dev gateway's real answer plus hostile entries,
+    `ai/gw-models.json`; suitability; the cache), `AiGatewayTest.listModels`,
+    `InternalAiModelsTest`, `PortalScreensTest.aiModelsCard`;
+  - `AiGatewayConfigTest` (precedence, the pairing rule, key-only rotation, validation, read
+    failure), `ServiceTokensTest` (introspection on the wire, the cache, the epoch, unavailable),
+    `InternalAiGatewayTest` (the real chains: 401, 403, 503, 422, 400, the key never answered),
+    `PortalScreensTest.aiGatewaySettings` (the card, the key never rendered, save, refusal,
+    reset, an org admin refused), `AuthzFeedTest.credentialEpochMoves`;
   - `PortalScreensTest.aiConnectionTest`: the card, both flashes, 403 for an organisation's admin;
   - `HtmlTranslationTest` runs on a legacy body, injection attempts and code samples;
   - `TranslateArticlesHandlerTest` and `TranslateSiteHandlerTest` use an echoing gateway, as the
@@ -2358,7 +2449,9 @@ application's account without one.
   `PACOD_PREVIEW_SECRET` (the same value; blank = no previews, see *The draft preview*). `cms-studio`:
   `MGMT_SESSION_TIMEOUT`, `IMAGE_*` (compose defaults equal the code's), `PACOD_PDF_GOTENBERG_URL`,
   `PACOD_JOBS_WORKERS`/`PACOD_JOBS_PER_ORGANISATION`, `PACOD_GW_URL`/`PACOD_GW_API_KEY`/`PACOD_AI_MODEL` (*AI*;
-  the URL defaults to `http://pacod-gw:8080`, the key has none, `make init` writes the dev gateway's), `SITE_PUBLIC_SCHEME`/`SITE_PUBLIC_PORT`, `PACOD_BOOTSTRAP_DEMO_HOSTS` (from
+  the URL defaults to `http://pacod-gw:8080`, the key has none, `make init` writes the dev gateway's;
+  a pair stored from the installation screen or the internal API replaces both; `PACOD_AI_MODEL`
+  and `pacod.ai.models.*` likewise give way to the models chosen there), `SITE_PUBLIC_SCHEME`/`SITE_PUBLIC_PORT`, `PACOD_BOOTSTRAP_DEMO_HOSTS` (from
   `DEMO_HOSTS`) and `PACOD_BOOTSTRAP_DEMO_MINIMAL_HOSTS` (from `DEMO_MINIMAL_HOSTS`), `PACOD_ID_ISSUER` (from `ID_ISSUER`), `PACOD_ID_INTERNAL_URL` (default `http://pacod-id-internal:8071`),
   `PACOD_ID_{STUDIO,SERVICE}_SECRET` (from `CMS_ID_*_SECRET`), `STUDIO_ORIGIN`,
   `PACOD_ID_PROVISIONER_TOKEN` (empty default: no provisioner, platform admins create

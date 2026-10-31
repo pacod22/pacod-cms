@@ -106,6 +106,19 @@ public class IdClient {
         });
     }
 
+    /** {@code POST} a form ({@code application/x-www-form-urlencoded}, as OAuth's endpoints take); the answer's JSON. */
+    public JsonNode postForm(String path, Map<String, String> form) {
+        org.springframework.util.LinkedMultiValueMap<String, String> body = new org.springframework.util.LinkedMultiValueMap<>();
+        form.forEach(body::add);
+        return call(() -> rest.post()
+                .uri(path)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .accept(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(String.class));
+    }
+
     private JsonNode call(java.util.function.Supplier<String> request) {
         return call(request, json);
     }

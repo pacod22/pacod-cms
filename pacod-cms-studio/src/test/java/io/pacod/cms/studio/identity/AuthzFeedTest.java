@@ -90,6 +90,22 @@ class AuthzFeedTest {
     }
 
     @Test
+    @DisplayName("a revoked service token and a snapshot each move the credential epoch, which drops cached token checks")
+    void credentialEpochMoves() {
+        long before = feed.credentialEpoch();
+        snapshot();
+        long afterSnapshot = feed.credentialEpoch();
+        assertThat(afterSnapshot).isGreaterThan(before);
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith("http://id-internal.test/internal/v1/authz/changes")))
+                .andRespond(withSuccess("""
+                        { "seq": 11, "events": [
+                          {"seq":11,"kind":"credential.revoked","token_id":"tok_1","sub":"usr_script"} ] }
+                        """, MediaType.APPLICATION_JSON));
+        feed.poll();
+        assertThat(feed.credentialEpoch()).isGreaterThan(afterSnapshot);
+    }
+
+    @Test
     @DisplayName("events are applied, and the next poll starts from the answer's own seq")
     void changesApplyAndAdvance() {
         snapshot();
