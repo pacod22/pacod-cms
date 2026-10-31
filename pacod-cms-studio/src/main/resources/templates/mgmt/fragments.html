@@ -586,7 +586,7 @@
 
     <span th:replace="~{mgmt/fragments :: uiLanguages}"></span>
 
-    <span class="who" th:if="${currentUser}">
+    <span class="who" th:if="${currentUser}" th:title="${currentUser}">
         <span class="avatar" th:text="${#strings.substring(currentUser, 0, 1)}">u</span>
         <span th:text="${currentUser}">user</span>
     </span>

@@ -372,6 +372,29 @@ svg.i {
 
 .topbar .spacer { margin-left: auto; }
 
+/* The open website, linking to the list. Shrinks to an ellipsis before it pushes the row wide. */
+.site-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    max-width: 260px;
+    padding: 4px 10px;
+    border-radius: var(--r-pill);
+    background: var(--surface-2);
+    color: var(--text-soft);
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.site-chip:hover { color: var(--text); }
+
+.site-chip svg.i { flex: none; }
+
+.site-chip > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+
 .who {
     display: inline-flex;
     align-items: center;
@@ -418,8 +441,30 @@ svg.i {
 
 .login-card .ui-lang { margin-top: 14px; }
 
+/*
+ * A phone has no room for the heading, the website, the theme, four languages, the e-mail address
+ * and sign-out on one row, and a row that does not fit widens the whole page. So the bar becomes
+ * two: the controls, then the heading with the language switch beside it. `::before` is the line
+ * break -- a full-width item ordered between the two -- since flex has no other way to force one.
+ * The website chip takes what is left of the first row (growing only to its own width, then an
+ * ellipsis), and the person is the avatar alone; the address stays its title and accessible name.
+ */
 @media (max-width: 700px) {
+    .topbar { flex-wrap: wrap; gap: 0 8px; }
+    .topbar::before { content: ""; order: 1; flex-basis: 100%; height: 6px; }
+    .topbar h1 { order: 2; flex: 1 1 0; min-width: 0; font-size: 16px; white-space: normal; }
+    .topbar .ui-lang { order: 2; }
+    .topbar .site-chip { flex: 1 1 0; max-width: max-content; }
     .topbar .ui-lang a { padding: 3px 5px; }
+    .topbar .who { padding: 0; background: none; }
+    .topbar .who > :not(.avatar) {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
 }
 
 .who .avatar {
@@ -857,7 +902,12 @@ input[readonly] { background: var(--surface-2); color: var(--text-muted); }
 
 /* -- tables ---------------------------------------------------------------- */
 
-.table-wrap { overflow-x: auto; }
+/*
+ * `position: relative` makes the wrapper the containing block of the visually hidden .sr-only
+ * labels in its cells. Without it they are placed against an ancestor outside the scroll, escape
+ * it, and widen the whole page on a phone by however wide the table is.
+ */
+.table-wrap { overflow-x: auto; position: relative; }
 
 table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 
@@ -1347,7 +1397,7 @@ tbody tr.has-langs:has(+ tr.lang-row:hover) { background: var(--surface-2); }
 }
 
 @media (max-width: 1000px) {
-    .savebar { left: 0; padding: 10px 14px; }
+    .savebar { left: 0; padding: 10px 14px; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
     .savebar .status { display: none; }
 }
 
