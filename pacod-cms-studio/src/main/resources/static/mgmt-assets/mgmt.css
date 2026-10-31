@@ -715,6 +715,8 @@ svg.i {
 .btn-icon.btn-sm { padding: 4px; width: 26px; height: 26px; }
 
 .inline-form { display: inline-flex; }
+/* A state badge and the button that flips it, side by side in a table cell. */
+.switch-cell { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 
 /* -- forms ----------------------------------------------------------------- */
 

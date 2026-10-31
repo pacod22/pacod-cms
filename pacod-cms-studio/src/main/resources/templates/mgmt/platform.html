@@ -220,14 +220,16 @@
                                 <span class="cell-sub" th:text="${o.id}">org_…</span>
                             </td>
                             <td class="muted" th:text="${o.websites}">2</td>
-                            <td>
-                                <form method="post" class="inline-form" th:action="${studioRoot} + '/mgmt/platform/organisations/' + ${o.id} + '/ai'">
-                                    <input type="hidden" name="enabled" th:value="${!o.organisation.aiEnabled}">
-                                    <button class="btn btn-sm" type="submit"
-                                            th:text="${o.organisation.aiEnabled} ? #{portal.platform.ai.turnOff} : #{portal.platform.ai.turnOn}">Turn on</button>
-                                </form>
-                                <span class="badge" th:classappend="${o.organisation.aiEnabled} ? 'published' : 'off'"
-                                      th:text="${o.organisation.aiEnabled} ? #{portal.org.ai.on} : #{portal.org.ai.off}">off</span>
+                            <td class="shrink">
+                                <div class="switch-cell">
+                                    <span class="badge" th:classappend="${o.organisation.aiEnabled} ? 'published' : 'off'"
+                                          th:text="${o.organisation.aiEnabled} ? #{portal.org.ai.on} : #{portal.org.ai.off}">off</span>
+                                    <form method="post" class="inline-form" th:action="${studioRoot} + '/mgmt/platform/organisations/' + ${o.id} + '/ai'">
+                                        <input type="hidden" name="enabled" th:value="${!o.organisation.aiEnabled}">
+                                        <button class="btn btn-sm" type="submit"
+                                                th:text="${o.organisation.aiEnabled} ? #{portal.platform.ai.turnOff} : #{portal.platform.ai.turnOn}">Turn on</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                         </tbody>
