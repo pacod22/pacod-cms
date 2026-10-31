@@ -245,6 +245,11 @@ svg.i {
     padding: 18px 14px 16px;
     background: var(--surface);
     border-right: 1px solid var(--border);
+    /* Fixed and as tall as the window: without its own scroll, every group below the window's
+       height (Website, Maintenance, Platform on a laptop) could never be reached. */
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
 }
 
 .brand {
@@ -639,6 +644,10 @@ svg.i {
 }
 
 .card-foot .spacer { margin-left: auto; }
+
+/* A card stretched to its grid row's height keeps its foot at the bottom, not under its last row. */
+.grid-2 > .card:has(> .card-foot) { display: flex; flex-direction: column; }
+.grid-2 > .card > .card-foot { margin-top: auto; }
 
 /* The article editor's language switcher: one wrapping row at the foot of the text card. */
 .lang-strip { gap: 6px; }

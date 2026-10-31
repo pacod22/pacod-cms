@@ -153,9 +153,9 @@
                             </tbody>
                         </table>
                     </div>
-                    <p class="result-line">
-                        <a th:href="@{/mgmt/social/stats(range=${range.key})}" th:text="#{ops.dash.details}">Details</a>
-                    </p>
+                    <div class="card-foot">
+                        <a class="btn btn-sm" th:href="@{/mgmt/social/stats(range=${range.key})}" th:text="#{ops.dash.details}">Details</a>
+                    </div>
                 </div>
 
                 <div class="card">
