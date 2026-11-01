@@ -48,7 +48,12 @@ public class StudioAccess {
 
     /** {@code [platform, organisation:<org>, cms.website:<id>]}. */
     public static List<String> pathOf(Tenant tenant) {
-        return List.of("platform", "organisation:" + tenant.organisationId(), "cms.website:" + tenant.siteId());
+        return pathOfWebsite(tenant.organisationId(), tenant.siteId());
+    }
+
+    /** {@code [platform, organisation:<org>, cms.website:<id>]}, for a website that is not bound. */
+    public static List<String> pathOfWebsite(String organisationId, String siteId) {
+        return List.of("platform", "organisation:" + organisationId, "cms.website:" + siteId);
     }
 
     public static List<String> pathOfOrganisation(String organisationId) {

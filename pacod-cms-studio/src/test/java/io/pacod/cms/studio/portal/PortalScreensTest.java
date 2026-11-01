@@ -647,6 +647,51 @@ class PortalScreensTest {
     }
 
     @Test
+    @DisplayName("a platform screen keeps the last website's menu, in the same place as on the website's own screens")
+    void sidebarKeepsTheLastWebsite() throws Exception {
+        when(sites.choices()).thenReturn(List.of(new StudioSites.SiteChoice("alpha", "org_alpha", "alpha"),
+                new StudioSites.SiteChoice("beta", "org_beta", "beta")));
+        when(sites.byId(anyString())).thenReturn(Optional.empty());
+        when(sites.byId("alpha")).thenReturn(Optional.of(view("alpha", "org_alpha")));
+        when(sites.byId("beta")).thenReturn(Optional.of(view("beta", "org_beta")));
+        // TestTenantExtension's website stays bound around the un-prefixed platform screens here;
+        // in the studio nothing is bound there, so nothing is current.
+        when(sites.current()).thenAnswer(i -> io.pacod.cms.core.tenant.TenantContext.find()
+                .filter(t -> !"test".equals(t.siteId())).map(t -> view(t.siteId(), t.organisationId())));
+        TestSubjects.use(websiteAdminOfAlpha());
+
+        // A website's screen keeps its website, for every screen of the studio.
+        org.springframework.test.web.servlet.MvcResult inside = mockMvc.perform(get("/sites/alpha/mgmt/members")
+                .with(oidcLogin())).andExpect(status().isOk()).andReturn();
+        Cookie kept = inside.getResponse().getCookie(io.pacod.cms.studio.site.StudioNavigation.SITE_COOKIE);
+        assertThat(kept).isNotNull();
+        assertThat(kept.getValue()).isEqualTo("alpha");
+        assertThat(kept.getPath()).isEqualTo("/");
+        String website = inside.getResponse().getContentAsString();
+
+        // A platform screen shows it where the website's screen does: Platform, the switcher, its menu.
+        String platform = render(get("/mgmt/organisations").cookie(kept));
+        for (String html : List.of(website, platform)) {
+            assertThat(html).contains("<span class=\"site-switch-name\">alpha</span>", "/sites/alpha/mgmt/articles",
+                    "/sites/alpha/mgmt/settings");
+            assertThat(html.indexOf("class=\"nav-platform\"")).isPositive()
+                    .isLessThan(html.indexOf("class=\"site-switch\""));
+            assertThat(html.indexOf("class=\"site-switch\"")).isLessThan(html.indexOf("/sites/alpha/mgmt/articles"));
+            // The switcher offers only the websites the person works on.
+            assertThat(html).doesNotContain("/sites/beta/");
+        }
+        // Switching from the members screen opens the other website's members; from a platform
+        // screen, its dashboard.
+        assertThat(website).containsPattern("href=\"/sites/alpha/mgmt/members\"\\s+aria-current=\"true\"");
+        assertThat(platform).containsPattern("href=\"/sites/alpha/mgmt/dashboard\"\\s+aria-current=\"true\"");
+
+        // A kept website the person does not work on is not shown; their only one is.
+        String crafted = render(get("/mgmt/organisations")
+                .cookie(new Cookie(io.pacod.cms.studio.site.StudioNavigation.SITE_COOKIE, "beta")));
+        assertThat(crafted).doesNotContain("/sites/beta/").contains("/sites/alpha/mgmt/articles");
+    }
+
+    @Test
     @DisplayName("an author edits but neither deletes nor publishes; an editor may do both")
     void authorsDoNotDeleteOrPublish() throws Exception {
         TestSubjects.use(Subject.user(List.of(new Binding("cms.author",

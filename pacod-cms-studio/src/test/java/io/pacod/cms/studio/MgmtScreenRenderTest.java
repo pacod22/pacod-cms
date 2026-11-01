@@ -2507,7 +2507,7 @@ class MgmtScreenRenderTest {
                 // entry is what proves the series reached the screen at all.
                 .andExpect(content().string(containsString("chart-key viewable")))
                 // The nav entry, which is shared chrome and therefore easy to break from elsewhere.
-                .andExpect(content().string(containsString("<span class=\"nav-text\">Статистика</span>")));
+                .andExpect(content().string(containsString("<span class=\"nav-text\">Трафик</span>")));
     }
 
     @Test
@@ -2820,7 +2820,7 @@ class MgmtScreenRenderTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("acme-2026")))
                 .andExpect(content().string(containsString("id=\"search-input\"")))
-                .andExpect(content().string(containsString("<span class=\"nav-text\">Макети</span>")))
+                .andExpect(content().string(containsString("<span class=\"nav-text\">Рекламни макети</span>")))
                 // The import card lives on the list because UploadSizeAdvice redirects an oversize
                 // upload to this URL's parent, which is this page.
                 .andExpect(content().string(containsString("/mgmt/banners/layouts/import")));
@@ -3307,7 +3307,7 @@ class MgmtScreenRenderTest {
                 // The 30-day click column comes from the statistics service.
                 .contains(">7<")
                 .contains("<span class=\"nav-text\">Социална страница</span>",
-                        "<span class=\"nav-text\">Социална статистика</span>")
+                        "<span class=\"nav-text\">Социални мрежи</span>", "title=\"Социална статистика\"")
                 // TinyMCE binds to id="text"; the bio is plain text.
                 .doesNotContain("id=\"text\"");
 

@@ -321,11 +321,60 @@
             <rect x="14" y="12" width="7" height="9" rx="1"/>
             <rect x="3" y="16" width="7" height="5" rx="1"/>
         </symbol>
+        <!--/* The sidebar: one drawing per entry, so the rail can be read by its icons alone. */-->
+        <symbol id="i-chevron-down" viewBox="0 0 24 24">
+            <path d="m6 9 6 6 6-6"/>
+        </symbol>
+        <!--/* The website list: a stack of them. */-->
+        <symbol id="i-websites" viewBox="0 0 24 24">
+            <path d="m12 2 10 5-10 5L2 7l10-5Z"/>
+            <path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>
+        </symbol>
+        <!--/* Page layouts: a page divided into regions. */-->
+        <symbol id="i-panels" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M3 9h18M9 21V9"/>
+        </symbol>
+        <symbol id="i-palette" viewBox="0 0 24 24">
+            <path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4.5 4H15a2 2 0 0 0-1.5 3.3A1.6 1.6 0 0 1 12 22Z"/>
+            <circle cx="7.5" cy="10.5" r="1"/>
+            <circle cx="10.5" cy="6.5" r="1"/>
+            <circle cx="15.5" cy="7.5" r="1"/>
+        </symbol>
+        <symbol id="i-printer" viewBox="0 0 24 24">
+            <path d="M6 9V2h12v7"/>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+            <rect x="6" y="14" width="12" height="8"/>
+        </symbol>
+        <symbol id="i-chart" viewBox="0 0 24 24">
+            <path d="M3 3v18h18"/>
+            <path d="M18 17V9M13 17V5M8 17v-3"/>
+        </symbol>
+        <!--/* Authors: who writes. Members keep i-users. */-->
+        <symbol id="i-pen" viewBox="0 0 24 24">
+            <path d="M12 20h9"/>
+            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+        </symbol>
     </defs>
 </svg>
 
 <!--/* ================================================================ sidebar */-->
 <!--/*
+  One skeleton on every screen, so the menu does not change under the operator as they go between
+  the platform and a website (pacod-gw's sidebar has the same shape): the brand, the Platform block,
+  the website switcher, then the website's screens. Only what is inside a part changes.
+
+  - The Platform block comes first and is the same everywhere. It folds; the fold is the
+    mgmt-platform-nav cookie, written by mgmt.js and read by StudioNavigation, so it renders folded
+    with no flash. Folded, it still names the platform screen shown.
+  - The website part shows navSite: the open website, or on a platform screen the one kept from the
+    screens before (StudioNavigation). Not currentSite, which is what the page itself is about and
+    what the topbar's chip names. Its links are built on navSite.screen(), never @{} -- on a
+    platform screen @{/mgmt/articles} has no prefix and lands on the website list -- and each group
+    asks can.at(navSite, ...), never can.site(...), which is false wherever no website is bound.
+  - The switcher is a <details>, so it opens with scripting off; the rail cannot hold it, so the
+    rail gets a link to the website list instead (.site-switch-rail).
+
   The checkbox in front of the <nav> is the mobile drawer. It is pure CSS -- `.nav-toggle:checked
   ~ .sidebar` -- so the navigation opens on a phone with scripting disabled, which a JS-driven
   hamburger would not.
@@ -349,178 +398,22 @@
         </a>
 
         <!--/*
-          A website's screens are offered only while one is open: under /sites/<id>/ every link
-          below gains that prefix, and without one each would land on the website list. The
-          platform's own screens are the last group, always shown.
-        */-->
-        <th:block th:if="${currentSite != null}">
-        <!--/* The landing page, above every group: it summarises all of them. */-->
-        <div>
-            <div class="nav">
-                <a th:href="@{/mgmt/dashboard}" th:classappend="${active == 'dashboard'} ? 'active'" th:title="#{chrome.nav.dashboard}">
-                    <svg class="i"><use href="#i-dashboard"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.dashboard}">dashboard</span>
-                </a>
-            </div>
-        </div>
-
-        <div>
-            <div class="nav-label" th:text="#{chrome.nav.group.content}">Content</div>
-            <div class="nav">
-                <a th:href="@{/mgmt/articles}" th:classappend="${active == 'articles'} ? 'active'" th:title="#{chrome.nav.articles}">
-                    <svg class="i"><use href="#i-file-text"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.articles}">articles</span>
-                </a>
-                <a th:href="@{/mgmt/authors}" th:classappend="${active == 'authors'} ? 'active'" th:title="#{chrome.nav.authors}">
-                    <svg class="i"><use href="#i-users"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.authors}">authors</span>
-                </a>
-                <a th:href="@{/mgmt/categories}" th:classappend="${active == 'categories'} ? 'active'" th:title="#{chrome.nav.categories}">
-                    <svg class="i"><use href="#i-folder"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.categories}">categories</span>
-                </a>
-                <a th:href="@{/mgmt/images}" th:classappend="${active == 'images'} ? 'active'" th:title="#{chrome.nav.images}">
-                    <svg class="i"><use href="#i-image"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.images}">images</span>
-                </a>
-                <a th:href="@{/mgmt/banners}" th:classappend="${active == 'banners'} ? 'active'" th:title="#{chrome.nav.banners}">
-                    <svg class="i"><use href="#i-megaphone"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.banners}">banners</span>
-                </a>
-                <!--/*
-                  The folders behind the HTML5 bookings. Its own entry rather than a link buried on
-                  the banner screen, because a layout outlives the booking that runs it: a campaign
-                  ends, the folder stays, and the next booking points at the same one.
-
-                  Routed under /mgmt/banners/ despite sitting beside «Реклами» here -- see
-                  MgmtBannerLayoutController for why a new prefix would reach the public app.
-                */-->
-                <a th:href="@{/mgmt/banners/layouts}" th:classappend="${active == 'layouts'} ? 'active'" th:title="#{chrome.nav.layouts}">
-                    <svg class="i"><use href="#i-layout"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.layouts}">layouts</span>
-                </a>
-                <!--/*
-                  The standing pages -- about, contact, terms and the rest. Under the content group
-                  rather than in a group of their own: they are text an editor writes,
-                  the same as an article, and the only difference is that they never appear in a
-                  listing.
-                */-->
-                <a th:href="@{/mgmt/pages}" th:classappend="${active == 'pages'} ? 'active'" th:title="#{chrome.nav.pages}">
-                    <svg class="i"><use href="#i-inbox"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.pages}">pages</span>
-                </a>
-                <!--/* /social, the link-in-bio page. Content, like the standing pages: what is on it is
-                       written here. Its numbers are under Наблюдение. */-->
-                <a th:href="@{/mgmt/social}" th:classappend="${active == 'social'} ? 'active'" th:title="#{chrome.nav.social}">
-                    <svg class="i"><use href="#i-share"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.social}">social</span>
-                </a>
-                <!--/* Journal issues: selected articles in one PDF with a cover and contents
-                       (MgmtIssueController), published at /issues. */-->
-                <a th:href="@{/mgmt/issues}" th:classappend="${active == 'issues'} ? 'active'" th:title="#{chrome.nav.issues}">
-                    <svg class="i"><use href="#i-book"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.issues}">issues</span>
-                </a>
-            </div>
-        </div>
-
-        <!--/*
-          Its own group: reading what the site is doing is neither editing content nor managing
-          who may edit it. Not gated on a property, unlike «Поддръжка» -- the screen degrades to
-          an empty chart when nothing has been recorded yet and says so, which is a truthful
-          answer rather than a broken link.
-        */-->
-        <div>
-            <div class="nav-label" th:text="#{chrome.nav.group.monitoring}">Monitoring</div>
-            <div class="nav">
-                <a th:href="@{/mgmt/monitoring}" th:classappend="${active == 'monitoring'} ? 'active'" th:title="#{chrome.nav.monitoring}">
-                    <svg class="i"><use href="#i-activity"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.monitoring}">monitoring</span>
-                </a>
-                <a th:href="@{/mgmt/social/stats}" th:classappend="${active == 'social-stats'} ? 'active'"
-                   th:title="#{chrome.nav.socialStats}">
-                    <svg class="i"><use href="#i-share"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.socialStats}">socialStats</span>
-                </a>
-                <a th:href="@{/mgmt/crawlers}" th:classappend="${active == 'crawlers'} ? 'active'" th:title="#{chrome.nav.crawlers}">
-                    <svg class="i"><use href="#i-bot"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.crawlers}">crawlers</span>
-                </a>
-            </div>
-        </div>
-
-
-        <!--/* The website's design: layouts per page type, its theme, its menus (MgmtDesignController). */-->
-        <div th:if="${can != null and can.site('design.read')}">
-            <div class="nav-label" th:text="#{chrome.nav.group.design}">Design</div>
-            <div class="nav">
-                <a th:href="@{/mgmt/design}" th:classappend="${active == 'design'} ? 'active'" th:title="#{chrome.nav.layouts.design}">
-                    <svg class="i"><use href="#i-layout"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.layouts.design}">layouts</span>
-                </a>
-                <a th:href="@{/mgmt/design/theme}" th:classappend="${active == 'design-theme'} ? 'active'" th:title="#{chrome.nav.theme}">
-                    <svg class="i"><use href="#i-sun"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.theme}">theme</span>
-                </a>
-                <a th:href="@{/mgmt/design/menus/main}" th:classappend="${active == 'design-menus'} ? 'active'" th:title="#{chrome.nav.menus}">
-                    <svg class="i"><use href="#i-menu"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.menus}">menus</span>
-                </a>
-            </div>
-        </div>
-
-        <!--/*
-          The website itself: its settings and who works on it. Offered only to who may open them;
-          each screen checks its own permission all the same.
-        */-->
-        <div th:if="${can != null and (can.site('website.manage') or can.site('website.read'))}">
-            <div class="nav-label" th:text="#{chrome.nav.group.website}">Website</div>
-            <div class="nav">
-                <a th:if="${can.site('website.manage')}" th:href="@{/mgmt/settings}"
-                   th:classappend="${active == 'settings'} ? 'active'" th:title="#{chrome.nav.settings}">
-                    <svg class="i"><use href="#i-settings"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.settings}">settings</span>
-                </a>
-                <!--/* robots.txt, sitemap.xml, llms.txt (MgmtSiteFilesController); readers of the website see them. */-->
-                <a th:href="@{/mgmt/site-files}" th:classappend="${active == 'site-files'} ? 'active'" th:title="#{chrome.nav.siteFiles}">
-                    <svg class="i"><use href="#i-globe"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.siteFiles}">site files</span>
-                </a>
-                <a th:href="@{/mgmt/members}" th:classappend="${active == 'members'} ? 'active'" th:title="#{chrome.nav.members}">
-                    <svg class="i"><use href="#i-users"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.members}">members</span>
-                </a>
-            </div>
-        </div>
-
-        <!--/* Background work for this website: PDF exports and AI translations (MgmtJobController). */-->
-        <div th:if="${can != null and can.site('content.read')}">
-            <div class="nav-label" th:text="#{chrome.nav.group.maintenance}">Maintenance</div>
-            <div class="nav">
-                <a th:href="@{/mgmt/jobs}" th:classappend="${active == 'jobs'} ? 'active'" th:title="#{chrome.nav.jobs}">
-                    <svg class="i"><use href="#i-play"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.jobs}">jobs</span>
-                </a>
-                <!--/* What every PDF starts from (MgmtPdfSettingsController). */-->
-                <a th:href="@{/mgmt/pdf}" th:classappend="${active == 'pdf'} ? 'active'" th:title="#{chrome.nav.pdf}">
-                    <svg class="i"><use href="#i-file-text"></use></svg>
-                    <span class="nav-text" th:text="#{chrome.nav.pdf}">pdf</span>
-                </a>
-            </div>
-        </div>
-        </th:block>
-
-        <!--/*
           Absolute addresses, not @{}: these belong to no website, and from inside one @{} would
           file them under its prefix. They answer there too (see StudioPaths), but the website list
           is the one place that must never look as if it were part of a website.
         */-->
-        <div>
-            <div class="nav-label" th:text="#{chrome.nav.group.platform}">Platform</div>
+        <details class="nav-platform" th:open="${platformNavOpen != false}">
+            <summary th:title="#{chrome.nav.group.platform}">
+                <span class="nav-text nav-platform-label" th:text="#{chrome.nav.group.platform}">Platform</span>
+                <span class="nav-text nav-platform-page"
+                      th:if="${active == 'sites' or active == 'organisations' or active == 'platform'}"
+                      th:text="${active == 'sites'} ? #{chrome.nav.sites} : (${active == 'organisations'} ? #{chrome.nav.organisations} : #{chrome.nav.platform})">sites</span>
+                <svg class="i nav-fold"><use href="#i-chevron-down"></use></svg>
+            </summary>
             <div class="nav">
                 <a th:href="${studioRoot} + '/mgmt/sites'"
                    th:classappend="${active == 'sites'} ? 'active'" th:title="#{chrome.nav.sites}">
-                    <svg class="i"><use href="#i-layout"></use></svg>
+                    <svg class="i"><use href="#i-websites"></use></svg>
                     <span class="nav-text" th:text="#{chrome.nav.sites}">sites</span>
                 </a>
                 <a th:href="${studioRoot} + '/mgmt/organisations'"
@@ -534,10 +427,205 @@
                     <span class="nav-text" th:text="#{chrome.nav.platform}">platform</span>
                 </a>
             </div>
+        </details>
+
+        <!--/*
+          The switcher. Open from the start while no website is shown, so the first choice is in
+          view. Each choice leads to the same screen in that website (navSwitchPath: the list, never
+          a record of this one), and the filter is mgmt.js's, offered only on a long list.
+        */-->
+        <details class="site-switch" th:open="${navSite == null}">
+            <summary th:title="#{chrome.site.switch}">
+                <span class="site-switch-mark" aria-hidden="true"
+                      th:text="${navSite != null} ? ${#strings.toUpperCase(#strings.substring(navSite.name, 0, 1))} : '?'">D</span>
+                <span class="site-switch-text">
+                    <span class="site-switch-name" th:text="${navSite != null} ? ${navSite.name} : #{chrome.site.choose}">Demo</span>
+                    <span class="site-switch-host" th:if="${navSite != null and !#lists.isEmpty(navSite.hosts)}"
+                          th:text="${navSite.hosts[0]}">demo.localhost</span>
+                </span>
+                <svg class="i nav-fold"><use href="#i-chevron-down"></use></svg>
+            </summary>
+            <div class="site-switch-panel">
+                <input class="site-switch-filter" type="search" hidden autocomplete="off"
+                       th:placeholder="#{chrome.site.filter}" th:aria-label="#{chrome.site.filter}">
+                <ul class="site-switch-list" th:unless="${#lists.isEmpty(navSites)}">
+                    <li th:each="choice : ${navSites}">
+                        <a th:href="${studioRoot} + '/sites/' + ${choice.id} + ${navSwitchPath ?: '/mgmt/dashboard'}"
+                           th:aria-current="${navSite != null and choice.id == navSite.id} ? 'true' : null">
+                            <span th:text="${choice.name}">Alpha</span>
+                            <svg class="i" th:if="${navSite != null and choice.id == navSite.id}"><use href="#i-check"></use></svg>
+                        </a>
+                    </li>
+                </ul>
+                <p class="site-switch-empty" th:if="${#lists.isEmpty(navSites)}" th:text="#{chrome.sites.empty}">No websites yet.</p>
+                <a class="site-switch-all" th:href="${studioRoot} + '/mgmt/sites'">
+                    <svg class="i"><use href="#i-websites"></use></svg>
+                    <span th:text="#{chrome.site.all}">All websites</span>
+                </a>
+            </div>
+        </details>
+        <a class="site-switch-rail" th:href="${studioRoot} + '/mgmt/sites'"
+           th:title="${navSite != null} ? #{chrome.site.switchTo(${navSite.name})} : #{chrome.site.choose}">
+            <span class="site-switch-mark" aria-hidden="true"
+                  th:text="${navSite != null} ? ${#strings.toUpperCase(#strings.substring(navSite.name, 0, 1))} : '?'">D</span>
+            <span class="sr-only" th:text="${navSite != null} ? #{chrome.site.switchTo(${navSite.name})} : #{chrome.site.choose}">Switch website</span>
+        </a>
+
+        <!--/*
+          The website's screens, grouped by what an operator comes to do: write, sell, shape, read
+          the numbers, run the website. Each group is offered only to who may open its screens;
+          every screen checks its own permission all the same.
+        */-->
+        <th:block th:if="${navSite != null and can != null}">
+        <!--/* The landing page, above every group: it summarises all of them. */-->
+        <div th:if="${can.at(navSite, 'website.read')}">
+            <div class="nav">
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/dashboard')}" th:classappend="${active == 'dashboard'} ? 'active'" th:title="#{chrome.nav.dashboard}">
+                    <svg class="i"><use href="#i-dashboard"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.dashboard}">dashboard</span>
+                </a>
+            </div>
         </div>
 
-        <div class="sidebar-foot" th:if="${currentSite != null and currentSite.publicUrl != null}">
-            <a th:href="${currentSite.publicUrl} + '/'" target="_blank" rel="noopener" th:title="#{chrome.nav.viewSite}">
+        <!--/*
+          Text an editor writes. The standing pages and the link-in-bio page sit here rather than in
+          groups of their own: they are written like an article and differ only in never appearing
+          in a listing. Journal issues are selected articles in one PDF (MgmtIssueController).
+        */-->
+        <div th:if="${can.at(navSite, 'content.read')}">
+            <div class="nav-label" th:text="#{chrome.nav.group.content}">Content</div>
+            <div class="nav">
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/articles')}" th:classappend="${active == 'articles'} ? 'active'" th:title="#{chrome.nav.articles}">
+                    <svg class="i"><use href="#i-file-text"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.articles}">articles</span>
+                </a>
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/pages')}" th:classappend="${active == 'pages'} ? 'active'" th:title="#{chrome.nav.pages}">
+                    <svg class="i"><use href="#i-inbox"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.pages}">pages</span>
+                </a>
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/images')}" th:classappend="${active == 'images'} ? 'active'" th:title="#{chrome.nav.images}">
+                    <svg class="i"><use href="#i-image"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.images}">images</span>
+                </a>
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/authors')}" th:classappend="${active == 'authors'} ? 'active'" th:title="#{chrome.nav.authors}">
+                    <svg class="i"><use href="#i-pen"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.authors}">authors</span>
+                </a>
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/categories')}" th:classappend="${active == 'categories'} ? 'active'" th:title="#{chrome.nav.categories}">
+                    <svg class="i"><use href="#i-folder"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.categories}">categories</span>
+                </a>
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/issues')}" th:classappend="${active == 'issues'} ? 'active'" th:title="#{chrome.nav.issues}">
+                    <svg class="i"><use href="#i-book"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.issues}">issues</span>
+                </a>
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/social')}" th:classappend="${active == 'social'} ? 'active'" th:title="#{chrome.nav.social}">
+                    <svg class="i"><use href="#i-share"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.social}">social</span>
+                </a>
+            </div>
+        </div>
+
+        <!--/*
+          The bookings, and the folders behind the HTML5 ones. The folders have an entry of their own
+          because a layout outlives the booking that runs it: a campaign ends, the folder stays, and
+          the next booking points at the same one. Routed under /mgmt/banners/ -- see
+          MgmtBannerLayoutController for why a new prefix would reach the public app.
+        */-->
+        <div th:if="${can.at(navSite, 'ads.manage')}">
+            <div class="nav-label" th:text="#{chrome.nav.group.advertising}">Advertising</div>
+            <div class="nav">
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/banners')}" th:classappend="${active == 'banners'} ? 'active'" th:title="#{chrome.nav.banners}">
+                    <svg class="i"><use href="#i-megaphone"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.banners}">banners</span>
+                </a>
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/banners/layouts')}" th:classappend="${active == 'layouts'} ? 'active'" th:title="#{chrome.nav.layouts}">
+                    <svg class="i"><use href="#i-layout"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.layouts}">layouts</span>
+                </a>
+            </div>
+        </div>
+
+        <!--/* The website's design: layouts per page type, its theme, its menus (MgmtDesignController). */-->
+        <div th:if="${can.at(navSite, 'design.read')}">
+            <div class="nav-label" th:text="#{chrome.nav.group.design}">Design</div>
+            <div class="nav">
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/design')}" th:classappend="${active == 'design'} ? 'active'" th:title="#{chrome.nav.layouts.design}">
+                    <svg class="i"><use href="#i-panels"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.layouts.design}">layouts</span>
+                </a>
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/design/theme')}" th:classappend="${active == 'design-theme'} ? 'active'" th:title="#{chrome.nav.theme}">
+                    <svg class="i"><use href="#i-palette"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.theme}">theme</span>
+                </a>
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/design/menus/main')}" th:classappend="${active == 'design-menus'} ? 'active'" th:title="#{chrome.nav.menus}">
+                    <svg class="i"><use href="#i-menu"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.menus}">menus</span>
+                </a>
+            </div>
+        </div>
+
+        <!--/*
+          Reading what the site is doing. The screens degrade to an empty chart when nothing has
+          been recorded yet and say so -- a truthful answer rather than a broken link.
+        */-->
+        <div th:if="${can.at(navSite, 'stats.read')}">
+            <div class="nav-label" th:text="#{chrome.nav.group.statistics}">Statistics</div>
+            <div class="nav">
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/monitoring')}" th:classappend="${active == 'monitoring'} ? 'active'" th:title="#{chrome.nav.monitoring}">
+                    <svg class="i"><use href="#i-activity"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.monitoring}">monitoring</span>
+                </a>
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/social/stats')}" th:classappend="${active == 'social-stats'} ? 'active'" th:title="#{chrome.nav.socialStats}">
+                    <svg class="i"><use href="#i-chart"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.stats.social}">social</span>
+                </a>
+                <a th:href="${studioRoot} + ${navSite.screen('/mgmt/crawlers')}" th:classappend="${active == 'crawlers'} ? 'active'" th:title="#{chrome.nav.crawlers}">
+                    <svg class="i"><use href="#i-bot"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.crawlers}">crawlers</span>
+                </a>
+            </div>
+        </div>
+
+        <!--/*
+          The website itself: its settings, who works on it, its crawler files (robots.txt,
+          sitemap.xml, llms.txt), what every PDF starts from, and its background work. Last, as in
+          pacod-gw, where a level's own settings close its part.
+        */-->
+        <div th:if="${can.at(navSite, 'website.read') or can.at(navSite, 'content.read')}">
+            <div class="nav-label" th:text="#{chrome.nav.group.website}">Website</div>
+            <div class="nav">
+                <a th:if="${can.at(navSite, 'website.manage')}" th:href="${studioRoot} + ${navSite.screen('/mgmt/settings')}"
+                   th:classappend="${active == 'settings'} ? 'active'" th:title="#{chrome.nav.settings}">
+                    <svg class="i"><use href="#i-settings"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.settings}">settings</span>
+                </a>
+                <a th:if="${can.at(navSite, 'website.read')}" th:href="${studioRoot} + ${navSite.screen('/mgmt/members')}"
+                   th:classappend="${active == 'members'} ? 'active'" th:title="#{chrome.nav.members}">
+                    <svg class="i"><use href="#i-users"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.members}">members</span>
+                </a>
+                <a th:if="${can.at(navSite, 'website.read')}" th:href="${studioRoot} + ${navSite.screen('/mgmt/site-files')}"
+                   th:classappend="${active == 'site-files'} ? 'active'" th:title="#{chrome.nav.siteFiles}">
+                    <svg class="i"><use href="#i-code"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.siteFiles}">site files</span>
+                </a>
+                <a th:if="${can.at(navSite, 'content.read')}" th:href="${studioRoot} + ${navSite.screen('/mgmt/pdf')}"
+                   th:classappend="${active == 'pdf'} ? 'active'" th:title="#{chrome.nav.pdf}">
+                    <svg class="i"><use href="#i-printer"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.pdf}">pdf</span>
+                </a>
+                <a th:if="${can.at(navSite, 'content.read')}" th:href="${studioRoot} + ${navSite.screen('/mgmt/jobs')}"
+                   th:classappend="${active == 'jobs'} ? 'active'" th:title="#{chrome.nav.jobs}">
+                    <svg class="i"><use href="#i-play"></use></svg>
+                    <span class="nav-text" th:text="#{chrome.nav.jobs}">jobs</span>
+                </a>
+            </div>
+        </div>
+        </th:block>
+
+        <div class="sidebar-foot" th:if="${navSite != null and navSite.publicUrl != null}">
+            <a th:href="${navSite.publicUrl} + '/'" target="_blank" rel="noopener" th:title="#{chrome.nav.viewSite}">
                 <svg class="i"><use href="#i-external"></use></svg>
                 <span class="nav-text" th:text="#{chrome.nav.viewSite}">viewSite</span>
             </a>
@@ -570,11 +658,21 @@
 
     <h1 th:text="${heading}">Heading</h1>
 
-    <a class="site-chip" th:if="${currentSite != null}" th:href="${studioRoot} + '/mgmt/sites'"
-       th:title="#{chrome.site.switch}">
-        <svg class="i"><use href="#i-layout"></use></svg>
+    <!--/*
+      Where the page itself is: its website, or the platform. Not navSite -- on a platform screen
+      the sidebar keeps the last website, and this is what says the page is not part of it.
+      Switching is the sidebar's.
+    */-->
+    <a class="site-chip" th:if="${currentSite != null}" th:href="@{/mgmt/dashboard}"
+       th:title="#{chrome.site.current}">
+        <svg class="i"><use href="#i-globe"></use></svg>
         <span class="sr-only" th:text="#{chrome.site.current}">Website</span>
         <span th:text="${currentSite.name}">Demo</span>
+    </a>
+    <a class="site-chip" th:unless="${currentSite != null}" th:href="${studioRoot} + '/mgmt/sites'"
+       th:title="#{chrome.nav.group.platform}">
+        <svg class="i"><use href="#i-websites"></use></svg>
+        <span th:text="#{chrome.nav.group.platform}">Platform</span>
     </a>
 
     <span class="spacer"></span>

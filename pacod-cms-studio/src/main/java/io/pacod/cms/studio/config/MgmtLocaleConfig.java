@@ -15,12 +15,14 @@ import io.pacod.cms.studio.identity.AuthzFeed;
 import io.pacod.cms.studio.identity.IdProperties;
 import org.springframework.beans.factory.ObjectProvider;
 import io.pacod.cms.studio.access.StudioAccess;
+import io.pacod.cms.studio.site.StudioNavigation;
 import io.pacod.cms.studio.site.StudioSites;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.view.RedirectView;
 
 /**
  * The console's languages. Both beans are named for what Spring looks them up by: the
@@ -54,16 +56,19 @@ public class MgmtLocaleConfig implements WebMvcConfigurer {
     private final MgmtText mgmtText;
     private final MgmtPresence presence;
     private final StudioSites sites;
+    private final StudioNavigation navigation;
 
     private final StudioAccess access;
     private final ObjectProvider<AuthzFeed> feed;
     private final IdProperties id;
 
     public MgmtLocaleConfig(@Lazy MgmtText mgmtText, MgmtPresence presence, @Lazy StudioSites sites,
-                            @Lazy StudioAccess access, ObjectProvider<AuthzFeed> feed, IdProperties id) {
+                            @Lazy StudioNavigation navigation, @Lazy StudioAccess access,
+                            ObjectProvider<AuthzFeed> feed, IdProperties id) {
         this.mgmtText = mgmtText;
         this.presence = presence;
         this.sites = sites;
+        this.navigation = navigation;
         this.access = access;
         this.feed = feed;
         this.id = id;
@@ -82,14 +87,25 @@ public class MgmtLocaleConfig implements WebMvcConfigurer {
             /**
              * Only for a response that renders a view -- the chrome is what reads it -- so the
              * stylesheet and script requests a screen makes do not each cost a control-plane read.
+             * The sidebar's attributes only for one that renders a page: a redirect draws no sidebar.
              */
             @Override
             public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
                                    ModelAndView modelAndView) {
-                if (modelAndView != null && modelAndView.hasView() && !modelAndView.wasCleared()
-                        && request.getAttribute(SITE_ATTRIBUTE) == null) {
+                if (modelAndView == null || !modelAndView.hasView() || modelAndView.wasCleared()) {
+                    return;
+                }
+                if (request.getAttribute(SITE_ATTRIBUTE) == null) {
                     sites.current().ifPresent(site -> request.setAttribute(SITE_ATTRIBUTE, site));
                 }
+                if (!redirects(modelAndView)) {
+                    navigation.expose(request, response, (StudioSites.SiteView) request.getAttribute(SITE_ATTRIBUTE));
+                }
+            }
+
+            private boolean redirects(ModelAndView modelAndView) {
+                String name = modelAndView.getViewName();
+                return (name != null && name.startsWith("redirect:")) || modelAndView.getView() instanceof RedirectView;
             }
         });
         // Here rather than in a configurer of its own only because this is where the console's

@@ -25,6 +25,7 @@ import java.util.Optional;
  * <p>The list is read fresh. The current website is cached for half a minute per id -- it is read
  * for every screen rendered, a renamed website or a new domain reaches the chrome within that, and
  * a control plane that cannot be read costs the chip and the "view site" link, never the screen.
+ * The sidebar's switcher ({@link #choices()}) is cached the same half minute, as one list.
  */
 @Slf4j
 @Service
@@ -34,6 +35,9 @@ public class StudioSites {
 
     private final Cache<String, SiteView> current = Caffeine.newBuilder()
             .maximumSize(1_000).expireAfterWrite(TTL).build();
+
+    private final Cache<String, List<SiteChoice>> choices = Caffeine.newBuilder()
+            .maximumSize(1).expireAfterWrite(TTL).build();
 
     private final WebsiteRepository websites;
     private final DomainRepository domains;
@@ -65,9 +69,18 @@ public class StudioSites {
         }
     }
 
+    /**
+     * One website in the sidebar's switcher: what it names and what its permission is checked at --
+     * no domains, which {@link #all()} reads one query per website and the switcher, on every
+     * screen, cannot afford.
+     */
+    public record SiteChoice(String id, String organisationId, String name) {
+    }
+
     /** Forgets the cached websites, after the studio has changed one. */
     public void evict() {
         current.invalidateAll();
+        choices.invalidateAll();
     }
 
     /** Every website, by name. An unreadable control plane is an empty list and an ERROR log. */
@@ -78,6 +91,51 @@ public class StudioSites {
             log.error("Could not list the websites: {}", e.getMessage());
             return List.of();
         }
+    }
+
+    /**
+     * Every website but those being deleted, by name, for the sidebar's switcher. Cached as one
+     * list; an unreadable control plane is an empty one (not cached) and an ERROR log.
+     */
+    public List<SiteChoice> choices() {
+        List<SiteChoice> cached = choices.getIfPresent("all");
+        if (cached != null) {
+            return cached;
+        }
+        try {
+            List<SiteChoice> read = websites.findAllByOrderByNameAsc().stream()
+                    .filter(website -> website.getStatus() != WebsiteStatus.DELETING)
+                    .map(website -> new SiteChoice(website.getId(), website.getOrganisationId(),
+                            website.getName() == null ? website.getId() : website.getName()))
+                    .toList();
+            choices.put("all", read);
+            return read;
+        } catch (DataAccessException e) {
+            log.error("Could not list the websites: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * A website by id, bound or not -- the one the sidebar keeps on a platform screen. Empty for an
+     * unknown website, one being deleted, or a control plane that cannot be read (which costs the
+     * kept website, never the screen).
+     */
+    public Optional<SiteView> byId(String id) {
+        SiteView cached = current.getIfPresent(id);
+        if (cached == null) {
+            try {
+                cached = websites.findById(id).map(this::view).orElse(null);
+            } catch (DataAccessException e) {
+                log.error("Could not read website {}: {}", id, e.getMessage());
+                return Optional.empty();
+            }
+            if (cached == null) {
+                return Optional.empty();
+            }
+            current.put(id, cached);
+        }
+        return cached.status() == WebsiteStatus.DELETING ? Optional.empty() : Optional.of(cached);
     }
 
     /**

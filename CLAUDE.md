@@ -537,7 +537,8 @@ into `StudioPaths`' lists, or `needsSite()` silently sends it to the website lis
   `SiteView.publicUrl` is `pacod.site.public-scheme` + primary host + `pacod.site.public-port`, null
   with no host. **An unreadable record still yields a current website**, built from the bound tenant
   — hiding the navigation would strand the operator. `MgmtLocaleConfig.postHandle` sets it as
-  `currentSite` for view-rendering responses only; the filter sets `studioRoot`.
+  `currentSite` for view-rendering responses only; the filter sets `studioRoot`. `byId` (the same
+  cache) and `choices()` serve the sidebar (*The studio's chrome*).
 - **`StudioMediaController` serves a website's pictures to the studio's screens**: `/assets/img/**`
   and `/resources/banners/**`, JPEG/PNG/GIF/WebP/AVIF only, `nosniff`, a sandboxing CSP, private
   cache, inside the authenticated chain (matcher `/mgmt/**`, `/assets/**`, `/resources/**`). **Never
@@ -775,8 +776,8 @@ checks first only so its screens offer what would succeed.
   session id. A session that holds no usable token asks the person to sign in again.
 - **The installation** (`/mgmt/platform`, `platform.manage`): the settings, the AI gateway's address
   and key and the models from its list (*AI*), and every organisation with its AI switch. **The chrome asks `${can}`** (`StudioCan`, a request attribute like
-  `mgmtText`): the Website group (Settings, Members) and the Installation link show only to who may
-  open them, and `null`-guarded for the error dispatch.
+  `mgmtText`): every website group of the sidebar (`can.at(navSite, …)`) and the Installation link
+  show only to who may open them, and `null`-guarded for the error dispatch.
 - **Tests**: `PortalScreensTest` runs the real filter and chain with people holding real-shaped
   roles (no role, org admin, website admin, author, platform admin), renders every portal screen in
   Bulgarian and English, and **posts with a real CSRF token taken from the sign-in page** —
@@ -1050,12 +1051,33 @@ Screens are assembled from `templates/mgmt/fragments.html` — `head(pageTitle)`
 - **`sidebar` is a `th:block`**: it also emits the `<input class="nav-toggle" type="checkbox">`
   before the `<nav>` and the `<label class="nav-scrim">` after. `.nav-toggle:checked ~ .sidebar` is
   the ≤1000 px drawer, pure CSS. The three must stay siblings inside `.shell`.
-- **A website's screens are offered only while one is open** (`currentSite != null`); without a
-  prefix each `@{/mgmt/…}` link would land on the website list. The **Platform** group (Websites
-  only, since the accounts moved to pacod-id) is always shown and built on **`${studioRoot} +
-  '/mgmt/…'`, never `@{}`**, which would file it under the open website's prefix — the list must
-  never look like part of a website. The topbar's
-  `site-chip` names the website and links to the list; "View site" is `currentSite.publicUrl`.
+- **The sidebar is one skeleton on every screen** (pacod-gw's shape), so it does not change as the
+  operator goes between the platform and a website: brand, the **Platform** block (Websites,
+  Organisations, Installation), the website switcher, then the website's groups — Dashboard,
+  Content, Advertising, Design, Statistics, Website. Only what is inside a part changes.
+  - **It shows `navSite`, never `currentSite`**: the open website, or on a platform screen the one
+    **kept** in the `mgmt-site` cookie, else the person's only website (`StudioNavigation`, called
+    from `MgmtLocaleConfig.postHandle` for pages, not redirects). A kept id is believed only when it
+    matches `Website.ID`, `StudioSites.byId` finds it (not `DELETING`) and the person still
+    `touches` it. Nothing clears it; opening another website replaces it. `currentSite` stays what
+    the page itself is about — the topbar's `site-chip` says that (the website, else "Platform"),
+    and banner previews and the brand link read it.
+  - **Website links are `${studioRoot} + ${navSite.screen('/mgmt/…')}`, never `@{}`**, which on a
+    platform screen has no prefix and lands on the website list; **each group asks `can.at(navSite,
+    …)`, never `can.site(…)`**, which is false wherever no website is bound — the groups would
+    vanish on platform screens and the menu would jump again. Each is gated on its screens' read
+    permission. The Platform block keeps **`${studioRoot} + '/mgmt/…'`, never `@{}`**, which would
+    file it under the open website's prefix.
+  - **The Platform block is a `<details>`** whose fold is the `mgmt-platform-nav` cookie, written by
+    `mgmt.js` and read by the server, so a remembered fold renders folded with no flash; folded on a
+    platform screen it names that screen.
+  - **The switcher is a `<details>`** (works with scripting off), open from the start while no website
+    is shown, listing `navSites` (`StudioSites.choices()`: one cached list, no domain reads, filtered
+    by `touches`). Each choice leads to `navSwitchPath`, the same sidebar screen in that website
+    (`StudioNavigation.SCREENS`, longest prefix; never a record of this one), else the dashboard; a
+    new sidebar screen goes into that map. `mgmt.js` closes it on Escape or a click outside and adds
+    a filter past eight websites. **The rail cannot hold it**: `.site-switch-rail`, a link to the
+    website list, stands in at 68 px. "View site" is `navSite.publicUrl`.
 - **The `hidden` attribute needs a stylesheet rule.** Controls needing JavaScript render `hidden`
   and `mgmt.js` removes it, but any author `display` beats the UA's `[hidden]` rule, and `mgmt.css`
   has many (`.btn` put dead buttons on screen; `.picker-list label` made the picker filter hide

@@ -233,6 +233,81 @@
         });
     }());
 
+    /*
+     * The Platform block's fold, remembered in a cookie rather than localStorage: the server reads
+     * it (StudioNavigation) and renders the <details> folded, so the block never paints open and
+     * then shuts. Path /, as every website's screens share one sidebar.
+     */
+    (function initPlatformFold() {
+        var block = document.querySelector('details.nav-platform');
+        if (!block) {
+            return;
+        }
+        block.addEventListener('toggle', function () {
+            var secure = location.protocol === 'https:' ? '; Secure' : '';
+            document.cookie = 'mgmt-platform-nav=' + (block.open ? '; Max-Age=0' : 'closed; Max-Age=31536000')
+                + '; Path=/; SameSite=Lax' + secure;
+        });
+    }());
+
+    /*
+     * The website switcher is a <details> and works without this. Here it only closes the way a
+     * menu does -- Escape (focus back on the box) or a click outside -- and, on a long list, gets a
+     * filter: every word typed must occur in the website's name.
+     */
+    (function initSiteSwitch() {
+        var box = document.querySelector('details.site-switch');
+        if (!box) {
+            return;
+        }
+        var summary = box.querySelector('summary');
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && box.open && !event.defaultPrevented) {
+                box.open = false;
+                summary.focus();
+            }
+        });
+        document.addEventListener('click', function (event) {
+            if (box.open && !box.contains(event.target)) {
+                box.open = false;
+            }
+        });
+
+        var filter = box.querySelector('.site-switch-filter');
+        var rows = box.querySelectorAll('.site-switch-list li');
+        if (!filter || rows.length <= 8) {
+            return;
+        }
+        filter.hidden = false;
+        filter.addEventListener('input', function () {
+            var words = filter.value.toLowerCase().split(/\s+/).filter(Boolean);
+            Array.prototype.forEach.call(rows, function (row) {
+                var name = row.textContent.toLowerCase();
+                row.hidden = !words.every(function (word) { return name.indexOf(word) >= 0; });
+            });
+        });
+        filter.addEventListener('keydown', function (event) {
+            // The first Escape clears the term; the next one closes the list.
+            if (event.key === 'Escape' && filter.value) {
+                event.preventDefault();
+                filter.value = '';
+                filter.dispatchEvent(new Event('input'));
+            }
+        });
+        // Into the filter only when the person opened the list: a box rendered open (no website
+        // shown yet) fires `toggle` as the page loads, and must not take the focus then.
+        var asked = false;
+        summary.addEventListener('click', function () {
+            asked = true;
+        });
+        box.addEventListener('toggle', function () {
+            if (box.open && asked) {
+                filter.focus();
+            }
+            asked = false;
+        });
+    }());
+
     /* ------------------------------------------------------ confirmations */
 
     document.addEventListener('submit', function (event) {

@@ -64,8 +64,7 @@ public class MgmtSitesController {
     @GetMapping(StudioPaths.SITES_SCREEN)
     public String list(Model model) {
         model.addAttribute("sites", sites.all().stream()
-                .filter(site -> access.touches(List.of("platform", "organisation:" + site.organisationId(),
-                        "cms.website:" + site.id())))
+                .filter(site -> access.touches(StudioAccess.pathOfWebsite(site.organisationId(), site.id())))
                 .toList());
         // The organisations only name and offer; a control plane that cannot be read costs those,
         // never the list (StudioSites.all() degrades the same way).

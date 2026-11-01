@@ -337,6 +337,151 @@ svg.i {
 
 .sidebar-foot a:hover { background: var(--surface-2); color: var(--text); }
 
+/*
+ * The Platform block: the same three entries on every screen, first, folding. A <details>, so it
+ * folds with scripting off too; the server renders it folded from the mgmt-platform-nav cookie, so
+ * a remembered fold never flashes open. Folded on a platform screen it names that screen.
+ */
+.nav-platform { padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+
+.nav-platform > summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: var(--r-sm);
+    list-style: none;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.nav-platform > summary::-webkit-details-marker { display: none; }
+
+.nav-platform > summary:hover { background: var(--surface-2); color: var(--text); }
+
+.nav-platform > .nav { margin-top: 6px; }
+
+/* The platform screen shown, while the block is folded. */
+.nav-platform-page {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--accent);
+    letter-spacing: 0;
+    text-transform: none;
+    font-size: 12.5px;
+}
+
+.nav-platform[open] .nav-platform-page { display: none; }
+
+.nav-fold { flex: none; margin-left: auto; width: 15px; height: 15px; transition: transform .15s var(--ease); }
+
+.nav-platform:not([open]) .nav-fold { transform: rotate(-90deg); }
+
+/*
+ * The website switcher: the website the menu below is for, and every other one a click away. The
+ * panel lies over the menu rather than pushing it down, within the sidebar's width.
+ */
+.site-switch { position: relative; }
+
+.site-switch > summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    list-style: none;
+    cursor: pointer;
+}
+
+.site-switch > summary::-webkit-details-marker { display: none; }
+
+.site-switch > summary:hover { border-color: var(--border-strong); }
+
+.site-switch[open] > summary { border-color: var(--accent-line); }
+
+.site-switch[open] > summary .nav-fold { transform: rotate(180deg); }
+
+.site-switch-mark {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--r-xs);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.site-switch-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+
+.site-switch-name,
+.site-switch-host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.site-switch-name { font-size: 13.5px; font-weight: 650; color: var(--text); }
+
+.site-switch-host { font-size: 11.5px; color: var(--text-muted); }
+
+.site-switch-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: min(60vh, 420px);
+    padding: 6px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    box-shadow: var(--shadow-md);
+}
+
+/* Above the global input[type=search] rule; no `display`, so `hidden` hides it with no guard. */
+.site-switch-panel input.site-switch-filter { padding: 6px 8px; font-size: 13px; }
+
+.site-switch-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+
+.site-switch-list a,
+.site-switch-all {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: var(--r-xs);
+    color: var(--text-soft);
+    font-size: 13.5px;
+    text-decoration: none;
+}
+
+.site-switch-list a > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.site-switch-list a svg.i { flex: none; margin-left: auto; width: 15px; height: 15px; }
+
+.site-switch-list a:hover,
+.site-switch-all:hover { background: var(--surface-2); color: var(--text); }
+
+.site-switch-list a[aria-current="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+
+.site-switch-all { border-top: 1px solid var(--border); border-radius: 0 0 var(--r-xs) var(--r-xs); padding-top: 9px; color: var(--text-muted); }
+
+.site-switch-empty { margin: 0; padding: 7px 8px; font-size: 13px; color: var(--text-muted); }
+
+/* The rail's stand-in for the switcher, which cannot fit in 68px: the website list, one click. */
+.site-switch-rail { display: none; }
+
 /* -- topbar ---------------------------------------------------------------- */
 
 .main {
@@ -527,6 +672,22 @@ svg.i {
 
     [data-nav="collapsed"] .nav a,
     [data-nav="collapsed"] .sidebar-foot a { justify-content: center; gap: 0; padding: 9px 0; }
+
+    [data-nav="collapsed"] .nav-platform > summary { justify-content: center; padding: 6px 0; }
+
+    [data-nav="collapsed"] .nav-fold { margin-left: 0; }
+
+    [data-nav="collapsed"] .site-switch { display: none; }
+
+    [data-nav="collapsed"] .site-switch-rail {
+        display: flex;
+        justify-content: center;
+        padding: 4px 0;
+        border-radius: var(--r-sm);
+        text-decoration: none;
+    }
+
+    [data-nav="collapsed"] .site-switch-rail:hover { background: var(--surface-2); }
 
     /*
      * CLIPPED, not display:none -- the same declarations as .sr-only at the foot of this file.
