@@ -36,7 +36,12 @@ import java.util.stream.Collectors;
  *       suits it; one it cannot see is the gateway's to route.</li>
  *   <li><b>Untrusted</b>: an id outside {@link #ID} is dropped, the lists are capped.</li>
  *   <li><b>Cached a minute</b>, keyed by the address and a hash of the key in effect, so a new
- *       gateway is asked at once; a failure is remembered for {@link #FAILURE_TTL} with its reason.</li>
+ *       gateway is asked at once; a failure is remembered for {@link #FAILURE_TTL} with its reason.
+ *       The installation screen asks afresh on every visit ({@link #refresh}), which also renews
+ *       what the jobs read.</li>
+ *   <li><b>What the gateway applies</b>: a model's limits and the parameters it takes come with
+ *       the list; a template's settings ({@link AiTemplateDetails}) need a call of their own,
+ *       {@link #template}, cached the same way and dropped with the list.</li>
  * </ul>
  */
 @Slf4j
@@ -46,11 +51,37 @@ public class AiCatalog {
     static final Duration TTL = Duration.ofSeconds(60);
     static final Duration FAILURE_TTL = Duration.ofSeconds(10);
     static final Pattern ID = Pattern.compile("[A-Za-z0-9@_./:-]{1,200}");
+    /**
+     * A template id that may go into an address, {@code /gw/v1/models/@name}: a slug, as pacod-gw
+     * names templates, never a dot or a slash -- {@code @../admin} would name another path.
+     */
+    static final Pattern TEMPLATE_PATH = Pattern.compile("@[A-Za-z0-9][A-Za-z0-9_-]{0,99}");
     static final int MAX_ENTRIES = 500;
 
-    /** A chat model the key may call. */
+    /**
+     * A chat model the key may call, with what the gateway says of it.
+     *
+     * @param maxOutputTokens the lower of the model's and the grant's ceiling, or null for none
+     * @param temperature     whether it takes one: {@code accepted}, {@code rejected},
+     *                        {@code default_only}; null when not said
+     * @param reasoning       its reasoning style ({@code none}, {@code effort}, {@code budget},
+     *                        {@code adaptive}, {@code always_on}); null when not said
+     * @param efforts         the reasoning levels it takes, for a style of {@code effort}
+     */
     public record ModelOption(String id, String displayName, String provider, boolean vision,
-                              boolean structuredOutput, boolean deprecated) {
+                              boolean structuredOutput, boolean deprecated, String state, Integer contextWindow,
+                              Integer maxOutputTokens, String temperature, String topP, String reasoning,
+                              List<String> efforts, String sunsetAt, String successor) {
+
+        /** Whether the gateway would drop (or, under {@code reject}, refuse) a temperature sent to it. */
+        public boolean refusesTemperature() {
+            return "rejected".equals(temperature) || "default_only".equals(temperature);
+        }
+
+        /** Whether a reasoning effort means nothing to it. */
+        public boolean takesNoEffort() {
+            return "none".equals(reasoning);
+        }
     }
 
     /** A template, {@code @name}, with the models of its pool. */
@@ -115,6 +146,18 @@ public class AiCatalog {
         public List<Choice> offeredForDefault() {
             return offeredFor(AiFeature.TRANSLATE);
         }
+
+        /** Every reasoning level a listed model takes, in the order first seen. */
+        public List<String> efforts() {
+            return models.stream().flatMap(m -> m.efforts().stream()).distinct().toList();
+        }
+
+        /** The models of {@code id}'s pool the key can see; empty for a model or an unknown id. */
+        public List<ModelOption> poolOf(String id) {
+            Map<String, ModelOption> byId = models.stream().collect(Collectors.toMap(ModelOption::id, Function.identity(), (a, b) -> a));
+            return template(id).map(t -> t.poolModels().stream().map(byId::get).filter(java.util.Objects::nonNull).toList())
+                    .orElse(List.of());
+        }
     }
 
     /** The catalogue, or why there is none. */
@@ -125,12 +168,24 @@ public class AiCatalog {
         }
     }
 
+    /** A template's settings, or why they could not be read. */
+    public record TemplateLookup(AiTemplateDetails details, String error) {
+    }
+
     private record Cached(String key, Lookup lookup, Instant until) {
     }
+
+    private record CachedTemplate(String key, TemplateLookup lookup, Instant until) {
+    }
+
+    static final Set<String> SUPPORT = Set.of("accepted", "rejected", "default_only");
+    static final Set<String> REASONING = Set.of("none", "effort", "budget", "adaptive", "always_on");
+    static final int MAX_EFFORTS = 8;
 
     private final AiGateway gateway;
     private final Clock clock;
     private volatile Cached cached;
+    private final Map<String, CachedTemplate> templates = new java.util.concurrent.ConcurrentHashMap<>();
 
     @Autowired
     public AiCatalog(AiGateway gateway) {
@@ -148,13 +203,59 @@ public class AiCatalog {
 
     /** The catalogue or the reason it could not be read; never throws. */
     public Lookup lookup() {
-        AiGatewayConfig.Effective target = gateway.target();
-        String key = target.url() + "|" + sha256(target.key());
-        Instant now = clock.instant();
+        String key = cacheKey();
         Cached c = cached;
+        if (c != null && c.key().equals(key) && clock.instant().isBefore(c.until())) {
+            return c.lookup();
+        }
+        return read(key);
+    }
+
+    /**
+     * The catalogue as the gateway answers now, kept for whoever looks next; the templates' settings
+     * are asked again too. For a screen that must show what the gateway offers, such as a template
+     * added a moment ago.
+     */
+    public Lookup refresh() {
+        templates.clear();
+        return read(cacheKey());
+    }
+
+    /**
+     * What {@code id}, a template the list names, applies to every call; cached like the list.
+     * Never throws.
+     */
+    public TemplateLookup template(String id) {
+        String key = cacheKey() + "|" + id;
+        Instant now = clock.instant();
+        CachedTemplate c = templates.get(id);
         if (c != null && c.key().equals(key) && now.isBefore(c.until())) {
             return c.lookup();
         }
+        TemplateLookup fresh;
+        Duration ttl;
+        try {
+            fresh = new TemplateLookup(AiTemplateDetails.parse(id, gateway.templateSpec(id)), null);
+            ttl = TTL;
+        } catch (AiGateway.AiException e) {
+            log.warn("The gateway's template {} could not be read: {}", id, e.getMessage());
+            fresh = new TemplateLookup(null, e.getMessage());
+            ttl = FAILURE_TTL;
+        }
+        if (templates.size() >= MAX_ENTRIES) {
+            templates.clear();
+        }
+        templates.put(id, new CachedTemplate(key, fresh, now.plus(ttl)));
+        return fresh;
+    }
+
+    private String cacheKey() {
+        AiGatewayConfig.Effective target = gateway.target();
+        return target.url() + "|" + sha256(target.key());
+    }
+
+    private Lookup read(String key) {
+        Instant now = clock.instant();
         Lookup fresh;
         Duration ttl;
         try {
@@ -172,6 +273,7 @@ public class AiCatalog {
     /** Forgets what was read, so the next look asks the gateway. */
     public void forget() {
         cached = null;
+        templates.clear();
     }
 
     public static Catalog parse(JsonNode answer) {
@@ -192,9 +294,22 @@ public class AiCatalog {
             }
             String provider = m.path("provider").asString("");
             JsonNode caps = m.path("capabilities");
+            List<String> efforts = new ArrayList<>();
+            for (JsonNode e : caps.path("reasoning_efforts")) {
+                String level = e.isString() ? e.asString() : "";
+                if (efforts.size() < MAX_EFFORTS && AiModels.EFFORT.matcher(level).matches() && !efforts.contains(level)) {
+                    efforts.add(level);
+                }
+            }
+            String successor = m.path("successor").isString() ? m.path("successor").asString() : "";
+            String sunset = m.path("sunset_at").isString() ? m.path("sunset_at").asString() : "";
             models.add(new ModelOption(id, display, ID.matcher(provider).matches() ? provider : "",
                     caps.path("vision").asBoolean(false), caps.path("structured_output").asBoolean(false),
-                    m.path("deprecated").asBoolean(false) || "deprecated".equals(state)));
+                    m.path("deprecated").asBoolean(false) || "deprecated".equals(state), state,
+                    tokens(m.path("context_window")), tokens(m.path("max_output_tokens")),
+                    oneOf(caps.path("temperature"), SUPPORT), oneOf(caps.path("top_p"), SUPPORT),
+                    oneOf(caps.path("reasoning"), REASONING), List.copyOf(efforts),
+                    instant(sunset), ID.matcher(successor).matches() ? successor : null));
         }
         List<TemplateOption> templates = new ArrayList<>();
         for (JsonNode t : answer.path("templates")) {
@@ -216,6 +331,24 @@ public class AiCatalog {
             templates.add(new TemplateOption(id, ID.matcher(primary).matches() ? primary : "", List.copyOf(pool)));
         }
         return new Catalog(List.copyOf(models), List.copyOf(templates));
+    }
+
+    private static Integer tokens(JsonNode n) {
+        return n.isIntegralNumber() && n.asLong() > 0 && n.asLong() <= 100_000_000 ? (int) n.asLong() : null;
+    }
+
+    private static String oneOf(JsonNode n, Set<String> allowed) {
+        String s = n.isString() ? n.asString() : "";
+        return allowed.contains(s) ? s : null;
+    }
+
+    /** An RFC 3339 instant as its date, {@code 2027-01-31}; null for anything else. */
+    private static String instant(String s) {
+        try {
+            return java.time.OffsetDateTime.parse(s).toLocalDate().toString();
+        } catch (java.time.format.DateTimeParseException e) {
+            return null;
+        }
     }
 
     private static String sha256(String s) {

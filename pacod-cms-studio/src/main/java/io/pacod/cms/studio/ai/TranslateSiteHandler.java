@@ -382,10 +382,16 @@ public class TranslateSiteHandler implements JobHandler {
                 throw new Exhausted();
             }
             calls++;
-            AiGateway.Answer answer = gateway.complete(new AiGateway.Call(TranslateArticlesHandler.FEATURE, models.modelFor(AiFeature.TRANSLATE),
+            AiGateway.Call call = new AiGateway.Call(TranslateArticlesHandler.FEATURE, models.modelFor(AiFeature.TRANSLATE),
                     TranslateArticlesHandler.prompt(from, target, what), text, null, "translation",
                     TranslateArticlesHandler.SCHEMA, TranslateArticlesHandler.maxTokens(text),
-                    siteId, null, context.job().getId()));
+                    siteId, null, context.job().getId(), models.params(AiFeature.TRANSLATE));
+            AiGateway.Answer answer;
+            try {
+                answer = gateway.complete(call);
+            } catch (AiGateway.AiException e) {
+                throw new AiGateway.AiException(e.getMessage() + " (" + what + ", " + call.budget() + " tokens asked)");
+            }
             context.addCostMicros(answer.costMicros());
             String translated = answer.json().path("text").asString("");
             return check.apply(text, translated)

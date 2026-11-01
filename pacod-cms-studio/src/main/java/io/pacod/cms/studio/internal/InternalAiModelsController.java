@@ -1,5 +1,6 @@
 package io.pacod.cms.studio.internal;
 
+import io.pacod.cms.core.control.data.AiCallParams;
 import io.pacod.cms.studio.access.PlatformPermission;
 import io.pacod.cms.studio.access.StudioPrincipals;
 import io.pacod.cms.studio.ai.AiCatalog;
@@ -31,6 +32,11 @@ import java.util.Map;
  * <p>{@code PUT {"default": "@fast", "features": {"vision": "openai/gpt-dev", "pdf": null}}}: an
  * absent {@code default} keeps it and {@code ""} clears it; in {@code features} only the named
  * features change, {@code null} or {@code ""} clearing the override.
+ *
+ * <p>{@code "params": {"translate": {"maxTokens": 20480, "temperature": 0.2, "reasoningEffort": "low"},
+ * "pdf": null}} sets what a feature's calls send beside the model: a named feature's parameters are
+ * replaced whole (an absent field sends nothing), {@code null} clears them. Checked before anything
+ * is written; with both models and parameters, either may be the one that changes.
  */
 @PlatformPermission(read = "platform.manage")
 @RestController
@@ -59,6 +65,9 @@ public class InternalAiModelsController {
         }
         String defaultModel = null;
         Map<AiFeature, String> features = new EnumMap<>(AiFeature.class);
+        Map<AiFeature, AiCallParams> params = null;
+        boolean modelsNamed = body == null || !body.isObject() || body.has("default") || body.has("features")
+                || !body.has("params");
         if (body != null && body.isObject()) {
             JsonNode d = body.get("default");
             if (d != null && !d.isNull()) {
@@ -84,9 +93,64 @@ public class InternalAiModelsController {
                     features.put(feature, v.isNull() ? "" : v.asString());
                 }
             }
+            JsonNode p = body.get("params");
+            if (p != null && !p.isNull()) {
+                if (!p.isObject()) {
+                    return refuse("bad_request", "params", "params must be an object");
+                }
+                params = new EnumMap<>(AiFeature.class);
+                for (Map.Entry<String, JsonNode> e : p.properties()) {
+                    AiFeature feature = AiFeature.of(e.getKey()).orElse(null);
+                    if (feature == null) {
+                        return refuse("unknown_feature", "params", "params may name " + keys());
+                    }
+                    JsonNode v = e.getValue();
+                    if (v.isNull()) {
+                        params.put(feature, AiCallParams.NONE);
+                        continue;
+                    }
+                    JsonNode max = v.path("maxTokens");
+                    JsonNode temperature = v.path("temperature");
+                    JsonNode effort = v.path("reasoningEffort");
+                    if (!v.isObject() || !(max.isMissingNode() || max.isNull() || max.isIntegralNumber())
+                            || !(temperature.isMissingNode() || temperature.isNull() || temperature.isNumber())
+                            || !(effort.isMissingNode() || effort.isNull() || effort.isString())) {
+                        return refuse("bad_request", feature.key(),
+                                "a feature's params are an object of maxTokens (integer), temperature (number) and reasoningEffort (string)");
+                    }
+                    // A whole number past int's range is refused by validate() as out of range, through -1.
+                    Integer maxTokens = !max.isIntegralNumber() ? null : max.canConvertToInt() ? Integer.valueOf(max.asInt()) : -1;
+                    params.put(feature, new AiCallParams(maxTokens,
+                            temperature.isNumber() ? temperature.asDouble() : null, effort.isString() ? effort.asString() : null));
+                }
+            }
         }
+        String by = StudioPrincipals.currentSubject();
         try {
-            models.set(new AiModels.Change(defaultModel, features), StudioPrincipals.currentSubject());
+            if (params != null) {
+                AiModels.validate(params);
+            }
+            boolean changed = false;
+            if (modelsNamed) {
+                try {
+                    models.set(new AiModels.Change(defaultModel, features), by);
+                    changed = true;
+                } catch (AiGatewayConfig.Refused e) {
+                    if (!"unchanged".equals(e.code()) || params == null) {
+                        throw e;
+                    }
+                }
+            }
+            if (params != null) {
+                try {
+                    models.setParams(params, by);
+                } catch (AiGatewayConfig.Refused e) {
+                    // Unchanged parameters beside changed models are no refusal: one of the two moved.
+                    if (!"unchanged".equals(e.code()) || !changed) {
+                        throw e;
+                    }
+                }
+            }
         } catch (AiGatewayConfig.Refused e) {
             return refuse(e.code(), e.field(), message(e.code(), e.field()));
         }
@@ -114,6 +178,16 @@ public class InternalAiModelsController {
             features.put(f.key(), entry);
         }
         body.put("features", features);
+        Map<String, Object> params = new LinkedHashMap<>();
+        for (AiFeature f : AiFeature.values()) {
+            AiCallParams p = stored.paramsOf(f);
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("maxTokens", p.maxTokens());
+            entry.put("temperature", p.temperature());
+            entry.put("reasoningEffort", p.reasoningEffort());
+            params.put(f.key(), entry);
+        }
+        body.put("params", params);
         AiCatalog.Lookup lookup = catalog.lookup();
         body.put("catalog", lookup.found().map(InternalAiModelsController::catalog).orElse(null));
         body.put("catalogError", lookup.error());
@@ -171,7 +245,11 @@ public class InternalAiModelsController {
 
     private static String message(String code, String field) {
         return switch (code) {
-            case "unchanged" -> "no model changes";
+            case "unchanged" -> "no model or parameter changes";
+            case "max_tokens_invalid" -> "maxTokens for " + field + " must be a whole number from "
+                    + AiModels.MIN_TOKENS + " to " + AiModels.MAX_TOKENS;
+            case "temperature_invalid" -> "temperature for " + field + " must be a number from 0 to 2";
+            case "effort_invalid" -> "reasoningEffort for " + field + " must be a level such as low, medium, high or none";
             case "catalogue_unavailable" -> "the gateway's list of models cannot be read now; try again";
             case "not_offered" -> "the gateway does not offer the model chosen for " + field;
             case "not_suitable" -> "the model chosen for " + field

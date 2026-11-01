@@ -1,5 +1,6 @@
 package io.pacod.cms.studio.ai;
 
+import io.pacod.cms.core.control.data.AiCallParams;
 import io.pacod.cms.core.control.data.AiModelSettings;
 import io.pacod.cms.core.control.repository.AiModelSettingsRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * Which model or template each AI feature calls, resolved per call: the installation's stored
@@ -30,7 +32,9 @@ import java.util.Optional;
  *       every select). A feature whose model moves -- also indirectly, a cleared override handing
  *       it to the default -- needs the new one offered and suitable for it.</li>
  *   <li><b>{@link #clear} asks nobody</b>: going back to the properties must work while the
- *       gateway is down.</li>
+ *       gateway is down; nor does {@link #setParams}, whose values depend on no list.</li>
+ *   <li><b>Each feature's call parameters</b> ({@link AiCallParams}) are stored beside its model
+ *       and sent with every call ({@link AiGateway.Call#params()}).</li>
  *   <li>Read fresh behind a {@link #MEMO}; an unreadable control plane falls back to the
  *       properties, logged at ERROR.</li>
  * </ul>
@@ -41,6 +45,11 @@ public class AiModels {
 
     static final Duration MEMO = Duration.ofSeconds(5);
     public static final String DEFAULT_MODEL = "@fast";
+    public static final int MIN_TOKENS = 16;
+    public static final int MAX_TOKENS = 200_000;
+    public static final double MAX_TEMPERATURE = 2.0;
+    /** A reasoning level: the gateway fits it to the model's own, which differ by model. */
+    public static final Pattern EFFORT = Pattern.compile("[a-z_]{1,16}");
 
     /** Where a feature's model comes from. */
     public enum Source { STORED_FEATURE, STORED_DEFAULT, ENVIRONMENT }
@@ -56,7 +65,16 @@ public class AiModels {
     }
 
     /** The stored choice as it stands, for a screen or an answer. */
-    public record Stored(String defaultModel, Map<AiFeature, String> features, Instant updatedOn, String updatedBy) {
+    public record Stored(String defaultModel, Map<AiFeature, String> features, Map<AiFeature, AiCallParams> params,
+                         Instant updatedOn, String updatedBy) {
+
+        public AiCallParams paramsOf(AiFeature feature) {
+            return params.getOrDefault(feature, AiCallParams.NONE);
+        }
+
+        boolean isEmpty() {
+            return defaultModel == null && features.isEmpty() && params.isEmpty();
+        }
     }
 
     private final String envDefault;
@@ -119,10 +137,20 @@ public class AiModels {
         return new Resolved(envFeatures.getOrDefault(feature, envDefault), Source.ENVIRONMENT);
     }
 
+    /** What {@code feature}'s calls send beside the model now; {@link AiCallParams#NONE} for nothing. */
+    public AiCallParams params(AiFeature feature) {
+        return stored().paramsOf(feature);
+    }
+
     /** The default in effect (the connection test's model). */
     public String defaultModel() {
         Stored s = stored();
         return blank(s.defaultModel()) ? envDefault : s.defaultModel();
+    }
+
+    /** What the properties give {@code feature}, where nothing is stored for it. */
+    public String environmentModel(AiFeature feature) {
+        return envFeatures.getOrDefault(feature, envDefault);
     }
 
     /** {@code pacod.ai.model}, what a blank default falls back to. */
@@ -153,7 +181,7 @@ public class AiModels {
                 log.error("Could not read the AI model settings, using the properties: {}", e.getMessage());
             }
         }
-        return new Stored(null, Map.of(), null, null);
+        return new Stored(null, Map.of(), Map.of(), null, null);
     }
 
     private static Stored toStored(AiModelSettings doc) {
@@ -165,8 +193,28 @@ public class AiModels {
                 }
             }));
         }
-        return new Stored(blank(doc.getDefaultModel()) ? null : doc.getDefaultModel().strip(), features,
+        Map<AiFeature, AiCallParams> params = new EnumMap<>(AiFeature.class);
+        if (doc.getParams() != null) {
+            doc.getParams().forEach((k, v) -> AiFeature.of(k).ifPresent(f -> {
+                AiCallParams p = sane(v);
+                if (!p.isEmpty()) {
+                    params.put(f, p);
+                }
+            }));
+        }
+        return new Stored(blank(doc.getDefaultModel()) ? null : doc.getDefaultModel().strip(), features, params,
                 doc.getUpdatedOn(), doc.getUpdatedBy());
+    }
+
+    /** A stored entry with what fails {@link #check(AiCallParams, String)} left out: written by hand, or by an older rule. */
+    private static AiCallParams sane(AiCallParams p) {
+        if (p == null) {
+            return AiCallParams.NONE;
+        }
+        Integer max = p.maxTokens() != null && p.maxTokens() >= MIN_TOKENS && p.maxTokens() <= MAX_TOKENS ? p.maxTokens() : null;
+        Double t = p.temperature() != null && p.temperature() >= 0 && p.temperature() <= MAX_TEMPERATURE ? p.temperature() : null;
+        String e = p.reasoningEffort() != null && EFFORT.matcher(p.reasoningEffort()).matches() ? p.reasoningEffort() : null;
+        return new AiCallParams(max, t, e);
     }
 
     /**
@@ -225,23 +273,87 @@ public class AiModels {
             }
         }
 
-        if (newDefault == null && newFeatures.isEmpty()) {
+        write(new Stored(newDefault, newFeatures, before.params(), null, null), by);
+        return stored();
+    }
+
+    /**
+     * Replaces the call parameters of the features named; {@link AiCallParams#NONE} (or every field
+     * null) sends none for that feature. Asks no gateway.
+     *
+     * @throws AiGatewayConfig.Refused {@code unchanged}, or {@code max_tokens_invalid},
+     *                                 {@code temperature_invalid}, {@code effort_invalid} with the
+     *                                 feature's key as the field
+     */
+    public Stored setParams(Map<AiFeature, AiCallParams> change, String by) {
+        if (repository == null) {
+            throw new IllegalStateException("No settings store");
+        }
+        Stored before = read();
+        Map<AiFeature, AiCallParams> params = new EnumMap<>(AiFeature.class);
+        params.putAll(before.params());
+        change.forEach((f, p) -> {
+            AiCallParams clean = p == null ? AiCallParams.NONE : check(p, f.key());
+            if (clean.isEmpty()) {
+                params.remove(f);
+            } else {
+                params.put(f, clean);
+            }
+        });
+        if (params.equals(before.params())) {
+            throw new AiGatewayConfig.Refused("unchanged", "params");
+        }
+        write(new Stored(before.defaultModel(), before.features(), params, null, null), by);
+        return stored();
+    }
+
+    /**
+     * Checks {@code change} as {@link #setParams} would, writing nothing: for a caller that must
+     * refuse before it writes anything else.
+     */
+    public static void validate(Map<AiFeature, AiCallParams> change) {
+        change.forEach((f, p) -> {
+            if (p != null) {
+                check(p, f.key());
+            }
+        });
+    }
+
+    /** {@code p} with its effort stripped, or the refusal naming what fails. */
+    private static AiCallParams check(AiCallParams p, String field) {
+        if (p.maxTokens() != null && (p.maxTokens() < MIN_TOKENS || p.maxTokens() > MAX_TOKENS)) {
+            throw new AiGatewayConfig.Refused("max_tokens_invalid", field);
+        }
+        if (p.temperature() != null && (p.temperature().isNaN() || p.temperature() < 0 || p.temperature() > MAX_TEMPERATURE)) {
+            throw new AiGatewayConfig.Refused("temperature_invalid", field);
+        }
+        String effort = blank(p.reasoningEffort()) ? null : p.reasoningEffort().strip();
+        if (effort != null && !EFFORT.matcher(effort).matches()) {
+            throw new AiGatewayConfig.Refused("effort_invalid", field);
+        }
+        return new AiCallParams(p.maxTokens(), p.temperature(), effort);
+    }
+
+    private void write(Stored next, String by) {
+        if (next.isEmpty()) {
             repository.deleteById(AiModelSettings.ID);
         } else {
             AiModelSettings doc = new AiModelSettings();
-            doc.setDefaultModel(newDefault);
-            Map<String, String> stored = new LinkedHashMap<>();
-            newFeatures.forEach((f, m) -> stored.put(f.key(), m));
-            doc.setFeatures(stored);
+            doc.setDefaultModel(next.defaultModel());
+            Map<String, String> features = new LinkedHashMap<>();
+            next.features().forEach((f, m) -> features.put(f.key(), m));
+            doc.setFeatures(features);
+            Map<String, AiCallParams> params = new LinkedHashMap<>();
+            next.params().forEach((f, p) -> params.put(f.key(), p));
+            doc.setParams(params);
             doc.setUpdatedOn(clock.instant());
             doc.setUpdatedBy(by);
             repository.save(doc);
         }
         forget();
-        return stored();
     }
 
-    /** Forgets the stored choice: the properties apply again. Asks no gateway. */
+    /** Forgets the stored choice and every call parameter: the properties apply again. Asks no gateway. */
     public void clear() {
         if (repository == null) {
             throw new IllegalStateException("No settings store");

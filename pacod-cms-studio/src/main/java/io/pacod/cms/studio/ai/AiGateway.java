@@ -1,5 +1,6 @@
 package io.pacod.cms.studio.ai;
 
+import io.pacod.cms.core.control.data.AiCallParams;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -90,10 +91,34 @@ public class AiGateway {
      * @param imageUrl   an image to look at ({@code data:} URL), or null
      * @param schemaName the answer schema's name
      * @param schema     the answer's JSON schema (strict)
+     * @param maxTokens  the feature's own estimate of the room its answer needs
+     * @param params     what the installation set for the feature ({@link AiModels#params}):
+     *                   a minimum budget, a temperature, a reasoning effort
      */
     public record Call(String feature, String model, String system, String user, String imageUrl,
                        String schemaName, Map<String, Object> schema, int maxTokens,
-                       String siteId, String userId, String trace) {
+                       String siteId, String userId, String trace, AiCallParams params) {
+
+        public Call {
+            params = params == null ? AiCallParams.NONE : params;
+        }
+
+        /** A call that sends no parameters of the installation's. */
+        public Call(String feature, String model, String system, String user, String imageUrl,
+                    String schemaName, Map<String, Object> schema, int maxTokens,
+                    String siteId, String userId, String trace) {
+            this(feature, model, system, user, imageUrl, schemaName, schema, maxTokens, siteId, userId, trace,
+                    AiCallParams.NONE);
+        }
+
+        /**
+         * What {@code max_tokens} says: the feature's estimate, raised to the installation's
+         * minimum -- never lowered, since one feature's calls range from a tag to a whole body. The
+         * gateway caps it at the template's, the grant's and the model's ceiling.
+         */
+        public int budget() {
+            return params.maxTokens() == null ? maxTokens : Math.max(maxTokens, params.maxTokens());
+        }
     }
 
     /** The parsed answer, what it cost, and the gateway's id for the call. */
@@ -109,18 +134,38 @@ public class AiGateway {
      * @throws AiException not set up, unreachable, refused, or not JSON
      */
     public JsonNode listModels() {
+        return getJson("/gw/v1/models", "The gateway's model list");
+    }
+
+    /**
+     * One template's definition, {@code GET <address>/gw/v1/models/@name}: the list's entry plus
+     * {@code spec}, what the gateway applies to every call of it, parsed by
+     * {@link AiTemplateDetails}. Only a template id is asked for, {@link AiCatalog#TEMPLATE_PATH} --
+     * no dot or slash, so nothing needs encoding and no other path can be named; a model's details
+     * come with the list.
+     *
+     * @throws AiException not set up, not a template id, unreachable, refused, or not JSON
+     */
+    public JsonNode templateSpec(String id) {
+        if (id == null || !AiCatalog.TEMPLATE_PATH.matcher(id).matches()) {
+            throw new AiException("Not a template: " + id);
+        }
+        return getJson("/gw/v1/models/" + id, "The gateway's template");
+    }
+
+    private JsonNode getJson(String path, String what) {
         AiGatewayConfig.Effective target = config.effective();
         if (!target.configured()) {
             throw new AiException("AI is not set up: no gateway address and key");
         }
         try {
-            String body = listing.get().uri(target.url() + "/gw/v1/models")
+            String body = listing.get().uri(target.url() + path)
                     .headers(h -> h.setBearerAuth(target.key()))
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve().body(String.class);
             JsonNode parsed = json.readTree(body == null ? "{}" : body);
             if (parsed == null || !parsed.isObject()) {
-                throw new AiException("The gateway's model list was not JSON");
+                throw new AiException(what + " was not JSON");
             }
             return parsed;
         } catch (RestClientResponseException e) {
@@ -128,7 +173,7 @@ public class AiGateway {
         } catch (ResourceAccessException e) {
             throw new AiException("The AI gateway cannot be reached: " + e.getMessage());
         } catch (tools.jackson.core.JacksonException e) {
-            throw new AiException("The gateway's model list was not JSON");
+            throw new AiException(what + " was not JSON");
         }
     }
 
@@ -187,7 +232,13 @@ public class AiGateway {
                 Map.of("role", "user", "content", content)));
         body.put("response_format", Map.of("type", "json_schema",
                 "json_schema", Map.of("name", call.schemaName(), "strict", true, "schema", call.schema())));
-        body.put("max_tokens", call.maxTokens());
+        body.put("max_tokens", call.budget());
+        if (call.params().temperature() != null) {
+            body.put("temperature", call.params().temperature());
+        }
+        if (call.params().reasoningEffort() != null) {
+            body.put("reasoning_effort", call.params().reasoningEffort());
+        }
         return body;
     }
 

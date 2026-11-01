@@ -221,9 +221,17 @@ theme, or switching the template set, needs `design.publish`.
   the installation's key (its templates and models). It sets a default and, per feature
   (translation, PDF front matter, writing help, alt text, design assist), an optional override.
   Only what can do the feature's work is offered: a JSON answer for all of them, and images for
-  alt text. "Use the environment's" goes back to `PACOD_AI_MODEL`/`pacod.ai.models.*`. A script
-  does the same with `GET`/`PUT`/`DELETE /internal/v1/ai-models` (same token, same rules), for
-  example `{"default": "@fast", "features": {"vision": "openai/gpt-4o", "pdf": null}}`.
+  alt text. Under each choice the card shows what the gateway applies to it (a template's models,
+  output ceiling, temperature, reasoning, timeout; a model's limits and the parameters it takes),
+  read when the page opens, so a template added on the gateway shows on the next visit. Per
+  feature it also sets what the calls send: a **minimum** output budget (each call's own
+  estimate is raised to it, never lowered; the gateway's ceiling still applies), a temperature
+  and a reasoning effort, each blank to leave it to the gateway. A value the template locks wins,
+  and the card says so. "Use the environment's" goes back to `PACOD_AI_MODEL`/`pacod.ai.models.*`
+  and forgets the parameters. A script does the same with `GET`/`PUT`/`DELETE
+  /internal/v1/ai-models` (same token, same rules), for example `{"default": "@fast",
+  "features": {"vision": "openai/gpt-4o", "pdf": null}, "params": {"translate": {"maxTokens":
+  20480}}}`.
 - **Setting the gateway from a script**: `PUT http://cms-studio:7443/internal/v1/ai-gateway` on the
   compose network, with `Authorization: Bearer <pidt_ token>` of a pacod-id service account holding
   `cms.platform_admin`, and a body of `{"url": "…", "apiKey": "…"}`. The key is always needed, and

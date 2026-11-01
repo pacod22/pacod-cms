@@ -10,7 +10,8 @@ import java.util.Map;
 
 /**
  * Which model or template the installation's AI features call: a default and, per feature, an
- * optional override (feature name in lower case → a model id or {@code @template}), chosen on the
+ * optional override (feature name in lower case → a model id or {@code @template}) and the
+ * parameters its calls send ({@link AiCallParams}), chosen on the
  * studio's platform screen or through its internal API from the gateway's own list. While this
  * document exists its entries replace {@code pacod.ai.model} and {@code pacod.ai.models.*}; an
  * entry it lacks leaves the property in force. One document, id {@value #ID}, in the control plane.
@@ -31,6 +32,9 @@ public class AiModelSettings {
     private String defaultModel;
 
     private Map<String, String> features = new LinkedHashMap<>();
+
+    /** Per feature (lower case), what its calls send beside the model; an absent feature sends none. */
+    private Map<String, AiCallParams> params = new LinkedHashMap<>();
 
     private Instant updatedOn;
 

@@ -4140,4 +4140,76 @@
         });
     }());
 
+
+    /*
+     * The models card on /mgmt/platform: what the gateway says of the model or template a select
+     * names, swapped in under it when the select changes.
+     *
+     * An enhancement, not a replacement: the server renders the details of each saved choice, and
+     * the selects post with the form as they always did. The answer is the server's own fragment
+     * (mgmt/ai-details :: details), the one a reload draws. "Use the default" asks for the default
+     * select's current value, and a change of the default redraws every feature that uses it.
+     */
+    (function () {
+        var selects = document.querySelectorAll('select[data-ai-details]');
+        if (!selects.length || !window.fetch) {
+            return;
+        }
+        var fallback = document.getElementById('aiDefault');
+
+        function slotOf(select) {
+            var field = select.closest('.field');
+            return field ? field.querySelector('[data-ai-details-slot]') : null;
+        }
+
+        function show(select) {
+            var slot = slotOf(select);
+            if (!slot) {
+                return;
+            }
+            var id = select.value || (select !== fallback && fallback ? fallback.value : '');
+            var url = select.getAttribute('data-ai-details');
+            url += (url.indexOf('?') === -1 ? '?' : '&') + 'id=' + encodeURIComponent(id);
+            slot.setAttribute('aria-busy', 'true');
+            fetch(url, {credentials: 'same-origin', headers: {'Accept': 'text/html'}})
+                .then(function (response) {
+                    // An expired session answers with the sign-in page, followed to a 200: readJson's rule.
+                    if (response.redirected) {
+                        throw new Error(t('request.sessionExpired'));
+                    }
+                    if (!response.ok || (response.headers.get('content-type') || '').indexOf('html') === -1) {
+                        throw new Error(t('request.failed', response.status));
+                    }
+                    return response.text();
+                })
+                .then(function (html) {
+                    var template = document.createElement('template');
+                    template.innerHTML = html.trim();
+                    var fresh = template.content.querySelector('[data-ai-details-slot]');
+                    if (!fresh) {
+                        throw new Error(t('request.failed', 200));
+                    }
+                    slot.replaceWith(fresh);
+                })
+                .catch(function (error) {
+                    slot.removeAttribute('aria-busy');
+                    slot.textContent = error.message;
+                    slot.classList.add('err');
+                });
+        }
+
+        Array.prototype.forEach.call(selects, function (select) {
+            select.addEventListener('change', function () {
+                show(select);
+                if (select === fallback) {
+                    Array.prototype.forEach.call(selects, function (other) {
+                        if (other !== fallback && !other.value) {
+                            show(other);
+                        }
+                    });
+                }
+            });
+        });
+    }());
+
 }());

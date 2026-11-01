@@ -135,10 +135,14 @@
                 </form>
             </div>
 
-            <div class="card">
+            <div class="card" id="ai-models">
                 <h2><svg class="i"><use href="#i-globe"></use></svg> <span th:text="#{portal.platform.ai.models.title}">AI models</span></h2>
                 <div class="card-body">
                     <p class="hint" th:text="#{portal.platform.ai.models.intro}">Chosen from what the gateway offers this installation's key.</p>
+                    <p class="hint" th:if="${aiConfigured}">
+                        <span th:text="#{portal.platform.ai.models.fresh}">Read from the gateway when this page opened.</span>
+                        <a th:href="${studioRoot} + '/mgmt/platform#ai-models'" th:text="#{portal.platform.ai.models.refresh}">Refresh the list</a>
+                    </p>
                     <p class="muted" th:if="${aiCatalog == null and aiCatalogError != null}"
                        th:text="#{portal.platform.ai.models.unavailable(${aiCatalogError})}">The gateway's list cannot be read.</p>
                     <p class="muted" th:if="${aiCatalog == null and aiCatalogError == null}"
@@ -154,11 +158,12 @@
                     <p class="hint" th:if="${aiModelsUpdated != null}"
                        th:text="#{portal.platform.ai.gateway.updated(${aiModelsUpdated}, ${aiModelsUpdatedBy == null ? '—' : aiModelsUpdatedBy})}">Set on …</p>
                 </div>
-                <form method="post" th:if="${aiCatalog != null}" th:action="${studioRoot} + '/mgmt/platform/ai-models'">
+                <form method="post" th:if="${aiCatalog != null}" th:action="${studioRoot} + '/mgmt/platform/ai-models'"
+                      th:with="detailsUrl=${studioRoot} + '/mgmt/platform/ai-models/details'">
                     <div class="card-body">
                         <div class="field">
                             <label for="aiDefault" th:text="#{portal.platform.ai.models.default}">Default</label>
-                            <select id="aiDefault" name="default">
+                            <select id="aiDefault" name="default" th:data-ai-details="${detailsUrl}">
                                 <option value="" th:text="#{portal.platform.ai.models.environment(${aiEnvironmentDefault})}">The environment's (@fast)</option>
                                 <option th:if="${!aiStoredDefaultOffered}" th:value="${aiStoredDefault}" selected
                                         th:text="#{portal.platform.ai.models.notOffered(${aiStoredDefault})}">@old (not offered)</option>
@@ -172,11 +177,13 @@
                                             th:text="${ch.deprecated()} ? #{portal.platform.ai.models.deprecated(${ch.label()})} : ${ch.label()}">openai/gpt</option>
                                 </optgroup>
                             </select>
+                            <th:block th:with="d=${aiDefaultDetails}"><div th:replace="~{mgmt/ai-details :: details}"></div></th:block>
                         </div>
                         <div class="grid-2">
                             <div class="field" th:each="row : ${aiFeatures}">
                                 <label th:for="'aiFeature_' + ${row.feature().key()}" th:text="${mgmtText.label(row.feature())}">Translation</label>
-                                <select th:id="'aiFeature_' + ${row.feature().key()}" th:name="'feature_' + ${row.feature().key()}">
+                                <select th:id="'aiFeature_' + ${row.feature().key()}" th:name="'feature_' + ${row.feature().key()}"
+                                        th:data-ai-details="${detailsUrl} + '?feature=' + ${row.feature().key()}">
                                     <option value="" th:text="#{portal.platform.ai.models.useDefault}">Use the default</option>
                                     <option th:if="${!row.overrideOffered()}" th:value="${row.override()}" selected
                                             th:text="#{portal.platform.ai.models.notOffered(${row.override()})}">@old (not offered)</option>
@@ -184,12 +191,56 @@
                                             th:text="${ch.deprecated()} ? #{portal.platform.ai.models.deprecated(${ch.label()})} : ${ch.label()}">@fast</option>
                                 </select>
                                 <span class="hint" th:text="${mgmtText.text(row.feature(), 'hint')}">Which features use it.</span>
+                                <th:block th:with="d=${row.details()}"><div th:replace="~{mgmt/ai-details :: details}"></div></th:block>
                             </div>
                         </div>
                     </div>
                     <div class="card-foot">
                         <button class="btn btn-primary" type="submit">
                             <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{portal.action.save}">Save</span>
+                        </button>
+                    </div>
+                </form>
+                <form method="post" th:if="${aiConfigured}" th:action="${studioRoot} + '/mgmt/platform/ai-params'">
+                    <div class="card-body">
+                        <h3 th:text="#{portal.platform.ai.params.title}">What each feature sends</h3>
+                        <p class="hint" th:text="#{portal.platform.ai.params.intro}">Sent with every call beside the model; a blank field sends nothing.</p>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="ai-params">
+                            <thead>
+                            <tr>
+                                <th th:text="#{portal.platform.ai.params.feature}">Feature</th>
+                                <th th:text="#{portal.platform.ai.params.maxTokens}">Minimum output budget</th>
+                                <th th:text="#{portal.platform.ai.params.temperature}">Temperature</th>
+                                <th th:text="#{portal.platform.ai.params.effort}">Reasoning effort</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row : ${aiFeatures}" th:with="k=${row.feature().key()}, p=${row.params()}">
+                                <td th:text="${mgmtText.label(row.feature())}">Translation</td>
+                                <td><input type="number" min="16" max="200000" step="1" th:name="'maxTokens_' + ${k}"
+                                           th:value="${p.maxTokens()}" th:placeholder="#{portal.platform.ai.params.automatic}"
+                                           th:aria-label="${mgmtText.label(row.feature())} + ': ' + #{portal.platform.ai.params.maxTokens}"></td>
+                                <td><input type="number" min="0" max="2" step="0.05" th:name="'temperature_' + ${k}"
+                                           th:value="${p.temperature()}" th:placeholder="#{portal.platform.ai.params.gateways}"
+                                           th:aria-label="${mgmtText.label(row.feature())} + ': ' + #{portal.platform.ai.params.temperature}"></td>
+                                <td><select th:name="'effort_' + ${k}"
+                                            th:aria-label="${mgmtText.label(row.feature())} + ': ' + #{portal.platform.ai.params.effort}">
+                                    <option value="" th:text="#{portal.platform.ai.params.gateways}">The gateway's</option>
+                                    <option th:each="e : ${aiEfforts}" th:value="${e}" th:text="${e}"
+                                            th:selected="${e == p.reasoningEffort()}">low</option>
+                                </select></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-body">
+                        <p class="hint" th:text="#{portal.platform.ai.params.maxTokens.hint}">At least this many tokens; the gateway's ceiling still applies.</p>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{portal.platform.ai.params.save}">Save the parameters</span>
                         </button>
                     </div>
                 </form>

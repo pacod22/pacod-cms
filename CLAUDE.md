@@ -2014,10 +2014,35 @@ Every AI feature calls **pacod-gw** (OpenAI's chat API, `/v1/chat/completions`) 
     native interface, which pacod-gw and lite both answer with exactly what the key may call)
     through `AiGateway.listModels()`, on a client of its own (2 s connect, 4 s read: a page
     render waits on it). It is cached 60 s, keyed by the address and a hash of the key, and a
-    failure is kept 10 s with its reason.
+    failure is kept 10 s with its reason. **The installation screen asks afresh on every visit**
+    (`AiCatalog.refresh()`, which renews what the jobs read too), so a template the gateway added a
+    moment ago is offered; the card's "Refresh the list" is a plain link back. The studio cannot
+    make a gateway list more: pacod-gw-lite reads its pools only when it starts, and a key
+    restricted by `allowed_templates` never lists a template outside that list.
   - Parsing treats the answer as untrusted: only `kind: chat` models in state `active` or
     `deprecated` (the callable ones), ids matching `[A-Za-z0-9@_./:-]{1,200}`, and templates
-    starting with `@`.
+    starting with `@`. A model also keeps what the list says of it: context window, output
+    ceiling (the model's and the grant's, the lower), whether it takes a temperature
+    (allow-listed `accepted`/`rejected`/`default_only`), its reasoning style and levels
+    (`[a-z_]{1,16}`, at most 8), sunset and successor.
+  - **A template's settings need a call of their own**: `AiGateway.templateSpec(id)`, `GET
+    /gw/v1/models/@name` (the list's entry plus pacod-gw's `TemplateSpec` as `spec`), only for an
+    id matching `AiCatalog.TEMPLATE_PATH` (a slug: **no dot or slash**, or `@../admin` names
+    another path). `AiTemplateDetails` parses it, typed and bounded: pool with weight and
+    priority, routing, output ceiling, each sampling parameter as `Param(value, locked, omit)`,
+    reasoning, timeout, attempts, prompt cache, unsupported-parameter policy; anything else reads
+    as absent. `AiCatalog.template(id)` caches each like the list and drops them with it. Model
+    details come from the list, never from `/gw/v1/models/{id}`: model ids hold a `/`.
+  - **What each feature sends beside the model** (`AiCallParams`, core, `AiModelSettings.params`,
+    keyed like `features`): a minimum output budget, a temperature (0-2), a reasoning effort
+    (`[a-z_]{1,16}`: levels differ by model, and the gateway fits one to the nearest lower). Null
+    is "not sent". **The budget is a floor, `max(feature's estimate, stored)`** (`Call.budget()`):
+    one feature's calls range from a 300-token tag to a whole body, and a replacing number would
+    cut long ones off; the gateway still caps it at the template's, grant's and model's ceiling,
+    and a value a template locks or omits beats the studio's. `AiModels.setParams` checks and
+    asks no gateway; `set` keeps the parameters, `clear()` drops them too, and the document goes
+    only when nothing is left. Every call site passes `models.params(feature)` into
+    `AiGateway.Call`; `body()` adds `temperature`/`reasoning_effort` only when set.
   - **Suitability, checked in pacod-gw**: every feature asks for a strict JSON schema, and without
     `structured_output` the gateway drops or refuses it. VISION also needs `vision`, without which
     an image is refused. A template suits when every pool model the key can see does; one it
@@ -2037,10 +2062,25 @@ Every AI feature calls **pacod-gw** (OpenAI's chat API, `/v1/chat/completions`) 
   - The installation screen's models card (`POST /mgmt/platform/ai-models` and `…/reset`) has a
     blank first option on the default ("the environment's") and "Use the default" on each
     feature. A stored choice the gateway dropped stays selected, labelled. Without a list it
-    says why and shows the models in use. **`/internal/v1/ai-models`**
-    (`InternalAiModelsController`): `GET` includes the catalogue and what each entry suits; `PUT
-    {default?, features?: {vision: "…", pdf: null}}` (absent keeps, `""`/`null` clears, an unknown
-    feature is a 422); `DELETE`. The connection test pings `models.defaultModel()`.
+    says why and shows the models in use. Under each select, `mgmt/ai-details :: details` shows
+    what the gateway says of the choice in use, with **notes where it meets the feature's own
+    parameters** (a minimum above the ceiling, a temperature the template locks or the model
+    drops, an effort it ignores or fits); `mgmt.js` swaps it on `change` from `GET
+    /mgmt/platform/ai-models/details?id=&feature=` (the fragment alone; only an id the list names
+    is ever asked about; "Use the default" asks with the default select's value). The templates
+    in use are asked in parallel on virtual threads when more than two. The parameters are their
+    own form, `POST /mgmt/platform/ai-params` (`maxTokens_<key>`, `temperature_<key>`,
+    `effort_<key>`), shown whenever a gateway is set up, list or not; the effort select offers
+    `none`, every listed model's levels (`low`/`medium`/`high` when none reports any) and a
+    stored one. **The swap in `mgmt.js` has had `node --check` only, not a browser**; the
+    server-rendered details and the forms are pinned by `PortalScreensTest.aiModelDetailsAndParams`
+    and `MgmtSecurityTest.aiModelsCardRequiresAuthentication`. **`/internal/v1/ai-models`**
+    (`InternalAiModelsController`): `GET` includes the catalogue, what each entry suits and
+    `params`; `PUT {default?, features?: {vision: "…", pdf: null}, params?: {translate:
+    {maxTokens, temperature, reasoningEffort}, pdf: null}}` (absent keeps, `""`/`null` clears, a
+    named feature's params are replaced whole, an unknown feature is a 422; the params are checked
+    before anything is written, and either half may be the one that changes); `DELETE`. The
+    connection test pings `models.defaultModel()`.
 
 - **The address and key are `AiGatewayConfig`'s, read per call**. The stored
   `AiGatewaySettings` (control plane, `aiGatewaySettings`, id `gateway`) wins while it exists;

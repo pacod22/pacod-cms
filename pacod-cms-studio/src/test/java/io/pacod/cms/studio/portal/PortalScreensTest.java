@@ -108,12 +108,14 @@ class PortalScreensTest {
     @BeforeEach
     void setUp() {
         when(gatewayConfig.effective()).thenReturn(gatewayOf("", "", io.pacod.cms.studio.ai.AiGatewayConfig.Source.NONE));
-        when(aiModels.stored()).thenReturn(new io.pacod.cms.studio.ai.AiModels.Stored(null, java.util.Map.of(), null, null));
+        when(aiModels.stored()).thenReturn(new io.pacod.cms.studio.ai.AiModels.Stored(null, java.util.Map.of(), java.util.Map.of(), null, null));
         when(aiModels.defaultModel()).thenReturn("@fast");
         when(aiModels.environmentDefault()).thenReturn("@fast");
         when(aiModels.resolve(any())).thenReturn(new io.pacod.cms.studio.ai.AiModels.Resolved("@fast",
                 io.pacod.cms.studio.ai.AiModels.Source.ENVIRONMENT));
         when(aiCatalog.lookup()).thenReturn(new io.pacod.cms.studio.ai.AiCatalog.Lookup(null, null));
+        when(aiCatalog.refresh()).thenReturn(new io.pacod.cms.studio.ai.AiCatalog.Lookup(null, null));
+        when(aiCatalog.template(anyString())).thenReturn(new io.pacod.cms.studio.ai.AiCatalog.TemplateLookup(null, null));
         when(directory.bySite(anyString())).thenReturn(Optional.empty());
         when(directory.bySite("alpha")).thenReturn(Optional.of(new Tenant("alpha", "org_alpha", "site_alpha", "en", ZoneId.of("UTC"))));
         when(directory.bySite("beta")).thenReturn(Optional.of(new Tenant("beta", "org_beta", "site_beta", "en", ZoneId.of("UTC"))));
@@ -512,10 +514,10 @@ class PortalScreensTest {
 
         when(gatewayConfig.effective()).thenReturn(gatewayOf("http://pacod-gw:8080", SECRET_KEY,
                 io.pacod.cms.studio.ai.AiGatewayConfig.Source.ENVIRONMENT));
-        when(aiCatalog.lookup()).thenReturn(new io.pacod.cms.studio.ai.AiCatalog.Lookup(
+        when(aiCatalog.refresh()).thenReturn(new io.pacod.cms.studio.ai.AiCatalog.Lookup(
                 io.pacod.cms.studio.ai.AiCatalog.parse(io.pacod.cms.studio.ai.AiCatalogTest.fixture()), null));
         when(aiModels.stored()).thenReturn(new io.pacod.cms.studio.ai.AiModels.Stored(null,
-                java.util.Map.of(io.pacod.cms.studio.ai.AiFeature.PDF, "gone/model"), null, null));
+                java.util.Map.of(io.pacod.cms.studio.ai.AiFeature.PDF, "gone/model"), java.util.Map.of(), null, null));
         String english = renderEnglish("/mgmt/platform");
         assertThat(english).contains("name=\"default\"", "name=\"feature_vision\"", "@fast", "anthropic/claude-dev",
                 "Alt text", "gone/model (not offered by the gateway)", "/mgmt/platform/ai-models/reset");
@@ -545,7 +547,7 @@ class PortalScreensTest {
         verify(aiModels).clear();
 
         // A list that cannot be read: said, no form.
-        when(aiCatalog.lookup()).thenReturn(new io.pacod.cms.studio.ai.AiCatalog.Lookup(null, "The AI gateway refused the key"));
+        when(aiCatalog.refresh()).thenReturn(new io.pacod.cms.studio.ai.AiCatalog.Lookup(null, "The AI gateway refused the key"));
         assertThat(renderEnglish("/mgmt/platform")).contains("cannot be read: The AI gateway refused the key")
                 .doesNotContain("name=\"feature_vision\"");
 
@@ -553,6 +555,65 @@ class PortalScreensTest {
         mockMvc.perform(postCsrf("/mgmt/platform/ai-models").param("default", "@fast").with(oidcLogin())).andExpect(status().isForbidden());
         mockMvc.perform(postCsrf("/mgmt/platform/ai-models/reset").with(oidcLogin())).andExpect(status().isForbidden());
         verify(aiModels, org.mockito.Mockito.times(1)).clear();
+    }
+
+    @Test
+    @DisplayName("the models card shows what the gateway applies, notes where it overrides the parameters set here, and saves them")
+    void aiModelDetailsAndParams() throws Exception {
+        TestSubjects.use(TestSubjects.platformAdmin());
+        when(gatewayConfig.effective()).thenReturn(gatewayOf("http://pacod-gw:8080", SECRET_KEY,
+                io.pacod.cms.studio.ai.AiGatewayConfig.Source.ENVIRONMENT));
+        io.pacod.cms.studio.ai.AiCatalog.Lookup listed = new io.pacod.cms.studio.ai.AiCatalog.Lookup(
+                io.pacod.cms.studio.ai.AiCatalog.parse(io.pacod.cms.studio.ai.AiCatalogTest.fixture()), null);
+        when(aiCatalog.refresh()).thenReturn(listed);
+        when(aiCatalog.lookup()).thenReturn(listed);
+        when(aiCatalog.template("@fast")).thenReturn(new io.pacod.cms.studio.ai.AiCatalog.TemplateLookup(
+                io.pacod.cms.studio.ai.AiTemplateDetails.parse("@fast", io.pacod.cms.studio.ai.AiTemplateDetailsTest.fixture()), null));
+        io.pacod.cms.core.control.data.AiCallParams translate = new io.pacod.cms.core.control.data.AiCallParams(30000, 0.3, "low");
+        when(aiModels.stored()).thenReturn(new io.pacod.cms.studio.ai.AiModels.Stored(null, java.util.Map.of(),
+                java.util.Map.of(io.pacod.cms.studio.ai.AiFeature.TRANSLATE, translate), null, null));
+        when(aiModels.params(io.pacod.cms.studio.ai.AiFeature.TRANSLATE)).thenReturn(translate);
+
+        String english = renderEnglish("/mgmt/platform");
+        assertThat(english).contains("id=\"ai-models\"", "Refresh the list", "/mgmt/platform/ai-models/details?feature=translate",
+                "data-ai-details-slot", "20480 tokens", "0.2, locked", "pool-fast", "openai/gpt-dev (weight 3, priority 0)",
+                "high by default", "omitted from every call", "120 s",
+                "name=\"maxTokens_translate\"", "value=\"30000\"", "value=\"0.3\"", "name=\"effort_pdf\"",
+                "The minimum budget of 30000 tokens is above", "The template sets the temperature itself");
+        // The effort select offers none, every listed model's levels, and keeps the stored one.
+        String effort = english.substring(english.indexOf("name=\"effort_translate\""));
+        effort = effort.substring(0, effort.indexOf("</select>"));
+        assertThat(effort).contains("value=\"none\"", "value=\"high\"", "<option value=\"low\" selected=\"selected\">");
+        assertThat(render(get("/mgmt/platform"))).contains("name=\"maxTokens_translate\"", "20480");
+
+        // One choice alone, for the select's change: a model from the list, judged against the feature's parameters.
+        String model = render(get("/mgmt/platform/ai-models/details").param("id", "local/text-only").param("feature", "translate")
+                .cookie(new Cookie("mgmt-lang", "en")));
+        assertThat(model).contains("data-ai-details-slot", "not accepted", "4096 tokens", "until 2027-01-31",
+                "does not take a temperature", "does not reason").doesNotContain("<html");
+        assertThat(render(get("/mgmt/platform/ai-models/details").param("id", "made/up").cookie(new Cookie("mgmt-lang", "en"))))
+                .contains("does not list it");
+        verify(aiCatalog, never()).template("made/up");
+
+        mockMvc.perform(postCsrf("/mgmt/platform/ai-params").with(oidcLogin()).param("maxTokens_translate", "20480")
+                        .param("temperature_translate", "").param("effort_translate", "low")
+                        .param("maxTokens_pdf", "").param("temperature_pdf", "0,4").param("effort_pdf", ""))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash().attributeExists("message"));
+        verify(aiModels).setParams(org.mockito.ArgumentMatchers.argThat(m ->
+                new io.pacod.cms.core.control.data.AiCallParams(20480, null, "low").equals(m.get(io.pacod.cms.studio.ai.AiFeature.TRANSLATE))
+                        && new io.pacod.cms.core.control.data.AiCallParams(null, 0.4, null).equals(m.get(io.pacod.cms.studio.ai.AiFeature.PDF))
+                        && !m.containsKey(io.pacod.cms.studio.ai.AiFeature.VISION)), any());
+        mockMvc.perform(postCsrf("/mgmt/platform/ai-params").with(oidcLogin()).param("maxTokens_translate", "lots")
+                        .cookie(new Cookie("mgmt-lang", "en")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash()
+                        .attribute("error", org.hamcrest.Matchers.containsString("Translation")));
+
+        TestSubjects.use(orgAdminOfAlpha());
+        mockMvc.perform(get("/mgmt/platform/ai-models/details").param("id", "@fast").with(oidcLogin())).andExpect(status().isForbidden());
+        mockMvc.perform(postCsrf("/mgmt/platform/ai-params").with(oidcLogin()).param("maxTokens_translate", "100"))
+                .andExpect(status().isForbidden());
+        verify(aiModels, org.mockito.Mockito.times(1)).setParams(any(), any());
     }
 
     @Test

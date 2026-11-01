@@ -90,4 +90,74 @@ public class AiCatalogTest {
         assertThat(failed.found()).isEmpty();
         assertThat(failed.error()).contains("refused the key");
     }
+
+    @Test
+    @DisplayName("a model's limits and the parameters it takes come with the list; hostile values read as absent")
+    void modelDetails() throws Exception {
+        AiCatalog.Catalog c = AiCatalog.parse(fixture());
+        AiCatalog.ModelOption text = c.model("local/text-only").orElseThrow();
+        assertThat(text.contextWindow()).isEqualTo(8192);
+        assertThat(text.maxOutputTokens()).isEqualTo(4096);
+        assertThat(text.temperature()).isEqualTo("rejected");
+        assertThat(text.refusesTemperature()).isTrue();
+        assertThat(text.takesNoEffort()).isTrue();
+        assertThat(text.sunsetAt()).isEqualTo("2027-01-31");
+        assertThat(text.successor()).isEqualTo("openai/gpt-dev");
+
+        AiCatalog.ModelOption hostile = c.model("local/no-json").orElseThrow();
+        assertThat(hostile.contextWindow()).isNull();
+        assertThat(hostile.maxOutputTokens()).isNull();
+        assertThat(hostile.temperature()).isNull();
+        assertThat(hostile.efforts()).containsExactly("low", "high");
+        assertThat(hostile.sunsetAt()).isNull();
+        assertThat(hostile.successor()).isNull();
+        assertThat(c.efforts()).containsExactly("low", "high");
+
+        // The dev gateway's own entries say nothing of either: nothing is invented.
+        AiCatalog.ModelOption real = c.model("openai/gpt-dev").orElseThrow();
+        assertThat(real.maxOutputTokens()).isNull();
+        assertThat(real.refusesTemperature()).isFalse();
+        assertThat(real.takesNoEffort()).isFalse();
+        assertThat(c.poolOf("@cheap")).extracting(AiCatalog.ModelOption::id).containsExactly("local/text-only");
+        assertThat(c.poolOf("openai/gpt-dev")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("refresh asks the gateway now and renews the cache; a template is asked once a minute and forgotten with the list")
+    void refreshAndTemplates() throws Exception {
+        AiGateway gateway = mock(AiGateway.class);
+        when(gateway.target()).thenReturn(new AiGatewayConfig.Effective("http://gw-a", "k1", AiGatewayConfig.Source.ENVIRONMENT, null, null));
+        when(gateway.listModels()).thenReturn(fixture());
+        when(gateway.templateSpec("@fast")).thenReturn(AiTemplateDetailsTest.fixture());
+        AtomicReference<Instant> now = new AtomicReference<>(Instant.parse("2026-10-31T10:00:00Z"));
+        Clock clock = new Clock() {
+            public ZoneId getZone() { return ZoneOffset.UTC; }
+            public Clock withZone(ZoneId zone) { return this; }
+            public Instant instant() { return now.get(); }
+        };
+        AiCatalog catalog = new AiCatalog(gateway, clock);
+
+        catalog.lookup();
+        catalog.refresh();
+        catalog.lookup();
+        verify(gateway, times(2)).listModels();
+
+        assertThat(catalog.template("@fast").details().maxOutputTokens()).isEqualTo(20480);
+        catalog.template("@fast");
+        verify(gateway, times(1)).templateSpec("@fast");
+        catalog.refresh();
+        catalog.template("@fast");
+        verify(gateway, times(2)).templateSpec("@fast");
+        now.set(now.get().plus(AiCatalog.TTL).plusSeconds(1));
+        catalog.template("@fast");
+        verify(gateway, times(3)).templateSpec("@fast");
+        catalog.forget();
+        catalog.template("@fast");
+        verify(gateway, times(4)).templateSpec("@fast");
+
+        when(gateway.templateSpec("@cheap")).thenThrow(new AiGateway.AiException("The AI gateway answered 404"));
+        AiCatalog.TemplateLookup failed = catalog.template("@cheap");
+        assertThat(failed.details()).isNull();
+        assertThat(failed.error()).contains("404");
+    }
 }

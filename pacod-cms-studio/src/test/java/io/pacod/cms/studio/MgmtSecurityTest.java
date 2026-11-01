@@ -348,6 +348,22 @@ class MgmtSecurityTest {
     }
 
     @Test
+    @DisplayName("the models card's details and parameters need sign-in, and the parameters CSRF")
+    @WithAnonymousUser
+    void aiModelsCardRequiresAuthentication() throws Exception {
+        // The details are a fetch target, like every JSON or fragment answer: a matcher covering the
+        // screen but not it would show the gateway's settings to anyone who asked.
+        mockMvc.perform(get("/mgmt/platform/ai-models/details").param("id", "@fast"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/mgmt/login"));
+        mockMvc.perform(post("/mgmt/platform/ai-params").param("maxTokens_translate", "20480"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/mgmt/platform/ai-params").with(csrf()).param("maxTokens_translate", "20480"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/mgmt/login"));
+    }
+
+    @Test
     @DisplayName("queueing, cancelling, promoting and deleting a job all require CSRF")
     @WithMockUser(roles = "MGMT")
     void jobPostsRequireCsrf() throws Exception {

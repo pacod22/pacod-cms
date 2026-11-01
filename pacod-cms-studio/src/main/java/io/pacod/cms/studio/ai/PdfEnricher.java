@@ -129,7 +129,8 @@ public class PdfEnricher {
             String model = models.modelFor(AiFeature.PDF);
             AiGateway.Answer answer = gateway.complete(new AiGateway.Call(FEATURE, model,
                     prompt(lang, settings), material, null, "pdf_front_matter", SCHEMA,
-                    Math.min(4000, 800 + material.length() / 8), siteId, null, context.job().getId()));
+                    Math.min(4000, 800 + material.length() / 8), siteId, null, context.job().getId(),
+                    models.params(AiFeature.PDF)));
             context.addCostMicros(answer.costMicros());
             PdfEnrichment row = check(answer.json(), settings);
             row.setId(key);

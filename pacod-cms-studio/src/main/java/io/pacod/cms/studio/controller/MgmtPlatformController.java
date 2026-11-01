@@ -12,6 +12,8 @@ import io.pacod.cms.studio.portal.PortalOrganisations;
 import io.pacod.cms.studio.portal.PortalSettings;
 import io.pacod.cms.studio.site.StudioPaths;
 import io.pacod.cms.studio.site.StudioSites;
+import io.pacod.cms.core.control.data.AiCallParams;
+import io.pacod.cms.studio.ai.AiTemplateDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -35,8 +37,15 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.function.Function;
 
 /**
  * The installation: who may create organisations, the self-service limits, AI for new
@@ -146,6 +155,7 @@ public class MgmtPlatformController {
                                    HttpServletRequest request, RedirectAttributes redirect) {
         try {
             gatewayConfig.set(url, apiKey, StudioPrincipals.currentSubject());
+            catalog.forget();
             String saved = text.msg("portal.platform.ai.gateway.saved");
             if (test) {
                 ping(redirect, saved);
@@ -162,27 +172,49 @@ public class MgmtPlatformController {
     @PostMapping("/ai-gateway/reset")
     public RedirectView resetGateway(HttpServletRequest request, RedirectAttributes redirect) {
         gatewayConfig.clear();
+        catalog.forget();
         redirect.addFlashAttribute("message", text.msg("portal.platform.ai.gateway.resetDone"));
         return PortalModels.toPlatform(request, StudioPaths.PLATFORM_SCREEN);
     }
 
-    /** One feature's row on the models card. */
+    /** One feature's row on the models card: its choice, the parameters it sends, and what the gateway makes of both. */
     public record FeatureRow(AiFeature feature, String override, boolean overrideOffered, AiModels.Resolved inUse,
-                             List<AiCatalog.Choice> choices) {
+                             List<AiCatalog.Choice> choices, AiCallParams params, Details details) {
+    }
+
+    /**
+     * What the gateway says of one model or template, for the screen.
+     *
+     * @param offered whether the gateway's list names it for this key
+     * @param model   the model, for a model id
+     * @param spec    the template's settings, for a template the gateway answered for
+     * @param pool    a template's pool models the key can see
+     * @param notes   where the feature's own parameters meet the gateway's: capped, ignored, fitted
+     */
+    public record Details(String id, boolean offered, boolean template, AiCatalog.ModelOption model,
+                          AiTemplateDetails spec, String specError, List<AiCatalog.ModelOption> pool, List<String> notes) {
     }
 
     private void addModels(Model model, boolean gatewaySetUp) {
         AiModels.Stored stored = models.stored();
-        AiCatalog.Lookup lookup = gatewaySetUp ? catalog.lookup() : new AiCatalog.Lookup(null, null);
+        // Asked afresh on every visit: a template added on the gateway a moment ago must be offered.
+        AiCatalog.Lookup lookup = gatewaySetUp ? catalog.refresh() : new AiCatalog.Lookup(null, null);
         AiCatalog.Catalog c = lookup.catalog();
+        Map<String, AiCatalog.TemplateLookup> specs = templateSpecs(c, stored);
+        Function<String, AiCatalog.TemplateLookup> spec = id -> specs.getOrDefault(id, new AiCatalog.TemplateLookup(null, null));
         List<FeatureRow> rows = new ArrayList<>();
         for (AiFeature f : AiFeature.values()) {
             String override = stored.features().get(f);
             List<AiCatalog.Choice> choices = c == null ? List.of() : c.offeredFor(f);
-            rows.add(new FeatureRow(f, override, override == null || offers(choices, override), models.resolve(f), choices));
+            AiModels.Resolved inUse = models.resolve(f);
+            AiCallParams params = stored.paramsOf(f);
+            rows.add(new FeatureRow(f, override, override == null || offers(choices, override), inUse, choices, params,
+                    details(c, inUse.model(), params, spec)));
         }
         String storedDefault = stored.defaultModel();
         List<AiCatalog.Choice> defaults = c == null ? List.of() : c.offeredForDefault();
+        model.addAttribute("aiDefaultDetails", details(c, models.defaultModel(), AiCallParams.NONE, spec));
+        model.addAttribute("aiEfforts", efforts(c, stored));
         model.addAttribute("aiCatalog", c);
         model.addAttribute("aiCatalogError", lookup.error());
         model.addAttribute("aiFeatures", rows);
@@ -198,6 +230,172 @@ public class MgmtPlatformController {
 
     private static boolean offers(List<AiCatalog.Choice> choices, String id) {
         return choices.stream().anyMatch(ch -> ch.id().equals(id));
+    }
+
+    /**
+     * The settings of every template the card shows, asked in parallel when there are several: a
+     * gateway that answers slowly then costs one read timeout, not one per template.
+     */
+    private Map<String, AiCatalog.TemplateLookup> templateSpecs(AiCatalog.Catalog c, AiModels.Stored stored) {
+        if (c == null) {
+            return Map.of();
+        }
+        Set<String> ids = new LinkedHashSet<>();
+        ids.add(models.defaultModel());
+        for (AiFeature f : AiFeature.values()) {
+            ids.add(models.resolve(f).model());
+        }
+        ids.removeIf(id -> c.template(id).isEmpty());
+        Map<String, AiCatalog.TemplateLookup> out = new LinkedHashMap<>();
+        if (ids.size() <= 2) {
+            ids.forEach(id -> out.put(id, catalog.template(id)));
+            return out;
+        }
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            Map<String, Future<AiCatalog.TemplateLookup>> asked = new LinkedHashMap<>();
+            ids.forEach(id -> asked.put(id, pool.submit(() -> catalog.template(id))));
+            asked.forEach((id, future) -> {
+                try {
+                    out.put(id, future.get());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (java.util.concurrent.ExecutionException e) {
+                    out.put(id, new AiCatalog.TemplateLookup(null, String.valueOf(e.getCause())));
+                }
+            });
+        }
+        return out;
+    }
+
+    /**
+     * {@code id}'s details for the card, judged against {@code params}. Only an id the gateway's
+     * list names is asked about, so nothing posted ever reaches the gateway unchecked.
+     */
+    private Details details(AiCatalog.Catalog c, String id, AiCallParams params,
+                            Function<String, AiCatalog.TemplateLookup> spec) {
+        boolean template = id != null && id.startsWith("@");
+        if (c == null || id == null || !c.has(id)) {
+            return new Details(id, false, template, null, null, null, List.of(), List.of());
+        }
+        Optional<AiCatalog.ModelOption> m = c.model(id);
+        if (m.isPresent()) {
+            return new Details(id, true, false, m.get(), null, null, List.of(), notes(params, null, List.of(m.get())));
+        }
+        AiCatalog.TemplateLookup t = spec.apply(id);
+        List<AiCatalog.ModelOption> pool = c.poolOf(id);
+        return new Details(id, true, true, null, t.details(), t.error(), pool, notes(params, t.details(), pool));
+    }
+
+    /** Where what the feature sends meets what the gateway applies; nothing when it sends nothing. */
+    private List<String> notes(AiCallParams p, AiTemplateDetails spec, List<AiCatalog.ModelOption> models) {
+        List<String> notes = new ArrayList<>();
+        if (p.maxTokens() != null) {
+            Integer ceiling = spec != null ? spec.maxOutputTokens()
+                    : models.size() == 1 ? models.getFirst().maxOutputTokens() : null;
+            if (ceiling != null && p.maxTokens() > ceiling) {
+                notes.add(text.msg("portal.platform.ai.details.note.budgetCapped", p.maxTokens(), ceiling));
+            }
+        }
+        if (p.temperature() != null) {
+            if (spec != null && spec.temperature() != null && spec.temperature().overridesCaller()) {
+                notes.add(text.msg("portal.platform.ai.details.note.temperatureLocked"));
+            } else if (models.stream().anyMatch(AiCatalog.ModelOption::refusesTemperature)) {
+                notes.add(text.msg("portal.platform.ai.details.note.temperatureDropped"));
+            }
+        }
+        String effort = p.reasoningEffort();
+        if (effort != null) {
+            if (spec != null && spec.reasoningEffort() != null && spec.reasoningEffort().overridesCaller()) {
+                notes.add(text.msg("portal.platform.ai.details.note.effortLocked"));
+            } else if (!models.isEmpty() && models.stream().allMatch(AiCatalog.ModelOption::takesNoEffort)) {
+                notes.add(text.msg("portal.platform.ai.details.note.effortIgnored"));
+            } else if (!"none".equals(effort) && models.stream()
+                    .anyMatch(mo -> !mo.efforts().isEmpty() && !mo.efforts().contains(effort))) {
+                notes.add(text.msg("portal.platform.ai.details.note.effortFitted", effort));
+            }
+        }
+        return notes;
+    }
+
+    /** Offered when no listed model reports its levels: the common three, which the gateway fits or drops. */
+    private static final List<String> COMMON_EFFORTS = List.of("low", "medium", "high");
+
+    /** The reasoning levels offered: {@code none}, every listed model's (else the common three), then any stored one. */
+    private static List<String> efforts(AiCatalog.Catalog c, AiModels.Stored stored) {
+        Set<String> out = new LinkedHashSet<>();
+        out.add("none");
+        List<String> listed = c == null ? List.of() : c.efforts();
+        out.addAll(listed.isEmpty() ? COMMON_EFFORTS : listed);
+        stored.params().values().forEach(p -> {
+            if (p.reasoningEffort() != null) {
+                out.add(p.reasoningEffort());
+            }
+        });
+        return List.copyOf(out);
+    }
+
+    /**
+     * The details of one choice alone, for the card to swap in when a select changes: a blank id is
+     * the default in effect -- the feature's, or the installation's.
+     */
+    @GetMapping("/ai-models/details")
+    public String details(@RequestParam(defaultValue = "") String id, @RequestParam(defaultValue = "") String feature,
+                          Model model) {
+        Optional<AiFeature> f = AiFeature.of(feature);
+        String target = id.isBlank() ? f.map(models::environmentModel).orElse(models.environmentDefault()) : id.strip();
+        AiCatalog.Catalog c = gatewayConfig.effective().configured() ? catalog.lookup().catalog() : null;
+        model.addAttribute("d", details(c, target, f.map(models::params).orElse(AiCallParams.NONE), catalog::template));
+        return "mgmt/ai-details :: details";
+    }
+
+    /**
+     * What each feature's calls send beside the model: a minimum budget, a temperature, a
+     * reasoning effort; a blank field sends nothing. Asks no gateway.
+     */
+    @PostMapping("/ai-params")
+    public RedirectView setParams(@RequestParam Map<String, String> params, HttpServletRequest request,
+                                  RedirectAttributes redirect) {
+        Map<AiFeature, AiCallParams> change = new EnumMap<>(AiFeature.class);
+        try {
+            for (AiFeature f : AiFeature.values()) {
+                String max = params.get("maxTokens_" + f.key());
+                String temperature = params.get("temperature_" + f.key());
+                String effort = params.get("effort_" + f.key());
+                if (max == null && temperature == null && effort == null) {
+                    continue;
+                }
+                change.put(f, new AiCallParams(integer(max, f), decimal(temperature, f),
+                        effort == null || effort.isBlank() ? null : effort.strip()));
+            }
+            models.setParams(change, StudioPrincipals.currentSubject());
+            redirect.addFlashAttribute("message", text.msg("portal.platform.ai.params.saved"));
+        } catch (AiGatewayConfig.Refused e) {
+            String where = AiFeature.of(e.field()).map(text::label).orElseGet(() -> text.msg("portal.platform.ai.params.title"));
+            redirect.addFlashAttribute("error", text.msg("portal.platform.ai.params.error." + e.code(), where));
+        }
+        return PortalModels.toPlatform(request, StudioPaths.PLATFORM_SCREEN + "#ai-models");
+    }
+
+    private static Integer integer(String s, AiFeature f) {
+        if (s == null || s.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(s.strip());
+        } catch (NumberFormatException e) {
+            throw new AiGatewayConfig.Refused("max_tokens_invalid", f.key());
+        }
+    }
+
+    private static Double decimal(String s, AiFeature f) {
+        if (s == null || s.isBlank()) {
+            return null;
+        }
+        try {
+            return Double.valueOf(s.strip().replace(',', '.'));
+        } catch (NumberFormatException e) {
+            throw new AiGatewayConfig.Refused("temperature_invalid", f.key());
+        }
     }
 
     /**

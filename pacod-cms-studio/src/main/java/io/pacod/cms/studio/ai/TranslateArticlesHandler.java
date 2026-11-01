@@ -128,9 +128,15 @@ public class TranslateArticlesHandler implements JobHandler {
         if (text == null || text.isBlank()) {
             return null;
         }
-        AiGateway.Answer answer = gateway.complete(new AiGateway.Call(FEATURE, models.modelFor(AiFeature.TRANSLATE),
+        AiGateway.Call call = new AiGateway.Call(FEATURE, models.modelFor(AiFeature.TRANSLATE),
                 prompt(source, target, what), text, null, "translation", SCHEMA, maxTokens(text),
-                siteId, null, context.job().getId()));
+                siteId, null, context.job().getId(), models.params(AiFeature.TRANSLATE));
+        AiGateway.Answer answer;
+        try {
+            answer = gateway.complete(call);
+        } catch (AiGateway.AiException e) {
+            throw new AiGateway.AiException(e.getMessage() + " (" + what + ", " + call.budget() + " tokens asked)");
+        }
         context.addCostMicros(answer.costMicros());
         String translated = answer.json().path("text").asString("");
         return check.apply(text, translated)
@@ -153,9 +159,13 @@ public class TranslateArticlesHandler implements JobHandler {
         return name.isBlank() || name.equals(code) ? code : name + " (" + code + ")";
     }
 
-    /** Room for the translation and its JSON: about a token per four characters, with headroom. */
+    /**
+     * Room for the translation and its JSON (about a token per four characters, with headroom), plus a
+     * floor for a model that reasons: its hidden tokens count against this budget, and pacod-gw takes
+     * the lower of this and a template's ceiling, so the template still caps it.
+     */
     static int maxTokens(String text) {
-        return Math.min(32_000, 512 + text.length() / 2);
+        return Math.min(32_000, 8_192 + text.length() / 2);
     }
 
     /** An answer that failed its check. */

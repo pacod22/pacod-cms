@@ -63,7 +63,7 @@ class InternalAiModelsTest {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         when(tokens.subjectOf(anyString())).thenReturn(Optional.empty());
         when(tokens.subjectOf(TOKEN)).thenReturn(Optional.of("usr_script"));
-        when(models.stored()).thenReturn(new AiModels.Stored(null, Map.of(AiFeature.VISION, "openai/gpt-dev"), null, null));
+        when(models.stored()).thenReturn(new AiModels.Stored(null, Map.of(AiFeature.VISION, "openai/gpt-dev"), Map.of(), null, null));
         when(models.defaultModel()).thenReturn("@fast");
         when(models.resolve(any())).thenReturn(new AiModels.Resolved("@fast", AiModels.Source.ENVIRONMENT));
         when(models.resolve(AiFeature.VISION)).thenReturn(new AiModels.Resolved("openai/gpt-dev", AiModels.Source.STORED_FEATURE));
@@ -144,5 +144,50 @@ class InternalAiModelsTest {
     void clear() throws Exception {
         mockMvc.perform(authed(delete(PATH))).andExpect(status().isNoContent());
         verify(models).clear();
+    }
+
+    @Test
+    @DisplayName("params: GET shows each feature's, PUT replaces the named ones, checked before anything is written")
+    void params() throws Exception {
+        when(models.stored()).thenReturn(new AiModels.Stored(null, Map.of(),
+                Map.of(AiFeature.TRANSLATE, new io.pacod.cms.core.control.data.AiCallParams(20480, null, "low")), null, null));
+        mockMvc.perform(authed(get(PATH)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.params.translate.maxTokens").value(20480))
+                .andExpect(jsonPath("$.params.translate.reasoningEffort").value("low"))
+                .andExpect(jsonPath("$.params.pdf.maxTokens").doesNotExist());
+
+        // Parameters alone: the models are not touched.
+        mockMvc.perform(authed(put(PATH)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"params\":{\"translate\":{\"maxTokens\":30000,\"temperature\":0.3},\"pdf\":null}}"))
+                .andExpect(status().isOk());
+        verify(models).setParams(argThat(p -> new io.pacod.cms.core.control.data.AiCallParams(30000, 0.3, null)
+                .equals(p.get(AiFeature.TRANSLATE)) && io.pacod.cms.core.control.data.AiCallParams.NONE.equals(p.get(AiFeature.PDF))
+                && !p.containsKey(AiFeature.VISION)), org.mockito.ArgumentMatchers.eq("usr_script"));
+        verify(models, never()).set(any(), any());
+
+        // Both, the models unchanged: the parameters still save.
+        when(models.set(any(), any())).thenThrow(new AiGatewayConfig.Refused("unchanged", "default"));
+        mockMvc.perform(authed(put(PATH)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"default\":\"@fast\",\"params\":{\"design\":{\"reasoningEffort\":\"none\"}}}"))
+                .andExpect(status().isOk());
+        verify(models).setParams(argThat(p -> p.containsKey(AiFeature.DESIGN)), any());
+
+        // Out of range or the wrong type: 422, and nothing is written.
+        org.mockito.Mockito.clearInvocations(models);
+        mockMvc.perform(authed(put(PATH)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"default\":\"openai/gpt-dev\",\"params\":{\"translate\":{\"maxTokens\":99999999999}}}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("max_tokens_invalid"))
+                .andExpect(jsonPath("$.field").value("translate"));
+        mockMvc.perform(authed(put(PATH)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"params\":{\"translate\":{\"temperature\":\"hot\"}}}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("bad_request"));
+        mockMvc.perform(authed(put(PATH)).contentType(MediaType.APPLICATION_JSON).content("{\"params\":{\"chat\":null}}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("unknown_feature"));
+        verify(models, never()).set(any(), any());
+        verify(models, never()).setParams(any(), any());
     }
 }

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+<!--/* What the gateway says of one model or template (MgmtPlatformController.Details, as ${d}): shown
+       under its select on the models card, and answered alone by /mgmt/platform/ai-models/details
+       for mgmt.js to swap in when the select changes. Every value came from the gateway: th:text only. */-->
+<div class="ai-details" data-ai-details-slot th:fragment="details">
+    <p class="hint" th:if="${d == null or !d.offered()}"
+       th:text="#{portal.platform.ai.details.notOffered}">The gateway does not list it for this key.</p>
+    <th:block th:if="${d != null and d.offered()}">
+        <dl class="kv" th:if="${d.model() != null}" th:with="m=${d.model()}">
+            <dt th:text="#{portal.platform.ai.details.provider}">Provider</dt>
+            <dd><span th:text="${m.provider().isEmpty()} ? '—' : ${m.provider()}">openai</span>
+                <span class="hint" th:if="${m.deprecated()}" th:text="${m.sunsetAt() == null} ? #{portal.platform.ai.details.deprecated}
+                      : #{portal.platform.ai.details.sunset(${m.sunsetAt()})}">deprecated</span>
+                <span class="hint" th:if="${m.successor() != null}" th:text="#{portal.platform.ai.details.successor(${m.successor()})}">successor</span></dd>
+            <dt th:text="#{portal.platform.ai.details.context}">Context window</dt>
+            <dd th:text="${m.contextWindow() == null} ? '—' : #{portal.platform.ai.details.tokens(${m.contextWindow()})}">200000 tokens</dd>
+            <dt th:text="#{portal.platform.ai.details.ceiling}">Output ceiling</dt>
+            <dd th:text="${m.maxOutputTokens() == null} ? #{portal.platform.ai.details.noCeiling} : #{portal.platform.ai.details.tokens(${m.maxOutputTokens()})}">64000 tokens</dd>
+            <dt th:text="#{portal.platform.ai.details.temperature}">Temperature</dt>
+            <dd th:text="${m.temperature() == null} ? '—' : #{'portal.platform.ai.details.support.' + ${m.temperature()}}">accepted</dd>
+            <dt th:text="#{portal.platform.ai.details.reasoning}">Reasoning</dt>
+            <dd><span th:text="${m.reasoning() == null} ? '—' : #{'portal.platform.ai.details.style.' + ${m.reasoning()}}">levels</span>
+                <code th:unless="${m.efforts().isEmpty()}" th:text="${#strings.listJoin(m.efforts(), ', ')}">low, medium, high</code></dd>
+            <dt th:text="#{portal.platform.ai.details.images}">Images</dt>
+            <dd th:text="${m.vision()} ? #{portal.platform.ai.details.yes} : #{portal.platform.ai.details.no}">yes</dd>
+        </dl>
+        <th:block th:if="${d.template()}">
+            <p class="muted" th:if="${d.spec() == null and d.specError() != null}"
+               th:text="#{portal.platform.ai.details.unavailable(${d.specError()})}">The template's settings cannot be read.</p>
+            <dl class="kv" th:if="${d.spec() != null}" th:with="s=${d.spec()}">
+                <dt th:text="#{portal.platform.ai.details.pool}">Models</dt>
+                <dd><th:block th:if="${s.pool().isEmpty()}"><code th:text="${s.model() == null} ? '—' : ${s.model()}">openai/gpt</code></th:block>
+                    <span class="note" th:each="e : ${s.pool()}"
+                          th:text="#{portal.platform.ai.details.poolEntry(${e.model()}, ${e.weight()}, ${e.priority()})}">openai/gpt (weight 1, priority 0)</span></dd>
+                <dt th:if="${s.routingScheme() != null}" th:text="#{portal.platform.ai.details.routing}">Routing</dt>
+                <dd th:if="${s.routingScheme() != null}"><code th:text="${s.routingScheme()}">pool-fast</code></dd>
+                <dt th:text="#{portal.platform.ai.details.ceiling}">Output ceiling</dt>
+                <dd th:text="${s.maxOutputTokens() == null} ? #{portal.platform.ai.details.noCeiling} : #{portal.platform.ai.details.tokens(${s.maxOutputTokens()})}">20480 tokens</dd>
+                <dt th:text="#{portal.platform.ai.details.temperature}">Temperature</dt>
+                <dd th:replace="~{mgmt/ai-details :: param(${s.temperature()})}">default 0.7</dd>
+                <th:block th:if="${s.topP() != null}">
+                    <dt>top_p</dt>
+                    <dd th:replace="~{mgmt/ai-details :: param(${s.topP()})}">default 1</dd>
+                </th:block>
+                <th:block th:if="${s.frequencyPenalty() != null}">
+                    <dt>frequency_penalty</dt>
+                    <dd th:replace="~{mgmt/ai-details :: param(${s.frequencyPenalty()})}">default 0</dd>
+                </th:block>
+                <th:block th:if="${s.presencePenalty() != null}">
+                    <dt>presence_penalty</dt>
+                    <dd th:replace="~{mgmt/ai-details :: param(${s.presencePenalty()})}">default 0</dd>
+                </th:block>
+                <dt th:text="#{portal.platform.ai.details.effort}">Reasoning effort</dt>
+                <dd th:replace="~{mgmt/ai-details :: param(${s.reasoningEffort()})}">locked low</dd>
+                <th:block th:if="${s.reasoningBudget() != null}">
+                    <dt th:text="#{portal.platform.ai.details.budget}">Reasoning budget</dt>
+                    <dd th:replace="~{mgmt/ai-details :: param(${s.reasoningBudget()})}">default 4096</dd>
+                </th:block>
+                <th:block th:if="${s.reasoningSummary() != null}">
+                    <dt th:text="#{portal.platform.ai.details.summary}">Reasoning summary</dt>
+                    <dd th:replace="~{mgmt/ai-details :: param(${s.reasoningSummary()})}">default true</dd>
+                </th:block>
+                <th:block th:if="${s.timeoutSeconds() != null}">
+                    <dt th:text="#{portal.platform.ai.details.timeout}">Timeout</dt>
+                    <dd th:text="#{portal.platform.ai.details.seconds(${s.timeoutSeconds()})}">120 s</dd>
+                </th:block>
+                <th:block th:if="${s.retryMaxAttempts() != null}">
+                    <dt th:text="#{portal.platform.ai.details.attempts}">Attempts</dt>
+                    <dd th:text="${s.retryMaxAttempts()}">2</dd>
+                </th:block>
+                <th:block th:if="${s.promptCache() != null}">
+                    <dt th:text="#{portal.platform.ai.details.cache}">Prompt cache</dt>
+                    <dd><code th:text="${s.promptCache()}">passthrough</code></dd>
+                </th:block>
+                <th:block th:if="${s.unsupportedParams() != null}">
+                    <dt th:text="#{portal.platform.ai.details.unsupported}">Unsupported parameters</dt>
+                    <dd><code th:text="${s.unsupportedParams()}">drop</code></dd>
+                </th:block>
+                <dt th:if="${s.version() != null}" th:text="#{portal.platform.ai.details.version}">Version</dt>
+                <dd th:if="${s.version() != null}" th:text="${s.version()}">3</dd>
+            </dl>
+        </th:block>
+        <ul class="ai-notes" th:unless="${d.notes().isEmpty()}">
+            <li th:each="n : ${d.notes()}" th:text="${n}">Your minimum is above the gateway's ceiling.</li>
+        </ul>
+    </th:block>
+</div>
+
+<!--/* One template parameter: omitted, locked to a value, a default the studio's value beats, or unset. */-->
+<dd th:fragment="param(p)"
+    th:text="${p == null} ? #{portal.platform.ai.details.param.unset}
+             : (${p.omit()} ? #{portal.platform.ai.details.param.omit}
+             : (${p.locked()} ? #{portal.platform.ai.details.param.locked(${p.value()})}
+             : #{portal.platform.ai.details.param.default(${p.value()})}))">default 0.7</dd>
+</body>
+</html>

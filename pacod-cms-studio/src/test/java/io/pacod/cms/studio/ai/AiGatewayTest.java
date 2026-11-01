@@ -216,4 +216,55 @@ class AiGatewayTest {
         AiGateway off = new AiGateway("", "", Duration.ofSeconds(1), false);
         assertThatThrownBy(off::listModels).hasMessageContaining("not set up");
     }
+
+    @Test
+    @DisplayName("the installation's parameters: a minimum that raises max_tokens and never lowers it, temperature and effort only when set")
+    void callParameters() throws Exception {
+        AiGateway gateway = serve(false, ok("{\"text\":\"x\"}", "stop"));
+        AiGateway.Call plain = translation();
+        gateway.complete(plain);
+        assertThat(requests.getLast().get("body")).contains("\"max_tokens\":600")
+                .doesNotContain("temperature", "reasoning_effort");
+
+        AiGateway.Call raised = new AiGateway.Call(plain.feature(), plain.model(), plain.system(), plain.user(), null,
+                plain.schemaName(), plain.schema(), 600, null, null, null,
+                new io.pacod.cms.core.control.data.AiCallParams(20_480, 0.2, "low"));
+        assertThat(raised.budget()).isEqualTo(20_480);
+        gateway.complete(raised);
+        assertThat(requests.getLast().get("body")).contains("\"max_tokens\":20480", "\"temperature\":0.2",
+                "\"reasoning_effort\":\"low\"");
+
+        AiGateway.Call lower = new AiGateway.Call(plain.feature(), plain.model(), plain.system(), plain.user(), null,
+                plain.schemaName(), plain.schema(), 600, null, null, null,
+                new io.pacod.cms.core.control.data.AiCallParams(100, null, null));
+        assertThat(lower.budget()).isEqualTo(600);
+        gateway.complete(lower);
+        assertThat(requests.getLast().get("body")).contains("\"max_tokens\":600").doesNotContain("temperature");
+    }
+
+    @Test
+    @DisplayName("a template's settings are GET /gw/v1/models/@name with the key; only a template id is ever asked for")
+    void templateSpec() throws IOException {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/gw/v1/models/", exchange -> {
+            Map<String, String> seen = new java.util.HashMap<>();
+            exchange.getRequestHeaders().forEach((k, v) -> seen.put(k.toLowerCase(), v.getFirst()));
+            seen.put("path", exchange.getRequestURI().getRawPath());
+            requests.add(seen);
+            byte[] body = "{\"id\":\"@fast\",\"spec\":{\"max_output_tokens\":20480}}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.start();
+        AiGateway gateway = new AiGateway("http://127.0.0.1:" + server.getAddress().getPort(), "pgw_cms_test", Duration.ofSeconds(5), false);
+        assertThat(gateway.templateSpec("@fast").path("spec").path("max_output_tokens").asInt()).isEqualTo(20480);
+        assertThat(requests.getFirst()).containsEntry("path", "/gw/v1/models/@fast")
+                .containsEntry("authorization", "Bearer pgw_cms_test");
+        assertThatThrownBy(() -> gateway.templateSpec("openai/gpt-dev")).hasMessageContaining("Not a template");
+        assertThatThrownBy(() -> gateway.templateSpec("@../admin")).hasMessageContaining("Not a template");
+        assertThatThrownBy(() -> gateway.templateSpec("@a/b")).hasMessageContaining("Not a template");
+        assertThat(requests).hasSize(1);
+    }
 }

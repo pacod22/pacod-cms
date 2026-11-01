@@ -262,7 +262,7 @@ public class DesignAssist {
     private AiGateway.Answer call(String feature, String system, String user, Map<String, Object> schema, String name,
                                   Actor actor) {
         return gateway.complete(new AiGateway.Call(feature, models.modelFor(AiFeature.DESIGN), system, user, null, name, schema, 4_000,
-                TenantContext.current().siteId(), actor.userId(), actor.jobId()));
+                TenantContext.current().siteId(), actor.userId(), actor.jobId(), models.params(AiFeature.DESIGN)));
     }
 
     private static String brief(String brief) {

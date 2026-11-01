@@ -1,0 +1,9 @@
+{"id":"@fast","version":3,"model":"openai/gpt-dev",
+ "models":[{"model":"openai/gpt-dev","tier":null,"weight":1,"priority":0},{"model":"anthropic/claude-dev","tier":null,"weight":1,"priority":1}],
+ "routing_scheme":"pool-fast","max_output_tokens":20480,
+ "spec":{"models":[{"model":"openai/gpt-dev","weight":3},{"model":"anthropic/claude-dev","priority":1}],
+   "routing_scheme":"pool-fast","max_output_tokens":20480,
+   "temperature":{"value":0.2,"locked":true},"top_p":null,"frequency_penalty":null,"presence_penalty":{"omit":true},
+   "reasoning":{"effort":{"value":"high"},"budget_tokens":null,"summary":null},
+   "timeout_seconds":120,"retry_max_attempts":2,"prompt_cache":"passthrough","unsupported_params":null,
+   "audit":"inherit","tags":{},"proxy":"apply","request_stream_usage":false}}

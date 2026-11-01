@@ -321,7 +321,8 @@ public class WritingAssist {
                 + "\"alt\" is the text.";
         String user = "Caption: " + (caption == null || caption.isBlank() ? "(none)" : HtmlSafety.text(caption));
         JsonNode answer = gateway.complete(new AiGateway.Call("alt", models.modelFor(AiFeature.VISION), system, user, dataUrl, "alt", ALT_SCHEMA,
-                300, TenantContext.current().siteId(), StudioPrincipals.currentSubject(), null)).json();
+                300, TenantContext.current().siteId(), StudioPrincipals.currentSubject(), null,
+                models.params(AiFeature.VISION))).json();
         String text = HtmlSafety.text(answer.path("alt").asString(""));
         return text.length() > 250 ? text.substring(0, 250).strip() : text;
     }
@@ -353,7 +354,8 @@ public class WritingAssist {
 
     private JsonNode call(String feature, String system, String user, Map<String, Object> schema, String name, int maxTokens) {
         return gateway.complete(new AiGateway.Call(feature, models.modelFor(AiFeature.ASSIST), system, user, null, name, schema,
-                Math.min(maxTokens, 16_000), TenantContext.current().siteId(), StudioPrincipals.currentSubject(), null)).json();
+                Math.min(maxTokens, 16_000), TenantContext.current().siteId(), StudioPrincipals.currentSubject(), null,
+                models.params(AiFeature.ASSIST))).json();
     }
 
     /** The article as material: its title and the text of its body, capped. */

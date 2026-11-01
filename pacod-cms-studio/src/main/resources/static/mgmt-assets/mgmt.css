@@ -1907,6 +1907,14 @@ td .path-row .path { max-width: 320px; }
 /* A qualifier under a value -- deliberately not .cell-sub, which is nowrap for table cells. */
 .kv .note { display: block; margin-top: 2px; font-size: 12px; color: var(--text-muted); }
 
+/* The models card: what the gateway says of a choice, under its select, and the per-feature parameters. */
+.ai-details { margin-top: 8px; padding: 8px 10px; border-left: 2px solid var(--border); }
+.ai-details .kv { font-size: 12px; gap: 4px 12px; }
+.ai-details[aria-busy="true"] { opacity: .6; }
+.ai-details.err { color: var(--danger); font-size: 12px; }
+.ai-notes { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: var(--warn); }
+.ai-params input, .ai-params select { width: 100%; min-width: 7em; }
+
 /* -- the editor's image library -------------------------------------------- */
 
 /*

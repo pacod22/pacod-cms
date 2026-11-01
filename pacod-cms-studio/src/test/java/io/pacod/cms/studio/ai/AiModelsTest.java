@@ -160,4 +160,60 @@ class AiModelsTest {
         assertThatThrownBy(() -> AiModels.fixed("@fast").set(new AiModels.Change("x", Map.of()), null))
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    @DisplayName("call parameters: stored per feature, checked, saved with no gateway, kept by a model change, cleared")
+    void callParameters() throws Exception {
+        when(catalog.lookup()).thenThrow(new AssertionError("parameters ask no gateway"));
+        assertThat(models.params(AiFeature.TRANSLATE)).isEqualTo(io.pacod.cms.core.control.data.AiCallParams.NONE);
+
+        Map<AiFeature, io.pacod.cms.core.control.data.AiCallParams> change = new EnumMap<>(AiFeature.class);
+        change.put(AiFeature.TRANSLATE, new io.pacod.cms.core.control.data.AiCallParams(20_480, 0.2, " low "));
+        models.setParams(change, "usr_admin");
+        assertThat(models.params(AiFeature.TRANSLATE))
+                .isEqualTo(new io.pacod.cms.core.control.data.AiCallParams(20_480, 0.2, "low"));
+        assertThat(models.params(AiFeature.PDF)).isEqualTo(io.pacod.cms.core.control.data.AiCallParams.NONE);
+        assertThat(held.get().getParams()).containsOnlyKeys("translate");
+        assertThat(held.get().getUpdatedBy()).isEqualTo("usr_admin");
+
+        assertThatThrownBy(() -> models.setParams(change, "usr_admin")).isInstanceOf(AiGatewayConfig.Refused.class)
+                .hasMessage("unchanged");
+        for (var bad : java.util.List.of(new io.pacod.cms.core.control.data.AiCallParams(8, null, null),
+                new io.pacod.cms.core.control.data.AiCallParams(300_000, null, null),
+                new io.pacod.cms.core.control.data.AiCallParams(null, 2.5, null),
+                new io.pacod.cms.core.control.data.AiCallParams(null, Double.NaN, null),
+                new io.pacod.cms.core.control.data.AiCallParams(null, null, "Very High!"))) {
+            AiGatewayConfig.Refused refused = org.junit.jupiter.api.Assertions.assertThrows(AiGatewayConfig.Refused.class,
+                    () -> models.setParams(Map.of(AiFeature.PDF, bad), "usr_admin"));
+            assertThat(refused.field()).isEqualTo("pdf");
+            assertThat(refused.code()).endsWith("_invalid");
+        }
+        assertThat(models.params(AiFeature.PDF)).isEqualTo(io.pacod.cms.core.control.data.AiCallParams.NONE);
+
+        // A model change keeps the parameters, which no gateway was asked about.
+        org.mockito.Mockito.reset(catalog);
+        when(catalog.lookup()).thenReturn(new AiCatalog.Lookup(AiCatalog.parse(AiCatalogTest.fixture()), null));
+        models.set(new AiModels.Change("openai/gpt-dev", features()), "usr_admin");
+        assertThat(models.params(AiFeature.TRANSLATE).maxTokens()).isEqualTo(20_480);
+        // Clearing the models leaves the document while parameters remain; clearing those too removes it.
+        models.set(new AiModels.Change("", features()), "usr_admin");
+        assertThat(held.get()).isNotNull();
+        models.setParams(Map.of(AiFeature.TRANSLATE, io.pacod.cms.core.control.data.AiCallParams.NONE), "usr_admin");
+        assertThat(held.get()).isNull();
+
+        models.setParams(change, "usr_admin");
+        models.clear();
+        assertThat(models.params(AiFeature.TRANSLATE)).isEqualTo(io.pacod.cms.core.control.data.AiCallParams.NONE);
+    }
+
+    @Test
+    @DisplayName("a stored entry written by hand keeps only what passes")
+    void storedParamsAreChecked() {
+        AiModelSettings doc = new AiModelSettings();
+        doc.setParams(new LinkedHashMap<>(Map.of("translate", new io.pacod.cms.core.control.data.AiCallParams(5, 1.0, "$where"),
+                "nonsense", new io.pacod.cms.core.control.data.AiCallParams(1000, null, null))));
+        held.set(doc);
+        assertThat(models.params(AiFeature.TRANSLATE)).isEqualTo(new io.pacod.cms.core.control.data.AiCallParams(null, 1.0, null));
+        assertThat(models.stored().params()).containsOnlyKeys(AiFeature.TRANSLATE);
+    }
 }
