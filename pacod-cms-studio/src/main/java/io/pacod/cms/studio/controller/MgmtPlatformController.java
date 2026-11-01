@@ -179,7 +179,8 @@ public class MgmtPlatformController {
 
     /** One feature's row on the models card: its choice, the parameters it sends, and what the gateway makes of both. */
     public record FeatureRow(AiFeature feature, String override, boolean overrideOffered, AiModels.Resolved inUse,
-                             List<AiCatalog.Choice> choices, AiCallParams params, Details details) {
+                             List<AiCatalog.Choice> choices, List<AiCatalog.Unusable> unusable, AiCallParams params,
+                             Details details) {
     }
 
     /**
@@ -208,8 +209,8 @@ public class MgmtPlatformController {
             List<AiCatalog.Choice> choices = c == null ? List.of() : c.offeredFor(f);
             AiModels.Resolved inUse = models.resolve(f);
             AiCallParams params = stored.paramsOf(f);
-            rows.add(new FeatureRow(f, override, override == null || offers(choices, override), inUse, choices, params,
-                    details(c, inUse.model(), params, spec)));
+            rows.add(new FeatureRow(f, override, override == null || offers(choices, override), inUse, choices,
+                    c == null ? List.of() : c.unusableFor(f), params, details(c, inUse.model(), params, spec)));
         }
         String storedDefault = stored.defaultModel();
         List<AiCatalog.Choice> defaults = c == null ? List.of() : c.offeredForDefault();
@@ -219,6 +220,7 @@ public class MgmtPlatformController {
         model.addAttribute("aiCatalogError", lookup.error());
         model.addAttribute("aiFeatures", rows);
         model.addAttribute("aiDefaultChoices", defaults);
+        model.addAttribute("aiDefaultUnusable", c == null ? List.of() : c.unusableForDefault());
         model.addAttribute("aiStoredDefault", storedDefault);
         model.addAttribute("aiStoredDefaultOffered", storedDefault == null || offers(defaults, storedDefault));
         model.addAttribute("aiEnvironmentDefault", models.environmentDefault());

@@ -33,7 +33,8 @@ import java.util.stream.Collectors;
  *       feature asks for one, and without {@code structured_output} the gateway drops or refuses
  *       it -- and, for {@link AiFeature#VISION}, taking images, which the gateway otherwise
  *       refuses. A template is offered for a feature when every model of its pool the key can see
- *       suits it; one it cannot see is the gateway's to route.</li>
+ *       suits it; one it cannot see is the gateway's to route. What a feature cannot use is still
+ *       listed, never offered ({@link Catalog#unusableFor}), so the screen shows the whole list.</li>
  *   <li><b>Untrusted</b>: an id outside {@link #ID} is dropped, the lists are capped.</li>
  *   <li><b>Cached a minute</b>, keyed by the address and a hash of the key in effect, so a new
  *       gateway is asked at once; a failure is remembered for {@link #FAILURE_TTL} with its reason.
@@ -92,6 +93,14 @@ public class AiCatalog {
     public record Choice(String id, String label, boolean template, boolean deprecated) {
     }
 
+    /**
+     * An entry the gateway lists that a feature cannot use, shown so the list is whole but never
+     * offered: {@code reason} is {@code no_json} (no JSON-schema answer, which every feature asks
+     * for) or {@code no_images} (alt text looks at the picture).
+     */
+    public record Unusable(String id, String label, boolean template, String reason) {
+    }
+
     public record Catalog(List<ModelOption> models, List<TemplateOption> templates) {
 
         public Optional<ModelOption> model(String id) {
@@ -133,9 +142,28 @@ public class AiCatalog {
             templates.stream().filter(t -> suits(t.id(), feature)).sorted(Comparator.comparing(TemplateOption::id))
                     .forEach(t -> out.add(new Choice(t.id(), t.id(), true, false)));
             models.stream().filter(m -> suits(m, feature)).sorted(Comparator.comparing(ModelOption::id))
-                    .forEach(m -> out.add(new Choice(m.id(), m.displayName().equals(m.id()) ? m.id()
-                            : m.displayName() + " (" + m.id() + ")", false, m.deprecated())));
+                    .forEach(m -> out.add(new Choice(m.id(), label(m), false, m.deprecated())));
             return out;
+        }
+
+        /** What the gateway lists that {@code feature} cannot use, with why: templates first, then models, each by id. */
+        public List<Unusable> unusableFor(AiFeature feature) {
+            List<Unusable> out = new ArrayList<>();
+            templates.stream().filter(t -> !suits(t.id(), feature)).sorted(Comparator.comparing(TemplateOption::id))
+                    .forEach(t -> out.add(new Unusable(t.id(), t.id(), true, poolOf(t.id()).stream()
+                            .anyMatch(pm -> !pm.structuredOutput()) ? NO_JSON : NO_IMAGES)));
+            models.stream().filter(m -> !suits(m, feature)).sorted(Comparator.comparing(ModelOption::id))
+                    .forEach(m -> out.add(new Unusable(m.id(), label(m), false, m.structuredOutput() ? NO_IMAGES : NO_JSON)));
+            return out;
+        }
+
+        /** {@link #unusableFor} for the default, which the features without images share. */
+        public List<Unusable> unusableForDefault() {
+            return unusableFor(AiFeature.TRANSLATE);
+        }
+
+        private static String label(ModelOption m) {
+            return m.displayName().equals(m.id()) ? m.id() : m.displayName() + " (" + m.id() + ")";
         }
 
         /**
@@ -178,6 +206,8 @@ public class AiCatalog {
     private record CachedTemplate(String key, TemplateLookup lookup, Instant until) {
     }
 
+    static final String NO_JSON = "no_json";
+    static final String NO_IMAGES = "no_images";
     static final Set<String> SUPPORT = Set.of("accepted", "rejected", "default_only");
     static final Set<String> REASONING = Set.of("none", "effort", "budget", "adaptive", "always_on");
     static final int MAX_EFFORTS = 8;

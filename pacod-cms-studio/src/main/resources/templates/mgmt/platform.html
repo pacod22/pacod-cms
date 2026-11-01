@@ -166,7 +166,8 @@
                             <select id="aiDefault" name="default" th:data-ai-details="${detailsUrl}">
                                 <option value="" th:text="#{portal.platform.ai.models.environment(${aiEnvironmentDefault})}">The environment's (@fast)</option>
                                 <option th:if="${!aiStoredDefaultOffered}" th:value="${aiStoredDefault}" selected
-                                        th:text="#{portal.platform.ai.models.notOffered(${aiStoredDefault})}">@old (not offered)</option>
+                                        th:text="${aiCatalog.has(aiStoredDefault)} ? #{portal.platform.ai.models.notUsable(${aiStoredDefault})}
+                                                 : #{portal.platform.ai.models.notOffered(${aiStoredDefault})}">@old (not offered)</option>
                                 <optgroup th:label="#{portal.platform.ai.models.templates}">
                                     <option th:each="ch : ${aiDefaultChoices}" th:if="${ch.template()}" th:value="${ch.id()}"
                                             th:selected="${ch.id() == aiStoredDefault}" th:text="${ch.label()}">@fast</option>
@@ -175,6 +176,11 @@
                                     <option th:each="ch : ${aiDefaultChoices}" th:if="${!ch.template()}" th:value="${ch.id()}"
                                             th:selected="${ch.id() == aiStoredDefault}"
                                             th:text="${ch.deprecated()} ? #{portal.platform.ai.models.deprecated(${ch.label()})} : ${ch.label()}">openai/gpt</option>
+                                </optgroup>
+                                <optgroup th:unless="${aiDefaultUnusable.isEmpty()}" th:label="#{portal.platform.ai.models.unusableGroup}">
+                                    <option th:each="u : ${aiDefaultUnusable}" disabled th:value="${u.id()}"
+                                            th:with="why=${mgmtText.msg('portal.platform.ai.models.reason.' + u.reason())}"
+                                            th:text="#{portal.platform.ai.models.unusable(${u.label()}, ${why})}">local/deepseek (no JSON schema)</option>
                                 </optgroup>
                             </select>
                             <th:block th:with="d=${aiDefaultDetails}"><div th:replace="~{mgmt/ai-details :: details}"></div></th:block>
@@ -186,9 +192,15 @@
                                         th:data-ai-details="${detailsUrl} + '?feature=' + ${row.feature().key()}">
                                     <option value="" th:text="#{portal.platform.ai.models.useDefault}">Use the default</option>
                                     <option th:if="${!row.overrideOffered()}" th:value="${row.override()}" selected
-                                            th:text="#{portal.platform.ai.models.notOffered(${row.override()})}">@old (not offered)</option>
+                                            th:text="${aiCatalog.has(row.override())} ? #{portal.platform.ai.models.notUsable(${row.override()})}
+                                                     : #{portal.platform.ai.models.notOffered(${row.override()})}">@old (not offered)</option>
                                     <option th:each="ch : ${row.choices()}" th:value="${ch.id()}" th:selected="${ch.id() == row.override()}"
                                             th:text="${ch.deprecated()} ? #{portal.platform.ai.models.deprecated(${ch.label()})} : ${ch.label()}">@fast</option>
+                                    <optgroup th:unless="${row.unusable().isEmpty()}" th:label="#{portal.platform.ai.models.unusableGroup}">
+                                        <option th:each="u : ${row.unusable()}" disabled th:value="${u.id()}"
+                                                th:with="why=${mgmtText.msg('portal.platform.ai.models.reason.' + u.reason())}"
+                                                th:text="#{portal.platform.ai.models.unusable(${u.label()}, ${why})}">local/deepseek (no JSON schema)</option>
+                                    </optgroup>
                                 </select>
                                 <span class="hint" th:text="${mgmtText.text(row.feature(), 'hint')}">Which features use it.</span>
                                 <th:block th:with="d=${row.details()}"><div th:replace="~{mgmt/ai-details :: details}"></div></th:block>

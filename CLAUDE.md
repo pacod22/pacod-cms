@@ -2047,6 +2047,13 @@ Every AI feature calls **pacod-gw** (OpenAI's chat API, `/v1/chat/completions`) 
     `structured_output` the gateway drops or refuses it. VISION also needs `vision`, without which
     an image is refused. A template suits when every pool model the key can see does; one it
     cannot see is the gateway's to route. `offeredFor(feature)` lists templates, then models.
+    **What a feature cannot use is still shown, never offered**: `unusableFor(feature)` (with
+    `no_json` or `no_images`) fills a disabled optgroup at the foot of each select, so every chat
+    model and template the gateway lists appears once per select. pacod-gw's own presets `deepseek`,
+    `glm-4`/`glm-5`, `openai-compatible`, `openai-compatible-fixed-temperature` and a model without
+    a preset have `structured_output: false`, so those models -- and every template whose visible
+    pool holds one -- are listed and greyed out; a stored choice that has become one is labelled
+    "not usable here", not "not offered".
   - **`set` checks only what changes**, feature by feature, because the screen posts every
     select:
     - a feature whose stored model moves (also indirectly, when a cleared override hands it to

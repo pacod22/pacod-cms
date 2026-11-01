@@ -56,6 +56,19 @@ public class AiCatalogTest {
         assertThat(c.offeredForDefault()).isEqualTo(c.offeredFor(AiFeature.TRANSLATE));
         assertThat(c.offeredFor(AiFeature.TRANSLATE)).filteredOn(AiCatalog.Choice::deprecated)
                 .extracting(AiCatalog.Choice::id).containsExactly("local/text-only");
+
+        // What a feature cannot use is still listed, with why: the list is whole, the offer is not.
+        assertThat(c.unusableFor(AiFeature.TRANSLATE)).containsExactly(
+                new AiCatalog.Unusable("local/no-json", "local/no-json", false, "no_json"));
+        assertThat(c.unusableFor(AiFeature.VISION)).containsExactly(
+                new AiCatalog.Unusable("@cheap", "@cheap", true, "no_images"),
+                new AiCatalog.Unusable("local/no-json", "local/no-json", false, "no_json"),
+                new AiCatalog.Unusable("local/text-only", "Text only (local/text-only)", false, "no_images"));
+        assertThat(c.unusableForDefault()).isEqualTo(c.unusableFor(AiFeature.TRANSLATE));
+        // Every chat model and template appears once for every feature, offered or not.
+        for (AiFeature f : AiFeature.values()) {
+            assertThat(c.offeredFor(f).size() + c.unusableFor(f).size()).isEqualTo(c.models().size() + c.templates().size());
+        }
     }
 
     @Test

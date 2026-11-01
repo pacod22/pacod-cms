@@ -521,10 +521,21 @@ class PortalScreensTest {
         String english = renderEnglish("/mgmt/platform");
         assertThat(english).contains("name=\"default\"", "name=\"feature_vision\"", "@fast", "anthropic/claude-dev",
                 "Alt text", "gone/model (not offered by the gateway)", "/mgmt/platform/ai-models/reset");
-        // Alt text is offered only what takes images.
+        // Alt text is offered only what takes images; the rest of the list shows, disabled, with why.
         String vision = english.substring(english.indexOf("name=\"feature_vision\""));
         vision = vision.substring(0, vision.indexOf("</select>"));
-        assertThat(vision).contains("openai/gpt-dev").doesNotContain("local/text-only", "@cheap", "local/no-json");
+        String offered = vision.substring(0, vision.indexOf("<optgroup"));
+        String unusable = vision.substring(vision.indexOf("<optgroup"));
+        assertThat(offered).contains("openai/gpt-dev").doesNotContain("local/text-only", "@cheap", "local/no-json");
+        assertThat(unusable).contains("Listed by the gateway, not usable here",
+                "<option disabled value=\"@cheap\">@cheap (takes no images)</option>",
+                "<option disabled value=\"local/no-json\">local/no-json (cannot answer with a JSON schema)</option>",
+                "<option disabled value=\"local/text-only\">Text only (local/text-only) (takes no images)</option>");
+        // Translation needs no images: only the model without JSON schemas is left out.
+        String translate = english.substring(english.indexOf("name=\"feature_translate\""));
+        translate = translate.substring(0, translate.indexOf("</select>"));
+        assertThat(translate.substring(translate.indexOf("<optgroup"))).contains("local/no-json")
+                .doesNotContain("local/text-only", "@cheap");
         assertThat(render(get("/mgmt/platform"))).contains("name=\"feature_vision\"");
 
         mockMvc.perform(postCsrf("/mgmt/platform/ai-models").param("default", "@fast").param("feature_vision", "openai/gpt-dev")

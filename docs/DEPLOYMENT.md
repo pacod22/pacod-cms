@@ -221,7 +221,10 @@ theme, or switching the template set, needs `design.publish`.
   the installation's key (its templates and models). It sets a default and, per feature
   (translation, PDF front matter, writing help, alt text, design assist), an optional override.
   Only what can do the feature's work is offered: a JSON answer for all of them, and images for
-  alt text. Under each choice the card shows what the gateway applies to it (a template's models,
+  alt text. The rest of the gateway's list shows greyed out at the foot of each list, with why
+  (a model whose capabilities say it cannot answer with a JSON schema, such as pacod-gw's
+  `deepseek`, `glm-*` and `openai-compatible` presets, or a template using one; a model that takes
+  no images, for alt text). Under each choice the card shows what the gateway applies to it (a template's models,
   output ceiling, temperature, reasoning, timeout; a model's limits and the parameters it takes),
   read when the page opens, so a template added on the gateway shows on the next visit. Per
   feature it also sets what the calls send: a **minimum** output budget (each call's own
