@@ -186,12 +186,9 @@ public final class SocialSourceClassifier {
             return campaign;
         }
 
-        if (userAgent != null && !userAgent.isBlank()) {
-            for (UaRule rule : UA_RULES) {
-                if (rule.pattern().matcher(userAgent).find()) {
-                    return rule.source();
-                }
-            }
+        SocialSource inApp = inAppBrowser(userAgent);
+        if (inApp != null) {
+            return inApp;
         }
 
         String host = hostOf(referer);
@@ -218,6 +215,23 @@ public final class SocialSourceClassifier {
             return SocialSource.DIRECT;
         }
         return ownReferrer ? SocialSource.SITE : SocialSource.OTHER;
+    }
+
+    /**
+     * The network whose in-app browser sent this User-Agent, or {@code null} -- the table above, in
+     * its order. {@code ReaderAgentClassifier} files a reader's browser by it too, so the two
+     * screens cannot disagree about which app a reader was in.
+     */
+    static SocialSource inAppBrowser(String userAgent) {
+        if (userAgent == null || userAgent.isBlank()) {
+            return null;
+        }
+        for (UaRule rule : UA_RULES) {
+            if (rule.pattern().matcher(userAgent).find()) {
+                return rule.source();
+            }
+        }
+        return null;
     }
 
     /** The network a referrer names, or {@code null} -- an unknown site, or an unknown app. */

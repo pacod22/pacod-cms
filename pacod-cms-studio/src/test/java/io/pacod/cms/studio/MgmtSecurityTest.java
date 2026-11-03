@@ -228,6 +228,12 @@ class MgmtSecurityTest {
         mockMvc.perform(get("/mgmt/monitoring/live"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/mgmt/login"));
+
+        // The reader log lists readers' IP addresses and User-Agents: personal data, pinned on
+        // its own for the same reason, with a filter on, as a bookmarked address would carry one.
+        mockMvc.perform(get("/mgmt/monitoring/readers").param("ip", "198.51.100.7"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/mgmt/login"));
     }
 
     @Test

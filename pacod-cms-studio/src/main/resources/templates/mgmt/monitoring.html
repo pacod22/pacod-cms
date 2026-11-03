@@ -192,6 +192,94 @@
                 </div>
             </div>
 
+            <!--/*
+              Who read the window, from the buckets, so every range works: the language each view
+              was shown in beside the one the reader's browser asked for first (a language asked for
+              and never served is a translation readers are missing), then browser, system and
+              device. Views, not readers -- the buckets keep one count per key.
+
+              Shares are of the views the site split, which is fewer than every view when the window
+              reaches back before it did; the note says so. Every row opens the reader log already
+              filtered to it, on the same range (cut to the log's 31 days there).
+            */-->
+            <p class="result-line" id="readers">
+                <svg class="i"><use href="#i-users"></use></svg>
+                <span th:if="${audience.empty}" th:text="#{ops.mon.readers.empty}">No views were split in the period.</span>
+                <span th:if="${audience.partial}"
+                      th:text="#{ops.mon.readers.partial(${audience.counted}, ${audience.views})}">Split since …</span>
+                <span th:unless="${audience.empty or audience.partial}" th:text="#{ops.mon.readers.intro}">Who read the period.</span>
+                <a th:href="@{/mgmt/monitoring/readers(range=${range.key})}" th:text="#{ops.mon.readers.log}">Reader log</a>
+            </p>
+
+            <div class="grid-2" th:unless="${audience.empty}">
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-globe"></use></svg> <th:block th:text="#{ops.mon.languages}">Languages</th:block>
+                        <span class="hint" th:text="#{ops.mon.languages.hint}">read in, and asked for by the browser</span>
+                    </h2>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th th:text="#{ops.mon.col.language}">Language</th>
+                                <th class="num shrink" th:title="#{ops.mon.col.readIn.title}" th:text="#{ops.mon.col.readIn}">Read in</th>
+                                <th class="num shrink" th:text="#{ops.mon.col.share}">Share</th>
+                                <th class="num shrink" th:title="#{ops.mon.col.preferred.title}" th:text="#{ops.mon.col.preferred}">Browser</th>
+                                <th class="num shrink" th:text="#{ops.mon.col.share}">Share</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="l : ${audience.languages}"
+                                th:attr="data-href=@{/mgmt/monitoring/readers(range=${range.key}, served=${l.code})}">
+                                <td>
+                                    <a th:href="@{/mgmt/monitoring/readers(range=${range.key}, served=${l.code})}"
+                                       th:text="${l.name}">Deutsch</a>
+                                    <span class="muted" th:unless="${l.unknown}" th:text="${l.code}">de</span>
+                                </td>
+                                <td class="num" th:text="${l.served}" th:classappend="${l.served == 0} ? 'muted'">0</td>
+                                <td class="num muted nowrap"
+                                    th:text="${l.servedShare != null} ? |${#numbers.formatDecimal(l.servedShare, 1, 1)} %| : '—'">—</td>
+                                <td class="num">
+                                    <a th:if="${l.preferred > 0}"
+                                       th:href="@{/mgmt/monitoring/readers(range=${range.key}, preferred=${l.code})}"
+                                       th:text="${l.preferred}">0</a>
+                                    <span class="muted" th:unless="${l.preferred > 0}">0</span>
+                                </td>
+                                <td class="num muted nowrap"
+                                    th:text="${l.preferredShare != null} ? |${#numbers.formatDecimal(l.preferredShare, 1, 1)} %| : '—'">—</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-panels"></use></svg> <th:block th:text="#{ops.mon.devices}">Devices</th:block>
+                        <span class="hint" th:text="${mgmtText.label(range)}">period</span>
+                    </h2>
+                    <div th:replace="~{mgmt/reader-splits :: splitTable(${audience.devices}, 'device')}"></div>
+                </div>
+            </div>
+
+            <div class="grid-2" th:unless="${audience.empty}">
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-globe"></use></svg> <th:block th:text="#{ops.mon.browsers}">Browsers</th:block>
+                        <span class="hint" th:text="${mgmtText.label(range)}">period</span>
+                    </h2>
+                    <div th:replace="~{mgmt/reader-splits :: splitTable(${audience.browsers}, 'browser')}"></div>
+                </div>
+
+                <div class="card">
+                    <h2>
+                        <svg class="i"><use href="#i-settings"></use></svg> <th:block th:text="#{ops.mon.systems}">Operating systems</th:block>
+                        <span class="hint" th:text="${mgmtText.label(range)}">period</span>
+                    </h2>
+                    <div th:replace="~{mgmt/reader-splits :: splitTable(${audience.systems}, 'os')}"></div>
+                </div>
+            </div>
+
             <div class="card">
                 <h2>
                     <svg class="i"><use href="#i-eye"></use></svg> <th:block th:text="#{ops.mon.top}">Most read articles</th:block>

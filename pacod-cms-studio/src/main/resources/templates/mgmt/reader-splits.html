@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*
+  One browser, system or device table of the monitoring screen's reader cards, over the period's
+  buckets: MgmtMonitoringService.SplitRow rows, the largest first.
+
+  `filterName` names the reader log's parameter a row opens -- browser, os or device, the
+  parameters of ReaderDimension -- spelled out in the ternary, because a link expression takes its
+  parameter names literally. Every row link carries the range.
+*/-->
+<div class="table-wrap" th:fragment="splitTable(rows, filterName)">
+    <table>
+        <thead>
+        <tr>
+            <th th:text="#{ops.mon.col.value}">Name</th>
+            <th class="num shrink" th:text="#{ops.mon.col.views}">Views</th>
+            <th class="num shrink" th:text="#{ops.mon.col.share}">Share</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="r : ${rows}"
+            th:with="href=${filterName == 'browser'} ? @{/mgmt/monitoring/readers(range=${range.key}, browser=${r.key})}
+                         : (${filterName == 'os'} ? @{/mgmt/monitoring/readers(range=${range.key}, os=${r.key})}
+                         : @{/mgmt/monitoring/readers(range=${range.key}, device=${r.key})})"
+            th:attr="data-href=${href}">
+            <td><a th:href="${href}" th:text="${r.value != null} ? ${mgmtText.label(r.value)} : ${r.key}">Chrome</a></td>
+            <td class="num" th:text="${r.views}">0</td>
+            <td class="num muted nowrap"
+                th:text="${r.share != null} ? |${#numbers.formatDecimal(r.share, 1, 1)} %| : '—'">—</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

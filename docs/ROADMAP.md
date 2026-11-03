@@ -79,7 +79,9 @@ Testcontainers).
 - **A link page** (`/social`) for the website's social profiles, with per-network statistics.
 - **Advertising**: image and HTML5 bookings, and banner layouts built in the studio or imported as
   a ZIP; served and viewable impressions and clicks.
-- **Statistics**: a dashboard, views and readers per period without a cookie, and a crawler log
+- **Statistics**: a dashboard, views and readers per period without a cookie, split by the language
+  read and the browser's, browser, system and device; a reader log of each view with its IP
+  address and User-Agent, kept 31 days and filterable by all of them; and a crawler log
   with reverse and forward DNS verification. A crawler is never counted as a reader.
 - **Only published articles reach a reader**, on every route, list, feed, sitemap and PDF.
   `/robots.txt` and `/sitemap.xml` are answered per website, from its own database.

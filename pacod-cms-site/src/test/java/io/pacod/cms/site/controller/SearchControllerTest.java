@@ -126,7 +126,7 @@ class SearchControllerTest {
         mockMvc.perform(get("/search-google").param("q", "solar panels").param("lang", "en"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/search?q=solar%20panels&lang=en"));
-        verify(metrics, org.mockito.Mockito.never()).recordPageView(any(), any());
+        verify(metrics, org.mockito.Mockito.never()).recordPageView(any(), any(), any());
     }
 
     /**
@@ -222,7 +222,7 @@ class SearchControllerTest {
         verify(bannerService, org.mockito.Mockito.times(2))
                 .forPage(BannerPlacement.SIDEBAR, BannerPage.SEARCH);
         verify(metrics, org.mockito.Mockito.times(2))
-                .recordPageView(eq(BannerPage.SEARCH), any());
+                .recordPageView(eq(BannerPage.SEARCH), eq("bg"), any());
     }
 
     /**

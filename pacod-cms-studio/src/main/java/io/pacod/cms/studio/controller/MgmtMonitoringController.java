@@ -2,8 +2,16 @@ package io.pacod.cms.studio.controller;
 
 import io.pacod.cms.studio.access.StudioPermission;
 import io.pacod.cms.core.data.Banner;
+import io.pacod.cms.core.data.BannerPage;
+import io.pacod.cms.core.data.ReaderBrowser;
+import io.pacod.cms.core.data.ReaderDevice;
+import io.pacod.cms.core.data.ReaderOs;
+import io.pacod.cms.studio.MgmtCrawlerService;
 import io.pacod.cms.studio.MgmtMonitoringService;
+import io.pacod.cms.studio.MgmtReaderLogService;
 import io.pacod.cms.studio.MonitoringRange;
+import io.pacod.cms.studio.ReaderDimension;
+import io.pacod.cms.studio.i18n.MgmtText;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -12,7 +20,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * The monitoring screen: who is reading the site right now, and what the traffic has been doing.
@@ -42,10 +55,18 @@ public class MgmtMonitoringController {
     /** Enough to see the shape of what is being read without turning the screen into a report. */
     private static final int TOP_ARTICLES = 10;
 
-    private final MgmtMonitoringService monitoringService;
+    /** Longest User-Agent a filter chip spells out; the whole one is in the link. */
+    private static final int CHIP_AGENT = 48;
 
-    public MgmtMonitoringController(MgmtMonitoringService monitoringService) {
+    private final MgmtMonitoringService monitoringService;
+    private final MgmtReaderLogService readerLogService;
+    private final MgmtText text;
+
+    public MgmtMonitoringController(MgmtMonitoringService monitoringService, MgmtReaderLogService readerLogService,
+                                    MgmtText text) {
         this.monitoringService = monitoringService;
+        this.readerLogService = readerLogService;
+        this.text = text;
     }
 
     /**
@@ -60,7 +81,7 @@ public class MgmtMonitoringController {
     @GetMapping
     public String monitoring(@RequestParam(name = "range", required = false) String range,
                              @RequestParam(name = "banner", required = false) String banner,
-                             Model model) {
+                             Locale locale, Model model) {
         MonitoringRange selected = MonitoringRange.of(range);
         List<MgmtMonitoringService.Bucket> buckets = monitoringService.series(selected);
         // Read once: the filter and the table must agree about which bookings exist.
@@ -75,11 +96,83 @@ public class MgmtMonitoringController {
         model.addAttribute("bannerChart", monitoringService.bannerChart(buckets, selectedBanner, selected));
         model.addAttribute("selectedBanner", selectedBanner);
         model.addAttribute("pageTraffic", monitoringService.trafficByPage(buckets));
+        model.addAttribute("audience", monitoringService.audience(buckets, locale));
         model.addAttribute("topArticles", monitoringService.topArticles(TOP_ARTICLES));
         model.addAttribute("bannerReport", monitoringService.bannerReport(buckets, bookings, selected));
         model.addAttribute("content", monitoringService.contentTotals());
 
         return "mgmt/monitoring";
+    }
+
+    /**
+     * The reader log: who read the website, from which address, with which browser -- filtered,
+     * split and paged, off the {@code readerVisit} rows (see {@link MgmtReaderLogService}).
+     *
+     * <p>Every parameter comes off the query string and is normalised before the model --
+     * {@link MgmtReaderLogService.Filter#of} -- so {@code ?browser=nonsense} is no filter and the
+     * chips never name what the rows are not filtered by. Every link on the screen is built from
+     * the filter ({@code Filter.query}), which is how each one carries all of them: a GET form or
+     * link replaces the whole query string. The pager's links alone carry {@code page}.
+     *
+     * <p>A literal segment, so it beats nothing and nothing beats it; under {@code /mgmt/}, so it
+     * is inside the authenticated chain, and pinned there in {@code MgmtSecurityTest}.
+     */
+    @GetMapping("/readers")
+    public String readers(@RequestParam Map<String, String> params, Locale locale, Model model) {
+        MonitoringRange selected = MonitoringRange.of(params.get("range"));
+        MgmtReaderLogService.Filter filter = MgmtReaderLogService.Filter.of(params);
+        MgmtReaderLogService.Window window = MgmtReaderLogService.window(selected, LocalDateTime.now());
+
+        model.addAttribute("range", selected);
+        model.addAttribute("ranges", MonitoringRange.values());
+        model.addAttribute("filter", filter);
+        model.addAttribute("chips", chips(filter, selected, locale));
+        model.addAttribute("window", window);
+        model.addAttribute("report", readerLogService.report(filter, window.from(), locale));
+        model.addAttribute("addresses", readerLogService.topAddresses(filter, window.from()));
+        model.addAttribute("agents", readerLogService.topAgents(filter, window.from()));
+        model.addAttribute("log", readerLogService.log(filter, window.from(),
+                MgmtCrawlerController.pageNumber(params.get("page"))));
+        model.addAttribute("pageTypes", BannerPage.values());
+        model.addAttribute("browsers", ReaderBrowser.values());
+        model.addAttribute("systems", ReaderOs.values());
+        model.addAttribute("devices", ReaderDevice.values());
+        model.addAttribute("times", MgmtCrawlerService.Times.at(Instant.now(), text));
+        model.addAttribute("retentionDays", MgmtReaderLogService.RETENTION.toDays());
+
+        return "mgmt/monitoring-readers";
+    }
+
+    /** One active filter, worded, with the query string of the log without it. */
+    public record Chip(String label, String query) {
+    }
+
+    private List<Chip> chips(MgmtReaderLogService.Filter filter, MonitoringRange range, Locale locale) {
+        List<Chip> chips = new ArrayList<>();
+        for (ReaderDimension dimension : ReaderDimension.values()) {
+            String key = filter.get(dimension);
+            if (key == null) {
+                continue;
+            }
+            Enum<?> constant = dimension.constant(key);
+            String value = constant != null ? text.label(constant)
+                    : ReaderDimension.languageName(key, locale, text.msg("ops.mon.lang.und"));
+            chips.add(new Chip(text.label(dimension) + ": " + value, filter.without(dimension).query(range)));
+        }
+        if (filter.ip() != null) {
+            chips.add(new Chip(text.msg("ops.readers.col.ip") + ": " + filter.ip(),
+                    filter.withIp(null).query(range)));
+        }
+        if (filter.userAgent() != null) {
+            String agent = filter.userAgent().length() > CHIP_AGENT
+                    ? filter.userAgent().substring(0, CHIP_AGENT) + "…" : filter.userAgent();
+            chips.add(new Chip(text.msg("ops.readers.col.agent") + ": " + agent,
+                    filter.withUserAgent(null).query(range)));
+        }
+        if (filter.q() != null) {
+            chips.add(new Chip(text.msg("ops.readers.col.path") + ": " + filter.q(), filter.withQ(null).query(range)));
+        }
+        return chips;
     }
 
     /**

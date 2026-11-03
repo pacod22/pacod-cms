@@ -54,6 +54,11 @@ public abstract class SiteMetric {
     public static final String FIELD_CRAWLER_ERRORS_BY_BOT = "crawlerErrorsByBot";
     public static final String FIELD_CRAWLER_VERIFIED_BY_BOT = "crawlerVerifiedByBot";
     public static final String FIELD_CRAWLER_UNVERIFIED_BY_BOT = "crawlerUnverifiedByBot";
+    public static final String FIELD_VIEWS_BY_LANGUAGE = "viewsByLanguage";
+    public static final String FIELD_VIEWS_BY_BROWSER_LANGUAGE = "viewsByBrowserLanguage";
+    public static final String FIELD_VIEWS_BY_BROWSER = "viewsByBrowser";
+    public static final String FIELD_VIEWS_BY_OS = "viewsByOs";
+    public static final String FIELD_VIEWS_BY_DEVICE = "viewsByDevice";
 
     /** Bucket key: {@code "2026-08-09T14"} for an hour, {@code "2026-08-09"} for a day. */
     @Id
@@ -104,6 +109,34 @@ public abstract class SiteMetric {
      * type existed simply does not mention it.
      */
     private Map<String, Long> viewsByPage = new LinkedHashMap<>();
+
+    /**
+     * Language code to the views shown in that language -- the original or a translation, what the
+     * page's {@code <html lang>} said.
+     *
+     * <p>The five reader splits below share {@link #viewsByPage}'s shape and its reasons: one more
+     * key is not a schema change, and an absent key is zero. Each sums to {@link #views} for every
+     * bucket written since they existed, because each view lands in exactly one key of each.
+     *
+     * <p>Language keys come off the request -- a path prefix nothing checks, a header the client
+     * wrote -- so the site lets through only codes from a closed set (ISO 639-1 and the website's
+     * own languages) and files everything else, and a missing value, under
+     * {@link ReaderVisit#UNKNOWN_LANGUAGE}. A day bucket is kept forever; a key per invented code
+     * would be too.
+     */
+    private Map<String, Long> viewsByLanguage = new LinkedHashMap<>();
+
+    /** Language code to the views whose reader's browser asked for it first ({@code Accept-Language}). */
+    private Map<String, Long> viewsByBrowserLanguage = new LinkedHashMap<>();
+
+    /** {@link ReaderBrowser} name to views. */
+    private Map<String, Long> viewsByBrowser = new LinkedHashMap<>();
+
+    /** {@link ReaderOs} name to views. */
+    private Map<String, Long> viewsByOs = new LinkedHashMap<>();
+
+    /** {@link ReaderDevice} name to views. */
+    private Map<String, Long> viewsByDevice = new LinkedHashMap<>();
 
     /**
      * Banner id, as a decimal string, to the times it was <em>served</em> -- selected for a
@@ -188,6 +221,31 @@ public abstract class SiteMetric {
     /** Never null, so the console can sum without guarding every bucket. */
     public Map<String, Long> getViewsByPage() {
         return viewsByPage == null ? Map.of() : viewsByPage;
+    }
+
+    /** Never null; see {@link #getViewsByPage()}. */
+    public Map<String, Long> getViewsByLanguage() {
+        return viewsByLanguage == null ? Map.of() : viewsByLanguage;
+    }
+
+    /** Never null; see {@link #getViewsByPage()}. */
+    public Map<String, Long> getViewsByBrowserLanguage() {
+        return viewsByBrowserLanguage == null ? Map.of() : viewsByBrowserLanguage;
+    }
+
+    /** Never null; see {@link #getViewsByPage()}. */
+    public Map<String, Long> getViewsByBrowser() {
+        return viewsByBrowser == null ? Map.of() : viewsByBrowser;
+    }
+
+    /** Never null; see {@link #getViewsByPage()}. */
+    public Map<String, Long> getViewsByOs() {
+        return viewsByOs == null ? Map.of() : viewsByOs;
+    }
+
+    /** Never null; see {@link #getViewsByPage()}. */
+    public Map<String, Long> getViewsByDevice() {
+        return viewsByDevice == null ? Map.of() : viewsByDevice;
     }
 
     /** Never null; see {@link #getViewsByPage()}. */

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<!--/*
+  /mgmt/monitoring/readers -- the reader log: every view the site counted, with the reader's
+  address, User-Agent and languages, filtered, split and paged.
+
+  Everything here reads readerVisit, which keeps 31 days, so a longer range is cut there and the
+  screen says so (window.clamped). The monitoring screen's reader cards come from the buckets and
+  cover every range, one split at a time; this screen is where splits filter one another.
+
+  Every link is built from the filter in Java (MgmtReaderLogService.Filter.query), so each one
+  carries all of them: a GET form or link replaces the whole query string. Clicking a row of any
+  split, an address or a User-Agent adds that filter; a chip removes one. The pager's links alone
+  carry `page`.
+
+  The addresses and User-Agents are personal data, shown to whoever holds stats.read; they are
+  printed as text (th:text), never as markup -- a User-Agent is whatever the client wrote.
+*/-->
+<head th:replace="~{mgmt/fragments :: head(#{ops.readers.title})}"></head>
+<body>
+<svg th:replace="~{mgmt/fragments :: icons}"></svg>
+<div class="shell">
+    <th:block th:replace="~{mgmt/fragments :: sidebar('monitoring')}"></th:block>
+    <div class="main">
+        <header th:replace="~{mgmt/fragments :: topbar(#{ops.readers.title})}"></header>
+        <main class="content" th:with="base=@{/mgmt/monitoring/readers}">
+            <div th:replace="~{mgmt/fragments :: flash}"></div>
+
+            <div class="toolbar">
+                <form class="toolbar" method="get" th:action="@{/mgmt/monitoring/readers}" style="flex:1 1 320px; margin:0">
+                    <label class="pick">
+                        <select name="range" data-autosubmit th:aria-label="#{ops.mon.range.aria}">
+                            <option th:each="r : ${ranges}" th:value="${r.key}" th:text="${mgmtText.label(r)}"
+                                    th:selected="${r.key == range.key}">24 hours</option>
+                        </select>
+                    </label>
+                    <input type="hidden" th:each="p : ${filter.params()}" th:name="${p.key}" th:value="${p.value}"/>
+                    <button class="btn" type="submit" th:text="#{ops.common.show}">Show</button>
+                </form>
+                <a class="btn btn-ghost push" th:href="@{/mgmt/monitoring(range=${range.key})} + '#readers'">
+                    <svg class="i"><use href="#i-activity"></use></svg> <th:block th:text="#{ops.crawl.toMonitoring}">Back to statistics</th:block>
+                </a>
+            </div>
+
+            <p class="result-line">
+                <svg class="i"><use href="#i-shield"></use></svg>
+                <span th:text="#{ops.readers.retention(${retentionDays})}">Each view is kept for 31 days.</span>
+                <span th:if="${window.clamped}" th:text="#{ops.readers.clamped(${retentionDays})}">The period is cut to them.</span>
+            </p>
+
+            <div class="card" th:if="${!chips.isEmpty()}">
+                <div class="card-body">
+                    <div class="chart-legend" style="margin:0">
+                        <span class="muted" th:text="#{ops.readers.filter}">Filter:</span>
+                        <a class="btn btn-sm btn-primary" th:each="c : ${chips}"
+                           th:href="${base} + '?' + ${c.query}" th:title="#{ops.readers.filter.remove}">
+                            <span th:text="${c.label}">Browser: Chrome</span> ×
+                        </a>
+                        <a class="btn btn-sm btn-ghost" th:href="@{/mgmt/monitoring/readers(range=${range.key})}"
+                           th:text="#{ops.common.clear}">Clear</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-grid">
+                <div class="stat">
+                    <span class="stat-label" th:text="#{ops.mon.col.views}">Views</span>
+                    <span class="stat-value" th:text="${report.totals.views}">0</span>
+                    <span class="stat-note" th:text="${window.clamped} ? #{ops.crawl.lastDays(${retentionDays})} : ${mgmtText.label(range)}">period</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label" th:text="#{ops.readers.visitors}">Readers</span>
+                    <span class="stat-value" th:text="${report.totals.readers}">0</span>
+                    <span class="stat-note" th:text="#{ops.readers.visitors.note}">distinct, without a cookie</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label" th:text="#{ops.readers.addresses}">IP addresses</span>
+                    <span class="stat-value" th:text="${report.totals.addresses}">0</span>
+                    <span class="stat-note" th:text="#{ops.readers.addresses.note}">distinct</span>
+                </div>
+            </div>
+
+            <!--/* The six splits, under the filter; a row adds itself to it. */-->
+            <div class="grid-2 reader-splits" th:unless="${report.empty}">
+                <div class="card" th:each="t : ${report.tables}">
+                    <h2>
+                        <svg class="i"><use href="#i-chart"></use></svg> <th:block th:text="${mgmtText.label(t.dimension)}">Browser</th:block>
+                        <span class="hint" th:if="${filter.active}" th:text="#{ops.readers.filtered}">filtered</span>
+                    </h2>
+                    <div class="table-wrap" th:unless="${t.rows.isEmpty()}">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th th:text="#{ops.mon.col.value}">Name</th>
+                                <th class="num shrink" th:text="#{ops.mon.col.views}">Views</th>
+                                <th class="num shrink" th:text="#{ops.readers.visitors}">Readers</th>
+                                <th class="num shrink" th:text="#{ops.mon.col.share}">Share</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="s : ${t.rows}"
+                                th:with="href=${base} + '?' + ${filter.with(t.dimension, s.key).query(range)}"
+                                th:classappend="${filter.get(t.dimension) == s.key} ? 'row-selected'"
+                                th:attr="data-href=${href}">
+                                <td>
+                                    <a th:href="${href}" th:title="${s.key}"
+                                       th:text="${s.value != null} ? ${mgmtText.label(s.value)} : (${s.name != null} ? ${s.name} : ${s.key})">Chrome</a>
+                                </td>
+                                <td class="num" th:text="${s.views}">0</td>
+                                <td class="num" th:text="${s.readers}">0</td>
+                                <td class="num muted nowrap"
+                                    th:text="${s.share != null} ? |${#numbers.formatDecimal(s.share, 1, 1)} %| : '—'">—</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="empty" th:if="${t.rows.isEmpty()}">
+                        <span th:text="#{ops.readers.log.noMatch}">No views match the filter.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>
+                    <svg class="i"><use href="#i-globe"></use></svg> <th:block th:text="#{ops.readers.topAddresses}">IP addresses</th:block>
+                    <span class="hint" th:text="#{ops.readers.top.hint}">most views first</span>
+                </h2>
+                <div class="table-wrap" th:unless="${addresses.isEmpty()}">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{ops.readers.col.ip}">IP address</th>
+                            <th class="num shrink" th:text="#{ops.mon.col.views}">Views</th>
+                            <th class="num shrink" th:text="#{ops.readers.visitors}">Readers</th>
+                            <th class="shrink" th:text="#{ops.readers.col.last}">Last</th>
+                            <th th:title="#{ops.readers.col.latest.title}" th:text="#{ops.readers.col.latest}">Latest browser</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="a : ${addresses}"
+                            th:with="href=${base} + '?' + ${filter.withIp(a.ip).query(range)} + '#log'"
+                            th:classappend="${filter.ip == a.ip} ? 'row-selected'"
+                            th:attr="data-href=${href}">
+                            <td class="reader-ip"><a th:href="${href}" th:text="${a.ip}">198.51.100.7</a></td>
+                            <td class="num" th:text="${a.views}">0</td>
+                            <td class="num" th:text="${a.readers}">0</td>
+                            <td class="muted nowrap" th:text="${times.ago(a.lastSeen)}" th:title="${times.stamp(a.lastSeen)}">—</td>
+                            <td class="muted nowrap"
+                                th:text="|${a.browser != null ? mgmtText.label(a.browser) : '—'} · ${a.os != null ? mgmtText.label(a.os) : '—'} · ${a.device != null ? mgmtText.label(a.device) : '—'}|">
+                                Chrome · Windows · Desktop</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${addresses.isEmpty()}">
+                    <svg class="i"><use href="#i-globe"></use></svg>
+                    <span th:text="#{ops.readers.log.noMatch}">No views match the filter.</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>
+                    <svg class="i"><use href="#i-code"></use></svg> <th:block th:text="#{ops.readers.topAgents}">User-Agents</th:block>
+                    <span class="hint" th:text="#{ops.readers.topAgents.hint}">as the browser sent it</span>
+                </h2>
+                <div class="table-wrap" th:unless="${agents.isEmpty()}">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th th:text="#{ops.readers.col.agent}">User-Agent</th>
+                            <th class="shrink" th:text="#{ops.readers.col.families}">Browser · System · Device</th>
+                            <th class="num shrink" th:text="#{ops.mon.col.views}">Views</th>
+                            <th class="num shrink" th:text="#{ops.readers.visitors}">Readers</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="g : ${agents}"
+                            th:with="href=${base} + '?' + ${filter.withUserAgent(g.userAgent).query(range)} + '#log'"
+                            th:classappend="${filter.userAgent == g.userAgent} ? 'row-selected'"
+                            th:attr="data-href=${href}">
+                            <td class="reader-agent"><a th:href="${href}" th:title="${g.userAgent}"><code th:text="${g.userAgent}">Mozilla/5.0</code></a></td>
+                            <td class="muted nowrap"
+                                th:text="|${g.browser != null ? mgmtText.label(g.browser) : '—'} · ${g.os != null ? mgmtText.label(g.os) : '—'} · ${g.device != null ? mgmtText.label(g.device) : '—'}|">
+                                Chrome · Windows · Desktop</td>
+                            <td class="num" th:text="${g.views}">0</td>
+                            <td class="num" th:text="${g.readers}">0</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${agents.isEmpty()}">
+                    <svg class="i"><use href="#i-code"></use></svg>
+                    <span th:text="#{ops.readers.log.noMatch}">No views match the filter.</span>
+                </div>
+            </div>
+
+            <!--/*
+              The log: one row per view, newest first, 50 a page. Its own GET form for the path and
+              the four splits a select can name; the filters it has no control for -- the languages,
+              the address, the User-Agent -- ride along as hidden fields, and the range too. The
+              path box reuses id="search-input" so mgmt.js debounces it and "/" focuses it.
+            */-->
+            <div class="card" id="log">
+                <h2>
+                    <svg class="i"><use href="#i-file-text"></use></svg> <th:block th:text="#{ops.readers.log}">Log</th:block>
+                    <span class="hint" th:text="${window.clamped} ? #{ops.crawl.lastDays(${retentionDays})} : ${mgmtText.label(range)}">period</span>
+                </h2>
+                <div class="card-body">
+                    <form class="toolbar reader-filters" method="get" th:action="@{/mgmt/monitoring/readers} + '#log'" style="margin:0">
+                        <input type="hidden" name="range" th:value="${range.key}"/>
+                        <input type="hidden" th:each="p : ${filter.paramsExcept({'type', 'browser', 'os', 'device', 'q'})}"
+                               th:name="${p.key}" th:value="${p.value}"/>
+                        <div class="search">
+                            <svg class="i"><use href="#i-search"></use></svg>
+                            <input type="search" id="search-input" name="q" th:value="${filter.q}"
+                                   th:placeholder="#{ops.readers.search.placeholder}" th:aria-label="#{ops.readers.search.aria}">
+                            <kbd>/</kbd>
+                        </div>
+                        <select class="pick" name="type" data-autosubmit th:aria-label="#{enum.ReaderDimension.PAGE}">
+                            <option value="" th:text="#{ops.readers.allPages}">Every page</option>
+                            <option th:each="v : ${pageTypes}" th:value="${v.name()}" th:text="${mgmtText.label(v)}"
+                                    th:selected="${v.name() == filter.value('type')}">Article</option>
+                        </select>
+                        <select class="pick" name="browser" data-autosubmit th:aria-label="#{enum.ReaderDimension.BROWSER}">
+                            <option value="" th:text="#{ops.readers.allBrowsers}">Every browser</option>
+                            <option th:each="v : ${browsers}" th:value="${v.name()}" th:text="${mgmtText.label(v)}"
+                                    th:selected="${v.name() == filter.value('browser')}">Chrome</option>
+                        </select>
+                        <select class="pick" name="os" data-autosubmit th:aria-label="#{enum.ReaderDimension.OS}">
+                            <option value="" th:text="#{ops.readers.allSystems}">Every system</option>
+                            <option th:each="v : ${systems}" th:value="${v.name()}" th:text="${mgmtText.label(v)}"
+                                    th:selected="${v.name() == filter.value('os')}">Windows</option>
+                        </select>
+                        <select class="pick" name="device" data-autosubmit th:aria-label="#{enum.ReaderDimension.DEVICE}">
+                            <option value="" th:text="#{ops.readers.allDevices}">Every device</option>
+                            <option th:each="v : ${devices}" th:value="${v.name()}" th:text="${mgmtText.label(v)}"
+                                    th:selected="${v.name() == filter.value('device')}">Desktop</option>
+                        </select>
+                        <button class="btn" type="submit" th:text="#{ops.common.search}">Search</button>
+                        <a class="btn btn-ghost" th:if="${filter.active}"
+                           th:href="@{/mgmt/monitoring/readers(range=${range.key})} + '#log'" th:text="#{ops.common.clear}">Clear</a>
+                    </form>
+                </div>
+
+                <div class="table-wrap" th:unless="${log.rows.isEmpty()}">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th class="shrink" th:text="#{ops.crawl.col.time}">Time</th>
+                            <th class="shrink" th:text="#{ops.mon.col.page}">Page</th>
+                            <th th:text="#{ops.readers.col.path}">Address</th>
+                            <th class="shrink" th:title="#{ops.mon.col.readIn.title}" th:text="#{ops.mon.col.readIn}">Read in</th>
+                            <th class="shrink" th:title="#{ops.mon.col.preferred.title}" th:text="#{ops.mon.col.preferred}">Browser</th>
+                            <th class="shrink" th:text="#{ops.readers.col.families}">Browser · System · Device</th>
+                            <th class="shrink" th:text="#{ops.readers.col.ip}">IP address</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="v : ${log.rows}">
+                            <td class="muted reader-time" th:text="${times.stamp(v.occurredAt)}">03.11.2026 08:15:30</td>
+                            <td class="nowrap" th:text="${v.page != null} ? ${mgmtText.label(v.page)} : '—'">Article</td>
+                            <td class="reader-path"><span th:text="${v.path}" th:title="${v.path}">/article/1</span></td>
+                            <td class="reader-time" th:text="${v.servedLanguage != null} ? ${v.servedLanguage} : '—'">en</td>
+                            <td class="reader-time" th:text="${v.browserLanguage != null} ? ${v.browserLanguage} : '—'">de</td>
+                            <td class="nowrap" th:title="${v.userAgent}"
+                                th:text="|${v.browser != null ? mgmtText.label(v.browser) : '—'} · ${v.os != null ? mgmtText.label(v.os) : '—'} · ${v.device != null ? mgmtText.label(v.device) : '—'}|">
+                                Chrome · Windows · Desktop</td>
+                            <td class="reader-ip">
+                                <a th:if="${v.ip != null}" th:href="${base} + '?' + ${filter.withIp(v.ip).query(range)} + '#log'"
+                                   th:text="${v.ip}">198.51.100.7</a>
+                                <span th:unless="${v.ip != null}" class="muted">—</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${log.rows.isEmpty()}">
+                    <svg class="i"><use href="#i-file-text"></use></svg>
+                    <span th:if="${filter.active}" th:text="#{ops.readers.log.noMatch}">No views match the filter.</span>
+                    <span th:unless="${filter.active}" th:text="#{ops.readers.log.none}">No views in the log for the period.</span>
+                    <a class="btn btn-sm" th:if="${filter.active}"
+                       th:href="@{/mgmt/monitoring/readers(range=${range.key})} + '#log'" th:text="#{ops.crawl.clearFilters}">Clear the filters</a>
+                </div>
+
+                <div class="pager" th:if="${log.hasPrevious() or log.hasNext}">
+                    <a th:if="${log.hasPrevious()}" th:title="#{ops.crawl.newer}"
+                       th:href="${base} + '?' + ${filter.query(range, log.page - 1)} + '#log'">&larr; <th:block th:text="#{ops.crawl.newer}">Newer</th:block></a>
+                    <a th:if="${log.hasNext}" th:title="#{ops.crawl.older}"
+                       th:href="${base} + '?' + ${filter.query(range, log.page + 1)} + '#log'"><th:block th:text="#{ops.crawl.older}">Older</th:block> &rarr;</a>
+                    <span class="count" th:if="${!log.rows.isEmpty()}" th:text="#{ops.crawl.shown(${log.from()}, ${log.to()})}">Showing 1–50</span>
+                </div>
+            </div>
+
+            <p class="muted" style="font-size:12.5px" th:text="#{ops.readers.footnote(${retentionDays})}">
+                Crawlers, previews and print renders are never in the log.
+            </p>
+        </main>
+    </div>
+</div>
+<script th:src="@{/mgmt-assets/mgmt.js}"></script>
+</body>
+</html>

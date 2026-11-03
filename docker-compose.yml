@@ -108,6 +108,9 @@ services:
       # reverse/forward DNS check that tells a real Googlebot from a forged one -- see .env.example.
       CRAWLER_TRACKING: ${CRAWLER_TRACKING:-true}
       CRAWLER_VERIFY: ${CRAWLER_VERIFY:-true}
+      # The reader log (/mgmt/monitoring/readers): each counted page view with the reader's IP
+      # address and User-Agent, kept 31 days. false writes none -- see .env.example.
+      READER_LOG: ${READER_LOG:-true}
       # Logging (pacod-demo/docs/LOGGING.md): the event's service name, the level (debug, info, warn,
       # error) and stdout's format (json or text; the file under LOG_DIR is JSON either way).
       SERVICE_NAME: cms-site

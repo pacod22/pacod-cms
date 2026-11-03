@@ -379,7 +379,7 @@ every setting a `.env` may hold. The secrets have no published default; `make ch
 | Portal | `PACOD_ID_PROVISIONER_TOKEN` (written by `make id-provisioner`; without it only platform admins create organisations) · `PACOD_SITE_DOMAIN` (new websites answer at `<id>.<domain>`) · `PACOD_ORG_CREATION` (`self-service` or `platform-admins`) · `PACOD_MAX_ORGS_PER_USER` `PACOD_MAX_SITES_PER_ORG` `PACOD_AI_FOR_NEW_ORGS` (starting values of the installation screen) |
 | Hosts | `STUDIO_HOST` `ID_HOST` (Caddy) · `DEMO_HOSTS`, `DEMO_MINIMAL_HOSTS`, `DEMO_SPACE_HOSTS` (the demo websites', on an empty platform) · `SITE_PUBLIC_SCHEME` `SITE_PUBLIC_PORT` (how the studio spells a website's address) |
 | Article image rules | `IMAGE_REQUIRED_WIDTH` `IMAGE_REQUIRED_HEIGHT` (the minimum, and the shape: 600×400 by default) `IMAGE_MAX_BYTES` (400 KB) `IMAGE_DIMENSION_CHECK` `IMAGE_FILE_SIZE_CHECK` |
-| Statistics | `METRICS_VISITOR_SALT` `CRAWLER_TRACKING` `CRAWLER_VERIFY` |
+| Statistics | `METRICS_VISITOR_SALT` `CRAWLER_TRACKING` `CRAWLER_VERIFY` `READER_LOG` (the reader log: each view with the reader's IP address and User-Agent, 31 days) |
 | CORS | `CORS_ALLOWED_ORIGINS` |
 | TLS in the JVM | `SSL_ENABLED` `SSL_KEYSTORE` `SSL_KEYSTORE_PASSWORD` `SSL_KEY_ALIAS` |
 | Paths | `LOG_DIR` `STORAGE_ROOT` (container side) · `MONGO_DATA_DIR` `LOG_DIR_HOST` `STORAGE_HOST` (host side) |

@@ -1,18 +1,16 @@
 package io.pacod.cms.site.config;
 
 import io.pacod.cms.core.util.CrawlerClassifier;
+import io.pacod.cms.site.services.ClientAddress;
 import io.pacod.cms.site.services.CrawlerRecorder;
 import io.pacod.cms.site.services.CrawlerTraffic;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletRequestWrapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.time.Instant;
 
 /**
@@ -35,7 +33,7 @@ import java.time.Instant;
  * first entry -- the one {@code ForwardedHeaderFilter} hands back as {@code getRemoteAddr()} -- is
  * the client's to choose wherever a proxy appends to it rather than replacing it, and on the site's
  * directly published port. A forger would put a real Googlebot address there. And {@code X-Real-IP} itself is believed only from a proxy hop; see
- * {@link #clientAddress}.
+ * {@link ClientAddress}, which the reader log shares.
  *
  * <h2>What is skipped</h2>
  * {@code /site-assets/**}, the site's own CSS and JS out of the jar, and {@code /web/v1/health}, which the compose healthcheck {@code wget}s
@@ -45,7 +43,6 @@ import java.time.Instant;
  */
 public class CrawlerTrafficFilter extends OncePerRequestFilter {
 
-    private static final String REAL_IP = "X-Real-IP";
 
     private final CrawlerRecorder recorder;
 
@@ -90,61 +87,8 @@ public class CrawlerTrafficFilter extends OncePerRequestFilter {
         }
     }
 
-    /**
-     * The client address, as an IP literal or {@code null}.
-     *
-     * <p>{@code X-Real-IP} is believed only when the TCP peer is a proxy hop -- loopback or a
-     * private address, which is what Caddy is on the compose network. The site's port is also
-     * published directly ({@code WEB_PORT}, "for bypassing the proxy"), and a client reaching it
-     * from outside could otherwise write any address it liked into the header and be shown as
-     * {@code VERIFIED}. The peer is read from the <em>innermost</em> request:
-     * {@code ForwardedHeaderFilter} wraps the request before this filter runs and answers
-     * {@code getRemoteAddr()} with the first {@code X-Forwarded-For} entry, which is the client's
-     * to choose. With
-     * {@code SERVER_FORWARD_HEADERS_STRATEGY=FRAMEWORK} Tomcat installs no {@code RemoteIpValve}, so
-     * the container's own request still holds the real peer.
-     *
-     * <p>Only a literal is returned, so the stored value is always an address and never whatever
-     * text a header carried.
-     */
+    /** The client address, by {@link ClientAddress}'s rule: {@code X-Real-IP} from a proxy hop only. */
     static String clientAddress(HttpServletRequest request) {
-        String peer = literal(innermost(request).getRemoteAddr());
-        String real = literal(request.getHeader(REAL_IP));
-        if (real != null && isProxyHop(peer)) {
-            return real;
-        }
-        return peer;
-    }
-
-    private static ServletRequest innermost(ServletRequest request) {
-        ServletRequest current = request;
-        while (current instanceof ServletRequestWrapper wrapper) {
-            current = wrapper.getRequest();
-        }
-        return current;
-    }
-
-    private static boolean isProxyHop(String peer) {
-        if (peer == null) {
-            return false;
-        }
-        InetAddress address = InetAddress.ofLiteral(peer);
-        if (address.isLoopbackAddress() || address.isSiteLocalAddress() || address.isLinkLocalAddress()) {
-            return true;
-        }
-        // fc00::/7, IPv6 unique-local: a Docker network with IPv6 enabled.
-        return !(address instanceof java.net.Inet4Address) && (address.getAddress()[0] & 0xfe) == 0xfc;
-    }
-
-    /** The value as a normalised IP literal, or {@code null}. Never resolves a name. */
-    private static String literal(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return InetAddress.ofLiteral(value.strip()).getHostAddress();
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
+        return ClientAddress.of(request);
     }
 }

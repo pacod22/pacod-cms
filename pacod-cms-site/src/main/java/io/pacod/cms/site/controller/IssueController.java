@@ -55,7 +55,7 @@ public class IssueController {
         model.addAttribute("lang", resolved);
         model.addAttribute("issues", issues);
         model.addAttribute("views", issues.getContent().stream().map(i -> reader.view(i, resolved)).toList());
-        rendered(model, request);
+        rendered(model, request, resolved);
         return "issues";
     }
 
@@ -73,14 +73,14 @@ public class IssueController {
         model.addAttribute("view", reader.view(issue, resolved));
         model.addAttribute("entries", reader.pageContents(issue.getArticleIds(), resolved));
         model.addAttribute("pdfs", files);
-        rendered(model, request);
+        rendered(model, request, resolved);
         return "issue";
     }
 
-    private void rendered(Model model, HttpServletRequest request) {
+    private void rendered(Model model, HttpServletRequest request, String lang) {
         model.addAttribute("topBanners", bannerService.forPage(BannerPlacement.TOP, BannerPage.LIST));
         model.addAttribute("sidebarBanners", bannerService.forPage(BannerPlacement.SIDEBAR, BannerPage.LIST));
-        metrics.recordPageView(BannerPage.LIST, request);
+        metrics.recordPageView(BannerPage.LIST, lang, request);
     }
 
     /** {@code PageController}'s precedence: {@code ?lang}, the cookie, the website's own. */

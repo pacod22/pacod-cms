@@ -3,6 +3,7 @@ package io.pacod.cms.studio;
 import io.pacod.cms.core.data.Banner;
 import io.pacod.cms.core.data.BannerPage;
 import io.pacod.cms.core.data.BannerType;
+import io.pacod.cms.core.data.ReaderVisit;
 import io.pacod.cms.core.data.SiteMetric;
 import io.pacod.cms.core.data.SiteVisitor;
 import io.pacod.cms.core.repository.AuthorRepository;
@@ -29,8 +30,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -201,7 +205,8 @@ public class MgmtMonitoringService {
                     metric == null ? Map.of() : metric.getViewsByPage(),
                     metric == null ? Map.of() : metric.getBannerImpressionsById(),
                     metric == null ? Map.of() : metric.getBannerViewableById(),
-                    metric == null ? Map.of() : metric.getBannerClicksById()));
+                    metric == null ? Map.of() : metric.getBannerClicksById(),
+                    metric == null ? Readers.NONE : Readers.of(metric)));
         }
 
         return buckets;
@@ -298,6 +303,67 @@ public class MgmtMonitoringService {
                 .map(page -> new PageTraffic(page, page.getLabel(), counts.getOrDefault(page, 0L),
                         share(counts.getOrDefault(page, 0L), finalTotal)))
                 .sorted(Comparator.comparingLong(PageTraffic::views).reversed())
+                .toList();
+    }
+
+    /**
+     * Who read the window: the views by language read, browser language, browser, system and
+     * device, summed over its buckets.
+     *
+     * <p>Each share is of {@link Audience#counted()}, the views the splits were recorded for, not of
+     * every view: buckets written before the site split its views hold none, and dividing by them
+     * would make every row look smaller than it was. The screen says when the two differ.
+     *
+     * @param ui the operator's language, which the language names are in
+     */
+    public Audience audience(List<Bucket> buckets, Locale ui) {
+        Map<String, Long> served = new HashMap<>();
+        Map<String, Long> preferred = new HashMap<>();
+        Map<String, Long> browsers = new HashMap<>();
+        Map<String, Long> systems = new HashMap<>();
+        Map<String, Long> devices = new HashMap<>();
+        long views = 0;
+
+        for (Bucket bucket : buckets) {
+            views += bucket.views();
+            Readers readers = bucket.readers();
+            readers.languages().forEach((code, count) -> served.merge(code, nz(count), Long::sum));
+            readers.browserLanguages().forEach((code, count) -> preferred.merge(code, nz(count), Long::sum));
+            readers.browsers().forEach((key, count) -> browsers.merge(key, nz(count), Long::sum));
+            readers.systems().forEach((key, count) -> systems.merge(key, nz(count), Long::sum));
+            readers.devices().forEach((key, count) -> devices.merge(key, nz(count), Long::sum));
+        }
+
+        long servedTotal = sum(served);
+        long preferredTotal = sum(preferred);
+        String unknown = msg("ops.mon.lang.und");
+
+        Set<String> codes = new LinkedHashSet<>(served.keySet());
+        codes.addAll(preferred.keySet());
+        List<LanguageRow> languages = codes.stream()
+                .map(code -> new LanguageRow(code, ReaderDimension.languageName(code, ui, unknown),
+                        served.getOrDefault(code, 0L), share(served.getOrDefault(code, 0L), servedTotal),
+                        preferred.getOrDefault(code, 0L), share(preferred.getOrDefault(code, 0L), preferredTotal)))
+                .filter(row -> row.served() > 0 || row.preferred() > 0)
+                // The unknown row last, wherever its count would put it: it is what is left over.
+                .sorted(Comparator.comparing(LanguageRow::isUnknown)
+                        .thenComparing(Comparator.comparingLong(LanguageRow::served).reversed())
+                        .thenComparing(Comparator.comparingLong(LanguageRow::preferred).reversed())
+                        .thenComparing(LanguageRow::code))
+                .toList();
+
+        return new Audience(languages, splitRows(ReaderDimension.BROWSER, browsers),
+                splitRows(ReaderDimension.OS, systems), splitRows(ReaderDimension.DEVICE, devices),
+                sum(browsers), views);
+    }
+
+    private static List<SplitRow> splitRows(ReaderDimension dimension, Map<String, Long> counts) {
+        long total = sum(counts);
+        return counts.entrySet().stream()
+                .filter(entry -> nz(entry.getValue()) > 0)
+                .map(entry -> new SplitRow(entry.getKey(), dimension.constant(entry.getKey()), entry.getValue(),
+                        share(entry.getValue(), total)))
+                .sorted(Comparator.comparingLong(SplitRow::views).reversed().thenComparing(SplitRow::key))
                 .toList();
     }
 
@@ -478,6 +544,10 @@ public class MgmtMonitoringService {
         return total;
     }
 
+    private static long nz(Long value) {
+        return value == null ? 0 : value;
+    }
+
     private static long sum(Map<String, Long> values) {
         long total = 0;
         for (Long value : values.values()) {
@@ -505,7 +575,67 @@ public class MgmtMonitoringService {
     public record Bucket(LocalDateTime start, String axisLabel, String tooltipLabel,
                          long views, long visitors, long bannerImpressions, long bannerClicks,
                          Map<String, Long> viewsByPage, Map<String, Long> impressionsById,
-                         Map<String, Long> viewableById, Map<String, Long> clicksById) {
+                         Map<String, Long> viewableById, Map<String, Long> clicksById, Readers readers) {
+
+        /** A bucket whose views were not split -- as every bucket before the site split them is. */
+        public Bucket(LocalDateTime start, String axisLabel, String tooltipLabel,
+                      long views, long visitors, long bannerImpressions, long bannerClicks,
+                      Map<String, Long> viewsByPage, Map<String, Long> impressionsById,
+                      Map<String, Long> viewableById, Map<String, Long> clicksById) {
+            this(start, axisLabel, tooltipLabel, views, visitors, bannerImpressions, bannerClicks, viewsByPage,
+                    impressionsById, viewableById, clicksById, Readers.NONE);
+        }
+    }
+
+    /**
+     * One bucket's reader splits, keyed as the site writes them: language codes, and the names of
+     * {@code ReaderBrowser}, {@code ReaderOs} and {@code ReaderDevice}. Never null.
+     */
+    public record Readers(Map<String, Long> languages, Map<String, Long> browserLanguages,
+                          Map<String, Long> browsers, Map<String, Long> systems, Map<String, Long> devices) {
+
+        public static final Readers NONE = new Readers(Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+
+        static Readers of(SiteMetric metric) {
+            return new Readers(metric.getViewsByLanguage(), metric.getViewsByBrowserLanguage(),
+                    metric.getViewsByBrowser(), metric.getViewsByOs(), metric.getViewsByDevice());
+        }
+    }
+
+    /**
+     * The window's reader cards.
+     *
+     * @param counted the views the splits were recorded for -- every row's share is of this
+     * @param views   every view in the window; more than {@code counted} when some buckets predate
+     *                the splits
+     */
+    public record Audience(List<LanguageRow> languages, List<SplitRow> browsers, List<SplitRow> systems,
+                           List<SplitRow> devices, long counted, long views) {
+
+        public boolean isEmpty() {
+            return counted <= 0;
+        }
+
+        /** Some of the window's views were counted before the site split them. */
+        public boolean isPartial() {
+            return counted > 0 && counted < views;
+        }
+    }
+
+    /**
+     * One language: the views read in it, and the views whose reader's browser asked for it first.
+     * A language readers ask for and the website lacks shows here as preferred and never served.
+     */
+    public record LanguageRow(String code, String name, long served, Double servedShare, long preferred,
+                              Double preferredShare) {
+
+        public boolean isUnknown() {
+            return ReaderVisit.UNKNOWN_LANGUAGE.equals(code);
+        }
+    }
+
+    /** One browser, system or device; {@code value} is its constant, for the label, or null for a stale key. */
+    public record SplitRow(String key, Enum<?> value, long views, Double share) {
     }
 
     /** @param peakVisitors the busiest bucket, not a sum -- distinct readers do not add up. */

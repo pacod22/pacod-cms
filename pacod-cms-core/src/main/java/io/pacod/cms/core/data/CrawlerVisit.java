@@ -22,7 +22,7 @@ import java.time.Instant;
  * A row is written only for a request the public site has already classified as a crawler or
  * another automated client, which is what lets this collection hold an address and a User-Agent
  * when {@link SiteVisitor} -- the reader statistics -- deliberately holds neither. No reader's
- * address reaches it.
+ * address reaches it; a reader's goes to {@link ReaderVisit}, the reader log, when that is on.
  *
  * <h2>The TTL index is what bounds it</h2>
  * Indexes are built by {@code SiteIndexes} in each website's database when it is provisioned, off

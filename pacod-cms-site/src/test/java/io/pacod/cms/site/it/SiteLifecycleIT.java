@@ -8,6 +8,7 @@ import io.pacod.cms.core.tenant.SiteProvisioner;
 import io.pacod.cms.core.tenant.SiteRetirement;
 import io.pacod.cms.core.tenant.Tenant;
 import io.pacod.cms.core.tenant.TenantContext;
+import io.pacod.cms.site.services.ReaderLogRecorder;
 import io.pacod.cms.site.services.SiteMetricCollector;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,9 @@ class SiteLifecycleIT extends TwoWebsitesIT {
     SiteMetricCollector collector;
 
     @Autowired
+    ReaderLogRecorder readerLog;
+
+    @Autowired
     MongoClient mongo;
 
     @Test
@@ -65,7 +69,7 @@ class SiteLifecycleIT extends TwoWebsitesIT {
         assertThat(databases()).contains("site_gamma");
 
         // Counted in its last moment, flushed after it is gone.
-        TenantContext.runAs(gamma, () -> collector.recordPageView(BannerPage.ARTICLE, reader()));
+        TenantContext.runAs(gamma, () -> collector.recordPageView(BannerPage.ARTICLE, "en", reader()));
 
         retirement.retire("gamma");
         assertThat(get(GAMMA_HOST, "/article/1").statusCode()).isEqualTo(404);
@@ -78,6 +82,9 @@ class SiteLifecycleIT extends TwoWebsitesIT {
 
         offThread(collector::flush);
         assertThat(databases()).as("the flush must not recreate the deleted database").doesNotContain("site_gamma");
+        // The same view went to the reader log, whose own flush is the other write that could.
+        offThread(readerLog::flush);
+        assertThat(databases()).as("the reader log must not recreate it either").doesNotContain("site_gamma");
 
         // The id is refused while its database may still be written back, and swept meanwhile.
         assertThatThrownBy(() -> provisioner.create(new SiteProvisioner.NewWebsite("org_it", "IT", "gamma", "Again",

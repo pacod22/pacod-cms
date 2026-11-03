@@ -2510,6 +2510,18 @@ td .path-row .path { max-width: 320px; }
 .crawl-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
 .crawl-check input { width: auto; margin: 0; accent-color: var(--accent); }
 
+/* The reader log (/mgmt/monitoring/readers): the crawler log's cells, and a User-Agent cut to its
+   cell like a path -- the whole string is the cell's title and its link's filter. */
+.reader-path { font-family: var(--mono); font-size: 12.5px; }
+.reader-path span { display: block; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reader-ip, .reader-time { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+.reader-agent a { display: block; max-width: 560px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reader-agent code { font-size: 12px; }
+.reader-filters { gap: 8px; }
+/* Six tables of four columns: three a row where they fit, never the four a .grid-2 packs in. */
+.grid-2.reader-splits { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+.reader-filters .search { flex: 1 1 220px; }
+
 /*
  * The hover targets: transparent, full plot height, one per bucket, drawn last so they take the
  * pointer. `fill: transparent` and not `fill: none` -- none is not a hit target, so the <title>

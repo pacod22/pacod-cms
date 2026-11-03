@@ -83,6 +83,8 @@ abstract class TwoWebsitesIT {
         // scheduled flush is pushed out of the way so only the tests' own flushes write.
         registry.add("app.metrics.enabled", () -> "true");
         registry.add("app.metrics.flush.ms", () -> "3600000");
+        registry.add("app.metrics.reader-log.enabled", () -> "true");
+        registry.add("app.metrics.reader-log.flush.ms", () -> "3600000");
         registry.add("pacod.studio.origin", () -> STUDIO_ORIGIN);
         registry.add("pacod.preview.secret", () -> "an-integration-test-secret-0123456789abcdef");
         // As compose runs the site (SERVER_FORWARD_HEADERS_STRATEGY): the PDF renderer names the

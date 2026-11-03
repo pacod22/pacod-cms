@@ -132,6 +132,48 @@ class SiteMetricMappingTest {
         assertThat(day.crawlerHitTotal()).isZero();
     }
 
+    @Test
+    @DisplayName("the reader splits read back keyed by code and enum name, Int32 included")
+    void readerSplitsReadBack() {
+        // The shape dotted $incs on viewsByLanguage.bg, viewsByBrowser.CHROME and friends leave behind.
+        Document raw = new Document("_id", "2026-11-03T14")
+                .append(SiteMetric.FIELD_START, new Date())
+                .append(SiteMetric.FIELD_VIEWS, 9L)
+                .append(SiteMetric.FIELD_VIEWS_BY_LANGUAGE, new Document("bg", 6L).append("und", 3))
+                .append(SiteMetric.FIELD_VIEWS_BY_BROWSER_LANGUAGE, new Document("de", 5L).append("en", 4))
+                .append(SiteMetric.FIELD_VIEWS_BY_BROWSER, new Document("CHROME", 7L).append("SAFARI", 2))
+                .append(SiteMetric.FIELD_VIEWS_BY_OS, new Document("ANDROID", 9))
+                .append(SiteMetric.FIELD_VIEWS_BY_DEVICE, new Document("MOBILE", 8L).append("TABLET", 1));
+
+        SiteMetricHour hour = converter.read(SiteMetricHour.class, raw);
+
+        assertThat(hour.getViewsByLanguage()).containsEntry("bg", 6L);
+        assertThat(hour.getViewsByLanguage().get("und")).isEqualTo(3L);
+        assertThat(hour.getViewsByBrowserLanguage()).containsEntry("de", 5L);
+        assertThat(hour.getViewsByBrowserLanguage().get("en")).isEqualTo(4L);
+        assertThat(hour.getViewsByBrowser()).containsEntry("CHROME", 7L);
+        assertThat(hour.getViewsByBrowser().get("SAFARI")).isEqualTo(2L);
+        assertThat(hour.getViewsByOs().get("ANDROID")).isEqualTo(9L);
+        assertThat(hour.getViewsByDevice()).containsEntry("MOBILE", 8L);
+        assertThat(hour.getViewsByDevice().get("TABLET")).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("a bucket written before the reader splits reads as empty maps, never null")
+    void olderBucketsHaveNoReaderSplits() {
+        Document raw = new Document("_id", "2026-10-11").append(SiteMetric.FIELD_START, new Date())
+                .append(SiteMetric.FIELD_VIEWS, 12L);
+
+        SiteMetricDay day = converter.read(SiteMetricDay.class, raw);
+
+        assertThat(day.getViews()).isEqualTo(12L);
+        assertThat(day.getViewsByLanguage()).isEmpty();
+        assertThat(day.getViewsByBrowserLanguage()).isEmpty();
+        assertThat(day.getViewsByBrowser()).isEmpty();
+        assertThat(day.getViewsByOs()).isEmpty();
+        assertThat(day.getViewsByDevice()).isEmpty();
+    }
+
     /** Wired the way Spring Boot wires it: without the simple-type holder, {@code java.time} is an entity. */
     private static MappingMongoConverter converter() {
         MongoCustomConversions conversions = new MongoCustomConversions(List.of());

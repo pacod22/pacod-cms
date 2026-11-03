@@ -537,6 +537,7 @@ Set per service, not globally:
 | `COMPOSE_PROFILES` | compose (the presets) | `dev-gateway,mailpit` on dev and stage: the development gateway and the mail catcher; empty in production |
 | `METRICS_VISITOR_SALT` | `cms-site` | salts the opaque reader key; blank means a new random salt per restart |
 | `CRAWLER_TRACKING`, `CRAWLER_VERIFY` | `cms-site` | crawler log, and its reverse/forward DNS check (needs outbound DNS) |
+| `READER_LOG` | `cms-site` | the reader log (default on): each counted page view with the reader's IP address, User-Agent, languages and path, deleted after 31 days. Personal data -- say so in each website's privacy page, or set `false` |
 | `CORS_ALLOWED_ORIGINS` | both | comma-separated origin patterns; a bare `*` is refused at startup |
 | `STORAGE_ROOT` | both | `/data/storage`, where `STORAGE_HOST` is mounted |
 

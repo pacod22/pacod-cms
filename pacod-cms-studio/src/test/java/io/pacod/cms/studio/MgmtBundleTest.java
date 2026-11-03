@@ -72,6 +72,34 @@ class MgmtBundleTest {
         assertThat(duplicates).isEmpty();
     }
 
+    /**
+     * Read as text, because a {@link Properties} keeps only the last definition: a key appended
+     * further down with a new meaning silently relabels every screen that used the first one. The
+     * reader cards' "Read in" once took over the advertising table's "Served" that way.
+     */
+    @Test
+    @DisplayName("no key is defined twice in one file")
+    void noKeyTwiceInAFile() throws java.io.IOException {
+        Pattern definition = Pattern.compile("^\\s*([^#!=:\\s][^=:\\s]*)\\s*[=:]");
+        List<String> duplicates = new ArrayList<>();
+        for (String basename : MgmtText.BASENAMES) {
+            for (String lang : java.util.stream.Stream.concat(java.util.stream.Stream.of((String) null),
+                    TRANSLATIONS.stream()).toList()) {
+                String path = basename + (lang == null ? "" : "_" + lang) + ".properties";
+                Set<String> seen = new TreeSet<>();
+                String text = new org.springframework.core.io.ClassPathResource(path)
+                        .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+                for (String line : text.split("\n")) {
+                    Matcher key = definition.matcher(line);
+                    if (key.find() && !seen.add(key.group(1))) {
+                        duplicates.add(path + ": " + key.group(1));
+                    }
+                }
+            }
+        }
+        assertThat(duplicates).isEmpty();
+    }
+
     @Test
     @DisplayName("values are not blank, parse as MessageFormat, and keep the same {n} in every language")
     void valuesAreWellFormed() {

@@ -106,7 +106,7 @@ class SocialControllerTest {
                 .andExpect(view().name("social"))
                 .andReturn();
 
-        verify(metrics).recordSocialView(eq(SocialSource.INSTAGRAM), any());
+        verify(metrics).recordSocialView(eq(SocialSource.INSTAGRAM), eq("bg"), any());
         SocialView view = (SocialView) result.getModelAndView().getModel().get("social");
         assertThat(view.sourceKey()).isEqualTo("instagram");
         assertThat(view.icons()).singleElement()
@@ -124,7 +124,7 @@ class SocialControllerTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        verify(metrics).recordSocialView(eq(SocialSource.FACEBOOK), any());
+        verify(metrics).recordSocialView(eq(SocialSource.FACEBOOK), any(), any());
         // ... and every tile carries it on, so the clicks are Facebook's too.
         SocialView view = (SocialView) result.getModelAndView().getModel().get("social");
         assertThat(view.sourceKey()).isEqualTo("facebook");
@@ -135,7 +135,7 @@ class SocialControllerTest {
     void trailingSlashRenders() throws Exception {
         mockMvc.perform(get("/social/").header("User-Agent", INSTAGRAM))
                 .andExpect(status().isOk());
-        verify(metrics).recordSocialView(eq(SocialSource.INSTAGRAM), any());
+        verify(metrics).recordSocialView(eq(SocialSource.INSTAGRAM), any(), any());
     }
 
     @Test
@@ -147,7 +147,7 @@ class SocialControllerTest {
         when(reader.page()).thenReturn(Optional.empty());
         mockMvc.perform(get("/social").header("User-Agent", SAFARI)).andExpect(status().isNotFound());
 
-        verify(metrics, never()).recordSocialView(any(), any());
+        verify(metrics, never()).recordSocialView(any(), any(), any());
     }
 
     @Test
@@ -155,7 +155,7 @@ class SocialControllerTest {
     void botsAreNotCounted() throws Exception {
         mockMvc.perform(get("/social").header("User-Agent", "facebookexternalhit/1.1"))
                 .andExpect(status().isOk());
-        verify(metrics, never()).recordSocialView(any(), any());
+        verify(metrics, never()).recordSocialView(any(), any(), any());
     }
 
     @Test
@@ -168,7 +168,7 @@ class SocialControllerTest {
                         .header("User-Agent", SAFARI).header("Sec-Fetch-Site", "same-origin")
                         .requestAttr(io.pacod.cms.site.services.CrawlerTraffic.UNCOUNTED_ATTRIBUTE, Boolean.TRUE))
                 .andExpect(status().isFound());
-        verify(metrics, never()).recordSocialView(any(), any());
+        verify(metrics, never()).recordSocialView(any(), any(), any());
         verify(metrics, never()).recordSocialClick(anyString(), any());
     }
 
@@ -179,7 +179,7 @@ class SocialControllerTest {
                         .header("User-Agent", SAFARI)
                         .header("Referer", "http://localhost/social?src=instagram"))
                 .andExpect(status().isOk());
-        verify(metrics, never()).recordSocialView(any(), any());
+        verify(metrics, never()).recordSocialView(any(), any(), any());
     }
 
     @Test

@@ -320,7 +320,8 @@ class ArticleTemplateControllerTest {
                 .andExpect(model().attributeExists("topBanners"))
                 .andExpect(model().attributeExists("sidebarBanners"));
 
-        verify(metrics, times(1)).recordPageView(eq(BannerPage.ARTICLE), any());
+        // Counted in the language served: the article has no English, so /en/ shows the original.
+        verify(metrics, times(1)).recordPageView(eq(BannerPage.ARTICLE), eq("bg"), any());
     }
 
     @Test

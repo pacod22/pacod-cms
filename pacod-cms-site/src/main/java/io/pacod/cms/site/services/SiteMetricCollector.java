@@ -5,6 +5,12 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.WriteModel;
 import io.pacod.cms.core.data.BannerPage;
 import io.pacod.cms.core.data.CrawlerVerification;
+import io.pacod.cms.core.data.Language;
+import io.pacod.cms.core.data.LanguageChain;
+import io.pacod.cms.core.data.ReaderBrowser;
+import io.pacod.cms.core.data.ReaderDevice;
+import io.pacod.cms.core.data.ReaderOs;
+import io.pacod.cms.core.data.ReaderVisit;
 import io.pacod.cms.core.data.SiteMetric;
 import io.pacod.cms.core.data.SiteMetricDay;
 import io.pacod.cms.core.data.SiteMetricHour;
@@ -23,6 +29,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -32,6 +39,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -86,6 +94,19 @@ import java.util.regex.Pattern;
  * {@code hourlyHashes} is keyed by hour and therefore a <em>separate</em> structure from
  * {@code visitorBuffer}, which step 1 drains. Reading a drained buffer in step 3 would silently
  * turn the hourly figure into "readers since the last flush".
+ *
+ * <h2>Who read it, and in which language</h2>
+ * Every view is also split five ways, in the same buckets and with the same {@code $inc}: the
+ * language the page was shown in, the reader's browser language (the first choice of
+ * {@code Accept-Language}), and the browser, operating system and device
+ * {@link ReaderAgentClassifier} reads off the User-Agent. Views only -- a distinct-reader figure
+ * per key would need a hash set per key. Both languages come off the request, so a code counts only
+ * when it is one of a closed set ({@link #languageKey}); anything else is
+ * {@link ReaderVisit#UNKNOWN_LANGUAGE}, because a day bucket is kept forever and so would a key per
+ * invented code.
+ *
+ * <p>The same view is then handed to {@link ReaderLogRecorder} as a {@link ReaderVisit} row -- the
+ * address, the User-Agent and the path, which the buckets never hold -- when that log is on.
  *
  * <h2>Accepted imprecision, stated plainly</h2>
  * Counts are attributed to the bucket open at <em>flush</em> time, so a flush straddling an hour
@@ -151,12 +172,44 @@ public class SiteMetricCollector {
         private final Map<String, Set<String>> socialDailyHashes = new ConcurrentHashMap<>();
     }
 
+    /** Every ISO 639-1 code: the closed set a language key is drawn from, with the website's own. */
+    private static final Set<String> ISO_LANGUAGES = Set.of(Locale.getISOLanguages());
+
+    /** What {@code LanguageChain.normalise} leaves of a code that could be a key. */
+    private static final Pattern LANGUAGE = Pattern.compile("[a-z]{2,3}");
+
+    /**
+     * Longest {@code Accept-Language} read. Browsers send a few dozen characters; the parse is cut
+     * short for anything that sends a novel.
+     */
+    private static final int MAX_ACCEPT_LANGUAGE = 256;
+
     private final PerSite<Buffers> sites = new PerSite<>(Buffers::new);
 
     private final MongoTemplate mongoTemplate;
     private final SiteVisitorRepository visitorRepository;
     private final VisitorIdentity visitorIdentity;
     private final boolean enabled;
+    private ReaderLogRecorder readerLog;
+    private LanguageReader languages;
+
+    /**
+     * Where each counted view goes as a row. Optional so a test can build this class by hand; without
+     * it, nothing is logged and the counts are unchanged.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void useReaderLog(ReaderLogRecorder readerLog) {
+        this.readerLog = readerLog;
+    }
+
+    /**
+     * The website's own languages, which a language key may name beside ISO 639-1's -- a
+     * three-letter code an operator added. Optional for the same reason as {@link #useReaderLog}.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void useLanguages(LanguageReader languages) {
+        this.languages = languages;
+    }
 
     /**
      * A deleted website's counts are discarded rather than flushed: the first write would recreate
@@ -183,14 +236,16 @@ public class SiteMetricCollector {
      *
      * @param page    which of the four public views rendered; {@code null} is counted as a view but
      *                lands in no page column
-     * @param request the current request, read only to derive an opaque reader key -- and to see
-     *                whether {@code CrawlerTrafficFilter} marked it as automated, in which case it is
-     *                not a reader and nothing is counted. The check is here, at the one choke point,
-     *                rather than in the four controllers that call this.
+     * @param lang    the language the content was shown in: for an article or a standing page, the
+     *                language of the body served, which may differ from the one asked for
+     * @param request the current request, read to derive an opaque reader key and the reader's
+     *                splits -- and to see whether {@code CrawlerTrafficFilter} marked it as
+     *                automated, in which case it is not a reader and nothing is counted. The check is
+     *                here, at the one choke point, rather than in the controllers that call this.
      */
-    public void recordPageView(BannerPage page, HttpServletRequest request) {
+    public void recordPageView(BannerPage page, String lang, HttpServletRequest request) {
         if (enabled && !CrawlerTraffic.isUncounted(request)) {
-            sites.current().ifPresent(b -> recordView(b, page, request));
+            sites.current().ifPresent(b -> recordView(b, page, lang, request));
         }
     }
 
@@ -218,8 +273,10 @@ public class SiteMetricCollector {
      * <p>Both go through this one call so the per-source views always sum to
      * {@code viewsByPage.SOCIAL}. The caller has already left out bots and self-referrals; this
      * method counts what it is given.
+     *
+     * @param lang the language the page was shown in, as for {@link #recordPageView}
      */
-    public void recordSocialView(SocialSource source, HttpServletRequest request) {
+    public void recordSocialView(SocialSource source, String lang, HttpServletRequest request) {
         if (!enabled) {
             return;
         }
@@ -229,7 +286,7 @@ public class SiteMetricCollector {
             b.hourly.recordSocialView(from);
             b.daily.recordSocialView(from);
 
-            String hash = recordView(b, BannerPage.SOCIAL, request);
+            String hash = recordView(b, BannerPage.SOCIAL, lang, request);
             if (hash != null) {
                 LocalDateTime now = LocalDateTime.now();
                 b.socialHourlyHashes.computeIfAbsent(SiteMetricHour.idFor(now), h -> ConcurrentHashMap.newKeySet())
@@ -266,12 +323,17 @@ public class SiteMetricCollector {
         }
     }
 
-    /** Counts the render and remembers the reader; returns the reader's hash, or {@code null}. */
-    private String recordView(Buffers b, BannerPage page, HttpServletRequest request) {
-        b.hourly.recordView(page);
-        b.daily.recordView(page);
+    /**
+     * Counts the render with its splits, remembers the reader and logs the view; returns the
+     * reader's hash, or {@code null}.
+     */
+    private String recordView(Buffers b, BannerPage page, String lang, HttpServletRequest request) {
+        ReaderSplit split = splitOf(lang, request);
+        b.hourly.recordView(page, split);
+        b.daily.recordView(page, split);
 
         String hash = visitorIdentity.hashOf(request);
+        logView(page, split, request, hash);
         if (hash == null) {
             return null;
         }
@@ -281,6 +343,105 @@ public class SiteMetricCollector {
         b.hourlyHashes.computeIfAbsent(SiteMetricHour.idFor(now), h -> ConcurrentHashMap.newKeySet())
                 .add(hash);
         return hash;
+    }
+
+    /** One view's five splits, decided once and counted in both grains. */
+    private record ReaderSplit(String servedLanguage, String browserLanguage,
+                               ReaderAgentClassifier.ReaderAgent agent) {
+    }
+
+    private ReaderSplit splitOf(String lang, HttpServletRequest request) {
+        String userAgent = request == null ? null : request.getHeader("User-Agent");
+        String acceptLanguage = request == null ? null : request.getHeader("Accept-Language");
+        return new ReaderSplit(languageKey(lang), languageKey(preferredLanguage(acceptLanguage)),
+                ReaderAgentClassifier.classify(userAgent));
+    }
+
+    /**
+     * The key a language is counted under: its bare code when that is an ISO 639-1 code, the
+     * website's original or one of its own languages, else {@link ReaderVisit#UNKNOWN_LANGUAGE}.
+     *
+     * <p>A closed set, not merely a shape: the path prefix ({@code /xx/article/5}) is checked against
+     * nothing and {@code Accept-Language} is whatever the client wrote, so a shape alone would let a
+     * script mint thousands of keys in day buckets that are never deleted.
+     */
+    String languageKey(String code) {
+        String bare = LanguageChain.normalise(code);
+        if (bare == null || !LANGUAGE.matcher(bare).matches()) {
+            return ReaderVisit.UNKNOWN_LANGUAGE;
+        }
+        if (ISO_LANGUAGES.contains(bare) || bare.equals(LanguageChain.original()) || isWebsiteLanguage(bare)) {
+            return bare;
+        }
+        return ReaderVisit.UNKNOWN_LANGUAGE;
+    }
+
+    /** Whether the website's {@code language} collection lists it -- read through the cached reader. */
+    private boolean isWebsiteLanguage(String code) {
+        if (languages == null) {
+            return false;
+        }
+        for (Language language : languages.findAll()) {
+            if (code.equals(LanguageChain.normalise(language.getCode()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The reader's first choice in {@code Accept-Language}, or {@code null}: the range of highest
+     * weight that is not {@code *} and not refused ({@code q=0}). A header that does not parse is no
+     * choice; a bad header must never cost the page.
+     */
+    static String preferredLanguage(String header) {
+        if (header == null || header.isBlank()) {
+            return null;
+        }
+        String value = header.strip();
+        if (value.length() > MAX_ACCEPT_LANGUAGE) {
+            value = value.substring(0, MAX_ACCEPT_LANGUAGE);
+            int lastComma = value.lastIndexOf(',');
+            value = lastComma > 0 ? value.substring(0, lastComma) : value;
+        }
+        try {
+            for (Locale.LanguageRange range : Locale.LanguageRange.parse(value)) {
+                if (range.getWeight() > 0 && !"*".equals(range.getRange())) {
+                    return range.getRange();
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+        return null;
+    }
+
+    /** Hands the view to the reader log, as a row: what the buckets deliberately do not hold. */
+    private void logView(BannerPage page, ReaderSplit split, HttpServletRequest request, String hash) {
+        if (readerLog == null || !readerLog.isEnabled() || request == null) {
+            return;
+        }
+        ReaderVisit visit = new ReaderVisit();
+        visit.setOccurredAt(Instant.now());
+        visit.setPage(page);
+        // The URI without its query string: a search term is the reader's own text.
+        visit.setPath(truncate(request.getRequestURI(), ReaderVisit.MAX_PATH));
+        visit.setServedLanguage(split.servedLanguage());
+        visit.setBrowserLanguage(split.browserLanguage());
+        visit.setBrowser(split.agent().browser());
+        visit.setOs(split.agent().os());
+        visit.setDevice(split.agent().device());
+        visit.setIp(ClientAddress.of(request));
+        visit.setUserAgent(truncate(request.getHeader("User-Agent"), ReaderVisit.MAX_USER_AGENT));
+        visit.setVisitor(hash);
+        readerLog.record(visit);
+    }
+
+    private static String truncate(String value, int max) {
+        if (value == null || value.length() <= max) {
+            return value;
+        }
+        return value.substring(0, max);
     }
 
     /**
@@ -537,7 +698,9 @@ public class SiteMetricCollector {
                            Map<SocialSource, Long> socialViews, Map<SocialKey, Long> socialClicks,
                            Map<SocialKey, Long> socialArticleClicks, Map<String, Long> crawlerHits,
                            Map<String, Long> crawlerErrors, Map<String, Long> crawlerVerified,
-                           Map<String, Long> crawlerUnverified) {
+                           Map<String, Long> crawlerUnverified, Map<String, Long> servedLanguages,
+                           Map<String, Long> browserLanguages, Map<ReaderBrowser, Long> browsers,
+                           Map<ReaderOs, Long> systems, Map<ReaderDevice, Long> devices) {
     }
 
     /** One cell of a {@code /social} click matrix: a link id or an article id, and a source. */
@@ -566,6 +729,11 @@ public class SiteMetricCollector {
         private final Map<String, LongAdder> crawlerErrors = new ConcurrentHashMap<>();
         private final Map<String, LongAdder> crawlerVerified = new ConcurrentHashMap<>();
         private final Map<String, LongAdder> crawlerUnverified = new ConcurrentHashMap<>();
+        private final Map<String, LongAdder> servedLanguages = new ConcurrentHashMap<>();
+        private final Map<String, LongAdder> browserLanguages = new ConcurrentHashMap<>();
+        private final Map<ReaderBrowser, LongAdder> browsers = new ConcurrentHashMap<>();
+        private final Map<ReaderOs, LongAdder> systems = new ConcurrentHashMap<>();
+        private final Map<ReaderDevice, LongAdder> devices = new ConcurrentHashMap<>();
 
         void recordCrawlerHit(String bot, int status, CrawlerVerification verification) {
             crawlerHits.computeIfAbsent(bot, b -> new LongAdder()).increment();
@@ -592,12 +760,17 @@ public class SiteMetricCollector {
                     k -> new LongAdder()).increment();
         }
 
-        void recordView(BannerPage page) {
+        void recordView(BannerPage page, ReaderSplit split) {
             views.increment();
 
             if (page != null) {
                 viewsByPage.computeIfAbsent(page, p -> new LongAdder()).increment();
             }
+            servedLanguages.computeIfAbsent(split.servedLanguage(), k -> new LongAdder()).increment();
+            browserLanguages.computeIfAbsent(split.browserLanguage(), k -> new LongAdder()).increment();
+            browsers.computeIfAbsent(split.agent().browser(), k -> new LongAdder()).increment();
+            systems.computeIfAbsent(split.agent().os(), k -> new LongAdder()).increment();
+            devices.computeIfAbsent(split.agent().device(), k -> new LongAdder()).increment();
         }
 
         void recordImpression(Integer bannerId) {
@@ -650,6 +823,11 @@ public class SiteMetricCollector {
             Map<String, Long> botErrors = drainEach(crawlerErrors);
             Map<String, Long> botVerified = drainEach(crawlerVerified);
             Map<String, Long> botUnverified = drainEach(crawlerUnverified);
+            Map<String, Long> served = drainEach(servedLanguages);
+            Map<String, Long> preferred = drainEach(browserLanguages);
+            Map<ReaderBrowser, Long> browserCounts = drainEach(browsers);
+            Map<ReaderOs, Long> systemCounts = drainEach(systems);
+            Map<ReaderDevice, Long> deviceCounts = drainEach(devices);
 
             Document increments = new Document();
             appendIfPositive(increments, SiteMetric.FIELD_VIEWS, viewCount);
@@ -689,9 +867,24 @@ public class SiteMetricCollector {
             botUnverified.forEach((bot, count) ->
                     increments.append(SiteMetric.FIELD_CRAWLER_UNVERIFIED_BY_BOT + "." + bot, count));
 
+            // The reader splits: viewsByLanguage.de, viewsByBrowser.CHROME. A language key is a
+            // code from a closed set or "und" (see languageKey), an enum name is an enum name, so
+            // every one is a legal key.
+            served.forEach((code, count) ->
+                    increments.append(SiteMetric.FIELD_VIEWS_BY_LANGUAGE + "." + code, count));
+            preferred.forEach((code, count) ->
+                    increments.append(SiteMetric.FIELD_VIEWS_BY_BROWSER_LANGUAGE + "." + code, count));
+            browserCounts.forEach((browser, count) ->
+                    increments.append(SiteMetric.FIELD_VIEWS_BY_BROWSER + "." + browser.name(), count));
+            systemCounts.forEach((os, count) ->
+                    increments.append(SiteMetric.FIELD_VIEWS_BY_OS + "." + os.name(), count));
+            deviceCounts.forEach((device, count) ->
+                    increments.append(SiteMetric.FIELD_VIEWS_BY_DEVICE + "." + device.name(), count));
+
             return new Drained(increments, viewCount, impressionCount, clickCount, pages,
                     impressions, viewable, clicks, social, linkClicks, articleClicks,
-                    botHits, botErrors, botVerified, botUnverified);
+                    botHits, botErrors, botVerified, botUnverified, served, preferred,
+                    browserCounts, systemCounts, deviceCounts);
         }
 
         /** Adds a failed drain back, summing into whatever arrived while the write was in flight. */
@@ -711,6 +904,11 @@ public class SiteMetricCollector {
             restoreEach(crawlerErrors, drained.crawlerErrors());
             restoreEach(crawlerVerified, drained.crawlerVerified());
             restoreEach(crawlerUnverified, drained.crawlerUnverified());
+            restoreEach(servedLanguages, drained.servedLanguages());
+            restoreEach(browserLanguages, drained.browserLanguages());
+            restoreEach(browsers, drained.browsers());
+            restoreEach(systems, drained.systems());
+            restoreEach(devices, drained.devices());
         }
 
         /** {@code sumThenReset} over a per-booking map, keeping only the ids that moved. */

@@ -74,7 +74,7 @@
       "en": "What this website records about its readers, and why."
     },
     "bodies": {
-      "en": "<h2>Privacy policy</h2>\n<p><strong>This is placeholder text, not legal advice.</strong> Replace it with a policy written for your organisation before publishing your website.</p>\n<p>pacod-cms itself sets one cookie on the public website, <code>lang</code>, which remembers the language a reader chose. Reader statistics are counted without cookies: a salted, truncated hash of the address and browser identifies a reader for one day, and no address is stored.</p>\n<p>Any analytics or advertising service you enable in the site settings sets cookies of its own and needs to be described here.</p>"
+      "en": "<h2>Privacy policy</h2>\n<p><strong>This is placeholder text, not legal advice.</strong> Replace it with a policy written for your organisation before publishing your website.</p>\n<p>pacod-cms itself sets one cookie on the public website, <code>lang</code>, which remembers the language a reader chose. Reader statistics are counted without cookies: a salted, truncated hash of the address and browser identifies a reader for one day. The site also keeps a log of each page view &mdash; the reader's IP address, browser identification (User-Agent), preferred language and the page read &mdash; for at most 31 days, to measure its audience and detect abuse. If your installation keeps no such log (<code>READER_LOG=false</code>), say so here instead.</p>\n<p>Any analytics or advertising service you enable in the site settings sets cookies of its own and needs to be described here.</p>"
     }
   }
 ]

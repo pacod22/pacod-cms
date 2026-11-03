@@ -798,7 +798,7 @@ website, never over one** (`studio.archive.PortalRestore`, routes in `MgmtArchiv
   format**, never JSON: a document comes back byte for byte, its `@DBRef`s and number types
   included -- JSON reads `{$ref, $id}` as a pointer), `files/{assets,resources,private}/…`. An
   organisation's: `pacod-organisation.json` and one such tree per website under `sites/<id>/`.
-- **Left out**: the analytics (`SKIPPED`: hour and day buckets, visitors, the crawler log), members
+- **Left out**: the analytics (`SKIPPED`: hour and day buckets, visitors, the crawler and reader logs), members
   and roles (pacod-id's), the hosts, `backups/`. **`COLLECTIONS` plus `SKIPPED` must name every
   website `@Document`** -- `SiteArchivesTest.everyCollectionIsDecided` scans core and fails when a
   new document is in neither.
@@ -1535,7 +1535,8 @@ profiles, unpublished. Until saved and published, `/social` is 404.
 ### Monitoring
 
 `/mgmt/monitoring`: readers now, a chart of views and readers, per-period tables for articles,
-bookings, page types and totals.
+bookings, page types and totals, and who read the period -- by language read and asked for,
+browser, system and device. `/mgmt/monitoring/readers` is the reader log behind it.
 
 - **The series starts when the stack first counted; nothing is back-filled** (`Article.counter`,
   `Banner.impressions`, `Banner.clicks` are dateless scalars). A fresh database renders `.empty`
@@ -1560,7 +1561,29 @@ bookings, page types and totals.
 - **Readers are identified without a cookie**: `VisitorIdentity` hashes salt + site id +
   `X-Forwarded-For` + UA to 16 hex characters; `SiteVisitor` stores that, a day and a timestamp — no
   address, UA or path — expiring after two days, anchored on `day`. It undercounts behind NAT, and
-  says so.
+  says so. **Leave its input alone**: a change re-keys every reader and counts them twice that day;
+  the reader log takes its address from `ClientAddress` instead (*The reader log*).
+- **Every view is split five ways in the same buckets** (`viewsByLanguage`, `viewsByBrowserLanguage`,
+  `viewsByBrowser`, `viewsByOs`, `viewsByDevice`; views only -- distinct readers per key would need a
+  hash set per key), so each split sums to `views` for buckets written since. The served language
+  is **an explicit argument** of `recordPageView(page, lang, request)` and `recordSocialView`, the
+  language of the body shown (`ArticleModel.servedLanguage()`, `Rendered.language()`,
+  `SocialView.htmlLang()`, else the model's `lang`) -- for an article, not the `?lang` asked for. The
+  browser language is `Accept-Language`'s highest weight (`Locale.LanguageRange.parse`, which throws
+  on a bad header: caught). **Both come off the request, so a language key is from a closed set**
+  (`SiteMetricCollector.languageKey`: ISO 639-1, the original, the website's `language` codes),
+  else `und`: a day bucket is kept forever, and so would a key per invented `/xx/` prefix be.
+- **`ReaderAgentClassifier` (site) is `CrawlerClassifier`'s shape for readers**: ordered lowercase
+  substrings, first match wins, total (`OTHER`, never null). In-app browsers first, through
+  `SocialSourceClassifier.inAppBrowser` (the link page's own table, so both screens name one app);
+  Edge/Opera/Samsung/Yandex/Vivaldi before Chrome, Chrome before Safari (which needs `Version/`);
+  Android before Linux, iOS before macOS; a TV or console before the desktop it also claims. iPadOS
+  sends a Mac's UA and is a macOS desktop. `ReaderBrowser`/`ReaderOs`/`ReaderDevice` (core) names
+  are stored keys: never renamed. Add the captured UA to `ReaderAgentClassifierTest` first.
+- **The cards' shares are of the views the splits were recorded for** (`Audience.counted`), not of
+  every view: buckets from before them hold none, and the card says so (`isPartial`). Each row opens
+  the reader log filtered to it. `ReaderDimension` (studio) names each split's parameter, field and
+  enum; the page type's parameter is `type`, since `page` is the log's page number.
 - **The live count must not degrade to zero**: it returns `LiveCount.unavailable()` and the screen
   says the database is unreachable; every other query falls back to zeroes plus an ERROR.
 - **The chart is server-rendered SVG; `MgmtChart` computes every coordinate**, tooltips are
@@ -1576,6 +1599,53 @@ bookings, page types and totals.
   `socialArticleClicks`, `socialVisitors`) and counts as a `BannerPage.SOCIAL` page view.
 - **`/mgmt/monitoring/live` is pinned separately** in `MgmtSecurityTest` and `make smoke`, like
   every poll: a matcher covering a page but not its JSON would leak it.
+
+### The reader log
+
+`readerVisit` (`ReaderVisit`, core): one row per page view the site counts -- the reader's **IP
+address and raw User-Agent**, both languages, the families, the page type, the path and the
+reader's hash. **Personal data, kept 31 days**, which the buckets must never hold.
+
+- **The TTL index is what bounds it**, built by `SiteIndexes` at provisioning: **`SCHEMA_VERSION`
+  went to 3 with it**, so every existing website is provisioned again (`provision()` moves only
+  `PROVISIONING` to `ACTIVE`; a suspended website stays suspended). Without the bump the rows of every
+  older website never expire. `MetricsIsolationIT` checks the index exists.
+- **`ReaderLogRecorder` is `CrawlerRecorder`'s buffer**: per website (`PerSite`), at most 5,000
+  rows, batched inserts every `app.metrics.reader-log.flush.ms`, a failed batch dropped (the counts
+  are retried in the buckets), `useLiveness` so a deleted website's rows recreate nothing
+  (`SiteLifecycleIT`). The collector reaches it through an optional setter; only views it counts
+  are logged, so crawlers, previews and print renders never are.
+- **The path is `getRequestURI()`, never the query string** (`/search?q=` is the reader's text);
+  the UA is cut at 512, the path at 2,048.
+- **The address is `ClientAddress.of`, the crawler log's rule** (moved out of
+  `CrawlerTrafficFilter`, which delegates): `X-Real-IP` only from a proxy hop. Both applications
+  spell an address through **`IpLiterals.normalise`** (core), or an IPv6 row written one way and a
+  filter typed another match nothing, at 200.
+- **`READER_LOG`** (`app.metrics.reader-log.enabled`, default on, off in the test profile, on again
+  in `TwoWebsitesIT`) writes no row when false; the splits in the buckets do not depend on it. The
+  seeded privacy page (`seed/pages.json`) says the log exists -- for **new** websites only; an
+  existing one keeps its own text, and `make reseed-pages` would drop its edits.
+- **Never in an export**: `SiteArchives.SKIPPED` names it.
+- **`/mgmt/monitoring/readers`** (`MgmtMonitoringController.readers`, `stats.read`: every role
+  that sees statistics sees addresses) reads only rows, so it filters one split by another and
+  counts distinct readers, cut to 31 days on a longer range (`Window.clamped`).
+  - **`MgmtReaderLogService.Filter.of`** normalises every parameter before the model (an enum by
+    name, a code by shape, an address through `IpLiterals`, a User-Agent exactly, `q` quoted), and
+    **every link is built in Java** (`Filter.query`, each value `URLEncoder`-encoded whole, `&` and
+    `=` included -- `UriComponentsBuilder` leaves them in a query) so each carries all the filters;
+    a chip removes one, a row adds one, only the pager carries `page`.
+  - **One `$facet`** reads the totals and the six splits. **Distinct readers group twice** -- by
+    value and `visitor`, then by value -- never `$addToSet`, which would hold every reader of
+    Chrome in a month in one group. An address row's families are its newest view's (`$top`).
+  - **A reader is `$gt: [visitor, null]`, never `$ne`**: the mapper writes no field for a null hash,
+    and a missing field is not equal to null. The operand is `Arrays.asList` (`List.of` refuses
+    `null`). Two conditions on one field throw in `Criteria`, so "has an address" is added only when
+    the filter names none.
+  - Tests: `ReaderAgentClassifierTest`, `ClientAddressTest`, `IpLiteralsTest`,
+    `ReaderLogRecorderTest`, `SiteMetricCollectorTest` (the splits, `und`, the weights, the row),
+    `SiteMetricMappingTest.readerSplitsReadBack`, `MgmtMonitoringServiceTest.audience*`,
+    `MgmtReaderLogServiceTest`, `MgmtScreenRenderTest.readerLog*`/`monitoringShowsTheReaderSplits`,
+    `MgmtSecurityTest.monitoringRequiresAuthentication`, `MetricsIsolationIT.readerRowsStayApart`.
 
 ### Crawlers
 
@@ -1597,6 +1667,7 @@ whether a "Googlebot" was Google. **A crawler is not a reader anywhere on the pl
 - **The address is `X-Real-IP`, never `X-Forwarded-For`** (a proxy that *appends* to XFF, as nginx
   did, and the directly published `cms-site` port leave its first entry the client's claim), and is believed **only when the TCP peer is a proxy hop**, read from
   the innermost request — the `cms-site` port is published directly. Only a parsed IP literal is stored.
+  The rule is `ClientAddress` (site), which the reader log shares.
   After a deploy, `db.crawlerVisit.distinct("ip")` should be public addresses.
 - **Verification is reverse then forward DNS, off the request thread** (`CrawlerVerifier`):
   `VERIFIED`, `UNVERIFIED` (forged — a finding) or `UNKNOWN` (no scheme, timeout, pool full, private
@@ -2441,6 +2512,10 @@ in.
   an apostrophe is always `''`, ids and years are `{0,number,#}`, markup only in keys without
   arguments (`th:utext`), counts as "Label: {0}" (Russian plurals defeat `ChoiceFormat`).
   `MgmtBundleTest` enforces it; `MgmtText.newMessageSource()` is the only `MessageSource`.
+  **Grep a key before adding it**: a `Properties` file keeps a key's last definition, so one
+  appended again relabels every screen that used the first (`noKeyTwiceInAFile` reads the files
+  as text for that; the reader cards' `ops.mon.col.served` once turned the advertising table's
+  "Served" into "Read in").
 - **`MgmtText` is the one resolver** (`msg`, `of(e)`, `label(enum)`, `text(enum, attr)`). Templates
   reach it as **`${mgmtText…}`, a request attribute, never `${@mgmtText…}`**: Thymeleaf 3.1's
   restricted mode refuses bean references (and `th:attr`; use `th:data-*`).
@@ -2515,7 +2590,7 @@ application's account without one.
   `docker/mongo-init/01-create-app-user.js` — run only on an empty data directory — grants
   `readWriteAnyDatabase` and `dbAdminAnyDatabase`: rights on databases that do not exist yet.
 - **Per service.** `cms-site`: `METRICS_VISITOR_SALT` (blank = a per-restart salt), `CRAWLER_TRACKING`,
-  `CRAWLER_VERIFY`, `STUDIO_ORIGIN` (who may frame it, see *Advertising*). `cms-site` and `cms-studio`:
+  `CRAWLER_VERIFY`, `READER_LOG` (*The reader log*), `STUDIO_ORIGIN` (who may frame it, see *Advertising*). `cms-site` and `cms-studio`:
   `PACOD_PREVIEW_SECRET` (the same value; blank = no previews, see *The draft preview*). `cms-studio`:
   `MGMT_SESSION_TIMEOUT`, `IMAGE_*` (compose defaults equal the code's), `PACOD_PDF_GOTENBERG_URL`,
   `PACOD_JOBS_WORKERS`/`PACOD_JOBS_PER_ORGANISATION`, `PACOD_GW_URL`/`PACOD_GW_API_KEY`/`PACOD_AI_MODEL` (*AI*;
@@ -2552,7 +2627,7 @@ application's account without one.
 - **`pacod.content.default-language`** (fallback where no website is bound) and
   **`pacod.studio.default-language`** default to `en`. Test profiles also turn off
   `pacod.bootstrap.enabled`, `pacod.id.enabled`, `app.metrics.enabled`,
-  `app.banner.impression-counting.enabled`, `app.crawlers.*.enabled` and
+  `app.metrics.reader-log.enabled`, `app.banner.impression-counting.enabled`, `app.crawlers.*.enabled` and
   `app.scheduler.tags.enabled`.
 - **CORS** is `app.cors.allowed-origins` (`CORS_ALLOWED_ORIGINS`), origin patterns; a bare `*` is
   refused at startup (credentials are allowed). Unset it is `http://localhost:[*]` everywhere — set

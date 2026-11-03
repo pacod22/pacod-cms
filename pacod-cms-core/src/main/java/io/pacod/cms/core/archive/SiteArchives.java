@@ -11,6 +11,7 @@ import io.pacod.cms.core.data.Menu;
 import io.pacod.cms.core.data.Page;
 import io.pacod.cms.core.data.PdfEnrichment;
 import io.pacod.cms.core.data.PdfSettings;
+import io.pacod.cms.core.data.ReaderVisit;
 import io.pacod.cms.core.data.SiteMetricDay;
 import io.pacod.cms.core.data.SiteMetricHour;
 import io.pacod.cms.core.data.SiteFiles;
@@ -75,7 +76,7 @@ import java.util.zip.ZipOutputStream;
  * ({@code @DBRef}: {@code $ref}/{@code $id}, no database) and number types included.
  *
  * <h2>What is left out</h2>
- * The analytics ({@link #SKIPPED}: hourly and daily buckets, visitors, the crawler log), which
+ * The analytics ({@link #SKIPPED}: hourly and daily buckets, visitors, the crawler and reader logs), which
  * expire on their own and describe another website's traffic; members and roles, which pacod-id
  * holds; the website's hosts, which belong to the installation it came from; the banner backups.
  * {@link #COLLECTIONS} and {@link #SKIPPED} together name every website collection, and
@@ -107,7 +108,7 @@ public class SiteArchives {
 
     /** The website collections it leaves out: analytics, which expire and are another website's traffic. */
     public static final List<String> SKIPPED = List.of(SiteMetricHour.COLLECTION, SiteMetricDay.COLLECTION,
-            SiteVisitor.COLLECTION, CrawlerVisit.COLLECTION);
+            SiteVisitor.COLLECTION, CrawlerVisit.COLLECTION, ReaderVisit.COLLECTION);
 
     /** The trees of a website's folder an archive carries. */
     public static final List<String> TREES = List.of("assets", "resources", "private");

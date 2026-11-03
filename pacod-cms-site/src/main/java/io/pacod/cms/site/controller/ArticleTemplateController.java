@@ -75,15 +75,20 @@ public class ArticleTemplateController {
      * <p>Both side effects must stay together and must not run for views that are not a reader on
      * the site: {@code getArticlePrint} is what gets printed and renders no advertising at all,
      * and does not call this -- which is why counting from here needs no exclusion list.
+     *
+     * <p>{@code lang} is the language the content was shown in, which the reader statistics split
+     * by: for an article, the language of the body served ({@link ArticleModel#servedLanguage()}),
+     * not the one asked for.
      */
-    private void pageRendered(Model model, HttpServletRequest request, BannerPage page) {
-        pageRendered(model, request, page, List.of());
+    private void pageRendered(Model model, HttpServletRequest request, BannerPage page, String lang) {
+        pageRendered(model, request, page, lang, List.of());
     }
 
-    /** {@link #pageRendered(Model, HttpServletRequest, BannerPage)} on a page of these sections. */
-    private void pageRendered(Model model, HttpServletRequest request, BannerPage page, List<Integer> categories) {
+    /** {@link #pageRendered(Model, HttpServletRequest, BannerPage, String)} on a page of these sections. */
+    private void pageRendered(Model model, HttpServletRequest request, BannerPage page, String lang,
+                              List<Integer> categories) {
         addBanners(model, page, categories);
-        metrics.recordPageView(page, request);
+        metrics.recordPageView(page, lang, request);
     }
 
     private void addBanners(Model model, BannerPage page, List<Integer> categories) {
@@ -122,7 +127,7 @@ public class ArticleTemplateController {
         model.addAttribute("regions", composer.compose(PageType.HOME, resolvedLang));
         model.addAttribute("lang", resolvedLang);
         model.addAttribute("head", HeadMeta.home(resolvedLang, site(model)));
-        pageRendered(model, request, BannerPage.LANDING);
+        pageRendered(model, request, BannerPage.LANDING, resolvedLang);
 
         return "landing";
     }
@@ -216,7 +221,8 @@ public class ArticleTemplateController {
         model.addAttribute("pdf", pdfs.article(articleModel.getId(), lang).orElse(null));
         model.addAttribute("regions", composer.compose(PageType.LATEST, lang));
         model.addAttribute("head", HeadMeta.latest(lang, site(model)));
-        pageRendered(model, request, BannerPage.INDEX, latest.map(ArticleTemplateController::categoryIds).orElse(List.of()));
+        pageRendered(model, request, BannerPage.INDEX, articleModel.servedLanguage(),
+                latest.map(ArticleTemplateController::categoryIds).orElse(List.of()));
 
         return "index";
     }
@@ -292,7 +298,7 @@ public class ArticleTemplateController {
         model.addAttribute("pdf", pdfs.article(articleModel.getId(), lang).orElse(null));
         model.addAttribute("regions", composer.compose(PageType.ARTICLE, lang));
         model.addAttribute("head", HeadMeta.article(articleModel, site(model)));
-        pageRendered(model, request, BannerPage.ARTICLE, categoryIds(article));
+        pageRendered(model, request, BannerPage.ARTICLE, articleModel.servedLanguage(), categoryIds(article));
         return "article";
     }
 
@@ -383,7 +389,7 @@ public class ArticleTemplateController {
         model.addAttribute("regions", composer.compose(PageType.CATEGORY, lang));
         model.addAttribute("head", HeadMeta.list(id, pageable.getPageNumber(),
                 listId != null && !WebArticleService.isMostRead(listId), lang, site(model)));
-        pageRendered(model, request, BannerPage.LIST, listId == null ? List.of() : List.of(listId));
+        pageRendered(model, request, BannerPage.LIST, lang, listId == null ? List.of() : List.of(listId));
 
         return "list";
     }

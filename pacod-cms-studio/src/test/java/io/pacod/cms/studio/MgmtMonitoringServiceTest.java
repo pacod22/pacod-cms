@@ -338,6 +338,89 @@ class MgmtMonitoringServiceTest {
         assertThat(traffic).filteredOn(p -> p.views() == 0).allMatch(p -> p.share() == 0d);
     }
 
+    @Test
+    @DisplayName("the reader splits sum the window; a language asked for and never served still has its row")
+    void audienceSumsTheWindow() {
+        List<MgmtMonitoringService.Bucket> buckets = List.of(
+                readerBucket(80, new MgmtMonitoringService.Readers(
+                        Map.of("bg", 60L, "en", 20L), Map.of("de", 50L, "bg", 30L),
+                        Map.of("CHROME", 50L, "SAFARI", 30L), Map.of("ANDROID", 80L), Map.of("MOBILE", 80L))),
+                readerBucket(20, new MgmtMonitoringService.Readers(
+                        Map.of("bg", 10L, "und", 10L), Map.of("und", 20L),
+                        Map.of("CHROME", 20L), Map.of("WINDOWS", 20L), Map.of("DESKTOP", 20L))));
+
+        MgmtMonitoringService.Audience audience = service.audience(buckets, java.util.Locale.ENGLISH);
+
+        assertThat(audience.counted()).isEqualTo(100);
+        assertThat(audience.isPartial()).isFalse();
+        assertThat(audience.languages()).extracting(MgmtMonitoringService.LanguageRow::code)
+                // By views read in it; German, never served, by what browsers asked; unknown last.
+                .containsExactly("bg", "en", "de", "und");
+        MgmtMonitoringService.LanguageRow bulgarian = audience.languages().getFirst();
+        assertThat(bulgarian.name()).isEqualTo("Bulgarian");
+        assertThat(bulgarian.served()).isEqualTo(70);
+        assertThat(bulgarian.servedShare()).isEqualTo(70d);
+        assertThat(bulgarian.preferred()).isEqualTo(30);
+        MgmtMonitoringService.LanguageRow german = audience.languages().get(2);
+        assertThat(german.served()).isZero();
+        assertThat(german.preferred()).isEqualTo(50);
+        assertThat(audience.languages().getLast().name()).isEqualTo("Unknown");
+
+        assertThat(audience.browsers()).extracting(MgmtMonitoringService.SplitRow::key).containsExactly("CHROME", "SAFARI");
+        assertThat(audience.browsers().getFirst().value()).isEqualTo(io.pacod.cms.core.data.ReaderBrowser.CHROME);
+        assertThat(audience.browsers().getFirst().share()).isEqualTo(70d);
+        assertThat(audience.systems()).extracting(MgmtMonitoringService.SplitRow::key).containsExactly("ANDROID", "WINDOWS");
+        assertThat(audience.devices()).extracting(MgmtMonitoringService.SplitRow::views).containsExactly(80L, 20L);
+    }
+
+    @Test
+    @DisplayName("views from before the splits are not divided by: the shares are of what was split, and that is said")
+    void audienceOverOlderBucketsIsPartial() {
+        List<MgmtMonitoringService.Bucket> buckets = List.of(
+                bucket(300, 40),
+                readerBucket(100, new MgmtMonitoringService.Readers(
+                        Map.of("bg", 100L), Map.of("bg", 100L), Map.of("FIREFOX", 100L), Map.of("LINUX", 100L),
+                        Map.of("DESKTOP", 100L))));
+
+        MgmtMonitoringService.Audience audience = service.audience(buckets, java.util.Locale.ENGLISH);
+
+        assertThat(audience.views()).isEqualTo(400);
+        assertThat(audience.counted()).isEqualTo(100);
+        assertThat(audience.isPartial()).isTrue();
+        assertThat(audience.browsers().getFirst().share()).isEqualTo(100d);
+
+        // A window with no split view at all is empty, not a table of zeroes.
+        assertThat(service.audience(List.of(bucket(300, 40)), java.util.Locale.ENGLISH).isEmpty()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a stored bucket's splits reach the series")
+    void seriesCarriesTheSplits() {
+        LocalDateTime hour = LocalDateTime.now().truncatedTo(ChronoUnit.HOURS).minusHours(1);
+        io.pacod.cms.core.data.SiteMetricHour metric = new io.pacod.cms.core.data.SiteMetricHour();
+        metric.setId(io.pacod.cms.core.data.SiteMetricHour.idFor(hour));
+        metric.setStart(hour);
+        metric.setViews(3);
+        metric.setViewsByLanguage(Map.of("de", 3L));
+        metric.setViewsByBrowser(Map.of("EDGE", 3L));
+        when(hourRepository.findInWindow(any(), any())).thenReturn(List.of(metric));
+
+        List<MgmtMonitoringService.Bucket> buckets = service.series(MonitoringRange.H24);
+
+        assertThat(buckets).filteredOn(b -> b.start().equals(hour)).singleElement().satisfies(b -> {
+            assertThat(b.readers().languages()).containsEntry("de", 3L);
+            assertThat(b.readers().browsers()).containsEntry("EDGE", 3L);
+            assertThat(b.readers().devices()).isEmpty();
+        });
+        assertThat(buckets).filteredOn(b -> !b.start().equals(hour))
+                .allMatch(b -> b.readers() == MgmtMonitoringService.Readers.NONE);
+    }
+
+    private static MgmtMonitoringService.Bucket readerBucket(long views, MgmtMonitoringService.Readers readers) {
+        return new MgmtMonitoringService.Bucket(LocalDateTime.now(), "14:00", "09.08 14:00",
+                views, 0, 0, 0, Map.of(), Map.of(), Map.of(), Map.of(), readers);
+    }
+
     /** An hour well after every fixture booking's creation, so the id-reuse guard keeps it. */
     private static final LocalDateTime HOUR = LocalDateTime.of(2026, 8, 9, 14, 0);
 

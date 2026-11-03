@@ -13,6 +13,8 @@ import java.time.format.DateTimeFormatter;
  *
  * <p>Three fields, and the list is the point: a hash, a day, and when that reader was last seen.
  * <b>No IP address, no User-Agent, no path, no referrer</b>, and nothing that survives two days.
+ * The reader log ({@link ReaderVisit}) does hold an address and a User-Agent, for 31 days and only
+ * while the site's {@code READER_LOG} switch is on; the counting here never depends on it.
  * The public site is deliberately {@code SessionCreationPolicy.STATELESS} and sets a cookie only
  * for language ({@code LocaleConfig}); counting readers must not change either fact, so
  * {@code VisitorIdentity} derives {@link #hash} from the request and the request alone.

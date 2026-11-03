@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -210,6 +211,10 @@ class MgmtScreenRenderTest {
     @MockitoBean
     private MgmtMonitoringService monitoringService;
 
+    /** Mocked: its reads are aggregations over readerVisit, which the tests' context has no server for. */
+    @MockitoBean
+    private MgmtReaderLogService readerLogService;
+
     @MockitoBean
     private MgmtPageService pageService;
 
@@ -367,6 +372,7 @@ class MgmtScreenRenderTest {
         when(imageService.countCreatedSince(any())).thenReturn(4L);
 
         stubMonitoring(List.of(bucket(4, 120, 31), bucket(3, 90, 24), bucket(2, 0, 0), bucket(1, 45, 12)));
+        stubReaderLog();
         stubCrawlers(List.of(crawlerBucket(2, 40, 12, 3), crawlerBucket(1, 25, 8, 1)),
                 new MgmtCrawlerService.Watch(false, java.time.Instant.parse("2026-09-01T00:00:00Z"), List.of()));
 
@@ -515,6 +521,8 @@ class MgmtScreenRenderTest {
         // whatever it was handed and prove nothing about MgmtChart.
         doCallRealMethod().when(monitoringService).trafficChart(any());
         doCallRealMethod().when(monitoringService).bannerChart(any(), any(), any());
+        // The reader cards' sums, shares and language names are the real ones over the buckets.
+        doCallRealMethod().when(monitoringService).audience(any(), any());
         when(monitoringService.trafficByPage(any())).thenReturn(List.of(
                 new MgmtMonitoringService.PageTraffic(io.pacod.cms.core.data.BannerPage.ARTICLE,
                         "Статия", 200L, 78.4d)));
@@ -535,7 +543,53 @@ class MgmtScreenRenderTest {
                 views, visitors, views * 8, views / 20, java.util.Map.of("ARTICLE", views),
                 java.util.Map.of("3", views * 6, "4", views * 3, "5", views * 3),
                 java.util.Map.of("3", views * 2, "4", views, "5", views),
-                java.util.Map.of("3", views * 3 / 20, "4", views * 3 / 40));
+                java.util.Map.of("3", views * 3 / 20, "4", views * 3 / 40),
+                // A quarter read in English, and German asked for by half the browsers but never
+                // served: the row the language card exists to show.
+                new MgmtMonitoringService.Readers(
+                        java.util.Map.of("bg", views - views / 4, "en", views / 4),
+                        java.util.Map.of("bg", views / 2, "de", views - views / 2),
+                        java.util.Map.of("CHROME", views / 2, "SAFARI", views - views / 2),
+                        java.util.Map.of("ANDROID", views / 2, "IOS", views - views / 2),
+                        java.util.Map.of("MOBILE", views)));
+    }
+
+    private static final String READER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 "
+            + "(KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36 <probe>";
+
+    /**
+     * The reader log reads four things; each is stubbed so a null never reaches the screen. The
+     * User-Agent carries markup on purpose: it is whatever a client wrote, and must come out as text.
+     */
+    private void stubReaderLog() {
+        java.time.Instant at = java.time.Instant.parse("2026-11-03T08:15:30Z");
+        when(readerLogService.report(any(), any(), any())).thenReturn(new MgmtReaderLogService.Report(
+                new MgmtReaderLogService.Totals(42, 17, 9),
+                List.of(new MgmtReaderLogService.SplitTable(ReaderDimension.BROWSER, List.of(
+                                new MgmtReaderLogService.Split("CHROME", io.pacod.cms.core.data.ReaderBrowser.CHROME,
+                                        null, 30, 12, 71.4d))),
+                        new MgmtReaderLogService.SplitTable(ReaderDimension.LANGUAGE, List.of(
+                                new MgmtReaderLogService.Split("de", null, "Deutsch", 20, 8, 47.6d))),
+                        new MgmtReaderLogService.SplitTable(ReaderDimension.DEVICE, List.of()))));
+        when(readerLogService.topAddresses(any(), any())).thenReturn(List.of(new MgmtReaderLogService.AddressRow(
+                "198.51.100.7", 12, 2, at, io.pacod.cms.core.data.ReaderBrowser.CHROME,
+                io.pacod.cms.core.data.ReaderOs.ANDROID, io.pacod.cms.core.data.ReaderDevice.MOBILE)));
+        when(readerLogService.topAgents(any(), any())).thenReturn(List.of(new MgmtReaderLogService.AgentRow(
+                READER_AGENT, io.pacod.cms.core.data.ReaderBrowser.CHROME, io.pacod.cms.core.data.ReaderOs.ANDROID,
+                io.pacod.cms.core.data.ReaderDevice.MOBILE, 12, 2)));
+        io.pacod.cms.core.data.ReaderVisit row = new io.pacod.cms.core.data.ReaderVisit();
+        row.setOccurredAt(at);
+        row.setPage(io.pacod.cms.core.data.BannerPage.ARTICLE);
+        row.setPath("/article/42");
+        row.setServedLanguage("bg");
+        row.setBrowserLanguage("de");
+        row.setBrowser(io.pacod.cms.core.data.ReaderBrowser.CHROME);
+        row.setOs(io.pacod.cms.core.data.ReaderOs.ANDROID);
+        row.setDevice(io.pacod.cms.core.data.ReaderDevice.MOBILE);
+        row.setIp("198.51.100.7");
+        row.setUserAgent(READER_AGENT);
+        when(readerLogService.log(any(), any(), anyInt())).thenAnswer(invocation ->
+                new MgmtReaderLogService.LogPage(List.of(row), invocation.getArgument(2), true));
     }
 
     /**
@@ -2508,6 +2562,80 @@ class MgmtScreenRenderTest {
                 .andExpect(content().string(containsString("chart-key viewable")))
                 // The nav entry, which is shared chrome and therefore easy to break from elsewhere.
                 .andExpect(content().string(containsString("<span class=\"nav-text\">Трафик</span>")));
+    }
+
+    @Test
+    @DisplayName("the reader cards split the period by language, browser, system and device, each row opening the log")
+    void monitoringShowsTheReaderSplits() throws Exception {
+        String html = mockMvc.perform(get("/mgmt/monitoring").param("range", "7d"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Language names in the operator's language, from the JDK, the code beside each.
+        assertThat(html).contains("Български", "Английски", "Немски");
+        // German is asked for and never served: its row is there with a zero under «Четено на».
+        assertThat(html).contains("/mgmt/monitoring/readers?range=7d&amp;preferred=de");
+        assertThat(html).contains("/mgmt/monitoring/readers?range=7d&amp;served=bg");
+        assertThat(html).contains("/mgmt/monitoring/readers?range=7d&amp;browser=CHROME", ">Chrome<", ">Safari<");
+        assertThat(html).contains("/mgmt/monitoring/readers?range=7d&amp;os=ANDROID", ">Android<");
+        assertThat(html).contains("/mgmt/monitoring/readers?range=7d&amp;device=MOBILE", ">Телефон<");
+        // Every view of the window was split, so no "split since" note.
+        assertThat(html).doesNotContain("Разделени, откакто");
+    }
+
+    @Test
+    @DisplayName("the reader log carries every filter on every link, as chips that remove one each")
+    void readerLogRendersWithItsFilters() throws Exception {
+        String html = mockMvc.perform(get("/mgmt/monitoring/readers").param("range", "7d")
+                        .param("browser", "chrome").param("served", "DE").param("ip", "198.51.100.7")
+                        .param("q", "/article"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Normalised before the model: the enum's name, the code in lower case.
+        org.mockito.ArgumentCaptor<MgmtReaderLogService.Filter> filter =
+                org.mockito.ArgumentCaptor.forClass(MgmtReaderLogService.Filter.class);
+        verify(readerLogService).report(filter.capture(), any(), any());
+        assertThat(filter.getValue().get(ReaderDimension.BROWSER)).isEqualTo("CHROME");
+        assertThat(filter.getValue().get(ReaderDimension.LANGUAGE)).isEqualTo("de");
+        assertThat(filter.getValue().ip()).isEqualTo("198.51.100.7");
+        assertThat(filter.getValue().q()).isEqualTo("/article");
+
+        // A chip per filter, each a link to the log without it.
+        assertThat(html).contains("Браузър: Chrome", "Език на четене: Немски", "IP адрес: 198.51.100.7", "Път: /article");
+        assertThat(html).contains("?range=7d&amp;served=de&amp;ip=198.51.100.7&amp;q=%2Farticle\"");
+        // The range form and the log's form keep what they have no control for.
+        assertThat(html).contains("type=\"hidden\" name=\"browser\" value=\"CHROME\"",
+                "type=\"hidden\" name=\"served\" value=\"de\"", "type=\"hidden\" name=\"ip\" value=\"198.51.100.7\"");
+        // The pager carries them all, and only it carries the page.
+        assertThat(html).contains("?range=7d&amp;served=de&amp;browser=CHROME&amp;ip=198.51.100.7&amp;q=%2Farticle&amp;page=1#log");
+        // A split row adds itself to the filter; the selected one is marked.
+        assertThat(html).contains("row-selected", ">Deutsch<");
+        // The address and the User-Agent, as text: what a client wrote is never markup.
+        assertThat(html).contains(">198.51.100.7<", "Chrome/130.0.0.0 Mobile Safari/537.36 &lt;probe&gt;")
+                .doesNotContain("<probe>");
+        assertThat(html).contains("Chrome · Android · Телефон");
+        // The log row itself, and the retention said up front.
+        assertThat(html).contains("/article/42", "03.11.2026");
+        assertThat(html).contains("31 дни");
+    }
+
+    @Test
+    @DisplayName("a filter that names nothing is no filter, and twelve months are cut to the log's 31 days")
+    void readerLogNormalisesItsFilters() throws Exception {
+        String html = mockMvc.perform(get("/mgmt/monitoring/readers").param("range", "12m")
+                        .param("browser", "netscape").param("served", "v1-x").param("ip", "example.com")
+                        .param("page", "-4"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        org.mockito.ArgumentCaptor<MgmtReaderLogService.Filter> filter =
+                org.mockito.ArgumentCaptor.forClass(MgmtReaderLogService.Filter.class);
+        verify(readerLogService).log(filter.capture(), any(), eq(0));
+        assertThat(filter.getValue().isActive()).isFalse();
+        assertThat(filter.getValue().ip()).isNull();
+        assertThat(html).doesNotContain("netscape", "Премахни този филтър");
+        assertThat(html).contains("Периодът стига по-назад");
     }
 
     @Test

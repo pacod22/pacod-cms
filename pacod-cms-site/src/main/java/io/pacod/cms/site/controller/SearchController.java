@@ -110,7 +110,7 @@ public class SearchController {
         model.addAttribute("head", HeadMeta.minimal(resolved,
                 model.getAttribute("site") instanceof SiteChrome site ? site : null));
         model.addAttribute("regions", composer.compose(PageType.SEARCH, resolved));
-        pageRendered(model, request);
+        pageRendered(model, request, resolved);
 
         return "search";
     }
@@ -158,7 +158,7 @@ public class SearchController {
         model.addAttribute("q", term);
         model.addAttribute("lang", resolved);
         model.addAttribute("head", HeadMeta.minimal(resolved, site));
-        pageRendered(model, request);
+        pageRendered(model, request, resolved);
 
         return "search-google";
     }
@@ -168,10 +168,10 @@ public class SearchController {
      * {@code ArticleTemplateController.pageRendered} states: they must not drift apart, and
      * neither is visible on the page if it is dropped.
      */
-    private void pageRendered(Model model, HttpServletRequest request) {
+    private void pageRendered(Model model, HttpServletRequest request, String lang) {
         model.addAttribute("topBanners", bannerService.forPage(BannerPlacement.TOP, BannerPage.SEARCH));
         model.addAttribute("sidebarBanners", bannerService.forPage(BannerPlacement.SIDEBAR, BannerPage.SEARCH));
-        metrics.recordPageView(BannerPage.SEARCH, request);
+        metrics.recordPageView(BannerPage.SEARCH, lang, request);
     }
 
     /**

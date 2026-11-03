@@ -117,7 +117,9 @@ preview is counted or tracked, and drafts are read past every cache.
   always as a new website created the way the portal creates one.
 - **Counters** (page views, readers, banner impressions, crawler visits) are buffered in the site per
   website and flushed into that website's database; the studio reads them for its dashboard,
-  monitoring and crawler screens.
+  monitoring and crawler screens. Page views are also split by the language read, the browser's
+  language, browser, system and device, and -- while `READER_LOG` is on -- written one row each to
+  a reader log that keeps the reader's address and User-Agent for 31 days.
 
 ## Front door
 

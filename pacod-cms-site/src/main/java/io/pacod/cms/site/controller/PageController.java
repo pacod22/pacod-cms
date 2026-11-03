@@ -102,7 +102,7 @@ public class PageController {
 
         model.addAttribute("topBanners", bannerService.forPage(BannerPlacement.TOP, BannerPage.PAGE));
         model.addAttribute("sidebarBanners", bannerService.forPage(BannerPlacement.SIDEBAR, BannerPage.PAGE));
-        metrics.recordPageView(BannerPage.PAGE, request);
+        metrics.recordPageView(BannerPage.PAGE, rendered.language(), request);
 
         return "page";
     }

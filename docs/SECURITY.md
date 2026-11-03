@@ -131,6 +131,14 @@ Every answer from the gateway is treated as hostile input:
 
 ## Public pages
 
+- **Readers are counted without a cookie**, by a salted, truncated hash of address and browser.
+  **The reader log keeps more**: each counted page view with the reader's IP address, User-Agent,
+  languages and the page's path (never its query string), deleted after 31 days by a TTL index,
+  for whoever holds `stats.read` on the website (`/mgmt/monitoring/readers`). That is personal
+  data: a website's privacy page should say it is kept, and `READER_LOG=false` keeps none. The
+  address is Caddy's `X-Real-IP`, believed only from a proxy hop, never a client-written
+  `X-Forwarded-For`. Crawlers, previews and print renders are never logged, and the log never
+  leaves in an export.
 - **Only published articles reach a reader**, on every route, list, feed, sitemap and PDF; only
   published journal issues are listed, and a draft issue's PDF is kept outside every public folder
   and downloaded only through the studio, as an attachment.

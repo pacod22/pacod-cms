@@ -111,20 +111,20 @@ public class SocialController {
         String host = request.getServerName();
         SocialSource source = SocialSourceClassifier.classify(src, utmSource,
                 request.getParameterMap().keySet(), userAgent, referer, host);
-        // The site's one definition of a bot (CrawlerTraffic), read off the header rather than the
-        // filter's attribute so these tests can assert on the User-Agent they send -- and the
-        // preview's mark, which no header carries.
-        if (CrawlerTraffic.classify(userAgent) == null && !CrawlerTraffic.isUncounted(request)
-                && !SocialSourceClassifier.isOwnSocialPage(referer, host)) {
-            metrics.recordSocialView(source, request);
-        }
-
         List<Article> latest = page.isShowLatestArticles()
                 ? reader.latestArticles(page.latestCount())
                 : List.of();
         SocialView view = SocialView.of(page, snapshot.avatarPath(), snapshot.targets(),
                 resolveLang(lang, langCookie), LocalDateTime.now(), latest, languageReader.findAll(), source,
                 siteChromeReader.settings().ownHosts());
+
+        // The site's one definition of a bot (CrawlerTraffic), read off the header rather than the
+        // filter's attribute so these tests can assert on the User-Agent they send -- and the
+        // preview's mark, which no header carries. Counted in the language the page is shown in.
+        if (CrawlerTraffic.classify(userAgent) == null && !CrawlerTraffic.isUncounted(request)
+                && !SocialSourceClassifier.isOwnSocialPage(referer, host)) {
+            metrics.recordSocialView(source, view.htmlLang(), request);
+        }
 
         model.addAttribute("social", view);
         // The page's language, which the chrome's messages follow (LocaleConfig).

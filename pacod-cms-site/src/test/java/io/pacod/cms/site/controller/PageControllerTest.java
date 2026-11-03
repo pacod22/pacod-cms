@@ -139,7 +139,7 @@ class PageControllerTest {
                 .andExpect(model().attributeExists("topBanners"))
                 .andExpect(model().attributeExists("sidebarBanners"));
 
-        verify(metrics, times(1)).recordPageView(eq(BannerPage.PAGE), any());
+        verify(metrics, times(1)).recordPageView(eq(BannerPage.PAGE), eq("bg"), any());
     }
 
     @Test
