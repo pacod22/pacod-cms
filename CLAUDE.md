@@ -1246,11 +1246,17 @@ MongoDB via Spring Data. No JPA, no JDBC.
   - **The one exception is the studio's draft preview**: under a valid preview token
     (`SitePreview.current()`) `getArticleById` serves an unpublished article, uncounted and
     `noindex`; lists stay published-only even there (`PreviewIT.draftArticleOnlyWithToken`). The
-    editor's Preview, the translation screen's and the image screen's "View on the site" go through
+    editor's Preview, the translation screen's, the image screen's and the article list's "View on
+    the site" go through
     **`GET /mgmt/articles/{id}/preview`** (`content.read`), which mints the token **at the click**
     (an editor page outlives a token) and redirects to the website's origin
     (`DesignPreview.articleUrl`; without the secret, the public address). They used to be
-    `@{/article/…}`, which on the studio's own host is a studio path — a 404 since Phase 2.
+    `@{/article/…}`, which on the studio's own host is a studio path — a 404 since Phase 2. **The
+    page editor's "View page" is `GET /mgmt/pages/{slug}/preview`** (`DesignPreview.pageUrl`), the
+    same shape; an unpublished page is refused there with a flash, since the website answers only a
+    published one. **No studio template may write `@{/article/…}`, `@{/p/…}` or `@{/list/…}`**:
+    `@{}` adds `/sites/<id>`, and the link is a 404 on the studio's host
+    (`MgmtScreenRenderTest.listAndPageLinksLeaveTheStudio`).
   - Elsewhere: `PdfArticlesHandler` skips an unpublished article (a PDF lands in public storage),
     the design preview shows the newest **published** article, the demo content writes every
     article `PUBLISHED`.

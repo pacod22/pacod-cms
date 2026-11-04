@@ -2400,6 +2400,31 @@ class MgmtScreenRenderTest {
     }
 
     @Test
+    @DisplayName("the article list and the page editor open the website through the studio's routes, never /sites/<id>/article or /p")
+    void listAndPageLinksLeaveTheStudio() throws Exception {
+        String list = mockMvc.perform(get("/mgmt/articles")).andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(list).contains("/preview\"").doesNotContain("href=\"/article/");
+
+        String page = mockMvc.perform(get("/mgmt/pages/terms").param("lang", "en"))
+                .andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(page).contains("href=\"/mgmt/pages/terms/preview?lang=en\"")
+                .doesNotContain("href=\"/p/");
+
+        // No website address here: back to the editor, in the language it was on, saying why.
+        mockMvc.perform(get("/mgmt/pages/terms/preview").param("lang", "en"))
+                .andExpect(redirectedUrl("/mgmt/pages/terms?lang=en"))
+                .andExpect(flash().attribute("error", org.hamcrest.Matchers.containsString("адрес")));
+
+        // An unpublished page is not on the website, token or not: said here, not a 404 there.
+        io.pacod.cms.core.data.Page draft = standingPage();
+        draft.setPublished(false);
+        when(pageService.find("terms")).thenReturn(Optional.of(draft));
+        mockMvc.perform(get("/mgmt/pages/terms/preview"))
+                .andExpect(redirectedUrl("/mgmt/pages/terms"))
+                .andExpect(flash().attribute("error", org.hamcrest.Matchers.containsString("не е публикувана")));
+    }
+
+    @Test
     @DisplayName("the rest of the website: a card of its own, tags unticked; the parts and languages posted are allow-listed")
     void queueSiteTranslation() throws Exception {
         org.assertj.core.api.Assertions.assertThat(mockMvc.perform(get("/mgmt/jobs")).andReturn().getResponse().getContentAsString())

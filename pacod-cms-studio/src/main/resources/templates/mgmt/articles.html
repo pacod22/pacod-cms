@@ -132,7 +132,7 @@
                             <td>
                                 <div class="row-actions">
                                     <a class="btn btn-ghost btn-icon btn-sm" th:title="#{articles.c.viewOnSite}"
-                                       th:href="@{/article/{id}(id=${a.id})}" target="_blank" rel="noopener">
+                                       th:href="@{/mgmt/articles/{id}/preview(id=${a.id})}" target="_blank" rel="noopener">
                                         <svg class="i"><use href="#i-eye"></use></svg>
                                         <span class="sr-only" th:text="#{articles.c.viewOnSite}">View on the site</span>
                                     </a>

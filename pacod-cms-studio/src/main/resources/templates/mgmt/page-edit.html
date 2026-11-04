@@ -33,7 +33,7 @@
                 <a class="btn btn-ghost" th:href="@{/mgmt/pages}">
                     <svg class="i"><use href="#i-arrow-up"></use></svg> <span th:text="#{pages.allPages}">All pages</span>
                 </a>
-                <a class="btn btn-ghost" th:href="@{'/p/' + ${page.slug}(lang=${language.code})}"
+                <a class="btn btn-ghost" th:href="@{/mgmt/pages/{slug}/preview(slug=${page.slug}, lang=${language.code})}"
                    target="_blank" rel="noopener">
                     <svg class="i"><use href="#i-external"></use></svg> <span th:text="#{pages.viewPage}">View page</span>
                 </a>

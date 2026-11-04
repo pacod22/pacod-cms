@@ -95,11 +95,25 @@ public class DesignPreview {
      * @param lang the language to show it in, kept only when it looks like a code
      */
     public Optional<String> articleUrl(int id, String lang) {
+        return siteUrl("/article/" + id, lang);
+    }
+
+    /**
+     * Where a standing page's "View page" goes: {@code /p/{slug}} on the website's own origin, as
+     * {@link #articleUrl} does for an article -- never {@code @{/p/…}}, which on the studio's host
+     * is the studio's path, a 404. The token marks the visit uncounted; the site still answers only
+     * a published page.
+     */
+    public Optional<String> pageUrl(String slug, String lang) {
+        return siteUrl("/p/" + UriUtils.encodePathSegment(slug, StandardCharsets.UTF_8), lang);
+    }
+
+    private Optional<String> siteUrl(String path, String lang) {
         String origin = sites.current().map(StudioSites.SiteView::publicUrl).orElse(null);
         if (origin == null) {
             return Optional.empty();
         }
-        StringBuilder url = new StringBuilder(origin).append("/article/").append(id);
+        StringBuilder url = new StringBuilder(origin).append(path);
         String separator = "?";
         if (lang != null && lang.matches("[a-z]{2,3}")) {
             url.append(separator).append("lang=").append(lang);

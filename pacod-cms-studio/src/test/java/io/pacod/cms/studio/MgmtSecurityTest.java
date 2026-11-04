@@ -267,6 +267,16 @@ class MgmtSecurityTest {
     }
 
     @Test
+    @DisplayName("a page's View page route is not answered anonymously")
+    @WithAnonymousUser
+    void pagePreviewRequiresAuthentication() throws Exception {
+        // It mints a preview token for the website: anonymous, that would be a token for anyone.
+        mockMvc.perform(get("/mgmt/pages/about/preview"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/mgmt/login"));
+    }
+
+    @Test
     @DisplayName("the language list is not editable anonymously, every route of it")
     @WithAnonymousUser
     void languageScreensRequireAuthentication() throws Exception {

@@ -90,6 +90,39 @@ public class MgmtPageController {
         }
     }
 
+    private io.pacod.cms.studio.design.DesignPreview preview;
+
+    /** Where "View page" goes; optional so the hand-built tests need none. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void usePreview(io.pacod.cms.studio.design.DesignPreview preview) {
+        this.preview = preview;
+    }
+
+    /**
+     * The editor's "View page": a redirect to the page on the website's own origin, as the article
+     * editor's "Preview" is. Never {@code @{/p/…}}, which on the studio's host is the studio's path
+     * under {@code /sites/<id>}, a 404. An unpublished page is not shown by the website, token or
+     * not, so the editor says so rather than sending the operator to a 404 of the website's.
+     */
+    @GetMapping("/{slug}/preview")
+    public String preview(@PathVariable String slug,
+                          @RequestParam(name = "lang", required = false) String lang,
+                          RedirectAttributes redirect) {
+        Page page = require(slug);
+        String back = "redirect:/mgmt/pages/" + page.getSlug()
+                + (lang != null && lang.matches("[a-z]{2,3}") ? "?lang=" + lang : "");
+        if (!page.isPublished()) {
+            redirect.addFlashAttribute("error", text.msg("pages.preview.unpublished"));
+            return back;
+        }
+        java.util.Optional<String> url = preview == null ? java.util.Optional.empty() : preview.pageUrl(page.getSlug(), lang);
+        if (url.isEmpty()) {
+            redirect.addFlashAttribute("error", text.msg("pages.preview.noAddress"));
+            return back;
+        }
+        return "redirect:" + url.get();
+    }
+
     @GetMapping("/{slug}")
     public String edit(@PathVariable String slug,
                        @RequestParam(name = "lang", required = false) String lang,
