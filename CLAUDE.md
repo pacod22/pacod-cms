@@ -2489,6 +2489,49 @@ Every AI feature calls **pacod-gw** (OpenAI's chat API, `/v1/chat/completions`) 
   - `MgmtScreenRenderTest.writingHelp`/`editorAiControls`/`bodyBlocksStylesheet` (the draft card
     outside the form, nothing named), and `MgmtSecurityTest` pins the seven endpoints anonymously.
 
+### pacod-broker
+
+pacod-broker is the platform's catalogue of models, MCP servers, agents, tools and datasets. The
+studio meets it in `studio.broker`, all off while `pacod.broker.url` (`PACOD_BROKER_URL`) is blank
+(`BrokerConfig`):
+
+- **A website offered as a dataset.** The website's settings screen (`website.manage`) sets
+  `Website.brokerOffer` -- `organisation` (announced as `organisation:<org>`), `platform`, `public`,
+  or null -- and `brokerSummary` (at most 300 characters); the field shows only where a broker is
+  configured, so a form without it posts null and **null leaves the stored offer** (blank clears it).
+  `BrokerAnnouncer` (a virtual thread from `ApplicationReadyEvent`, like `IdentityLifecycle`) every
+  `pacod.broker.refresh` (60 s) builds one announcement per organisation from its offered `ACTIVE`
+  websites: kind `dataset`, key the website id, interfaces `other:website`, `other:llms-txt`,
+  `other:llms-full-txt`, `other:atom`, `other:sitemap` at the website's origin (`baseUrl`, else
+  `StudioSites.publicUrl`) -- each file only while `SiteFiles` leaves it on -- and the robots AI
+  switches as tags. It sends only what changed, under the same lease, heartbeats every
+  `heartbeat_every_s`, and says goodbye when nothing is offered or the studio stops. Each
+  organisation fails on its own (`errors()`, shown on the settings screen). **Off in the one-off
+  command runs** (`--pacod.broker.announce=false` in the Makefile's `STUDIO_CLI`), which would
+  otherwise announce for a moment.
+- **Each organisation announces as itself** (`BrokerProviders`): its own pacod-id service account
+  `cms-broker`, holding `broker.provider` at the organisation, made the first time it offers a
+  website by **`Provisioner.mintBrokerProvider`** -- the provisioner's second fixed method, so its
+  `pidt_` is still read by `Provisioner` alone. It works when the provisioner account also holds
+  `broker.provisioner` at the platform: pacod-id lets whoever holds the acting product's grant
+  permission at a scope (`cms.members.manage`, through `cms.provisioner`) manage service accounts
+  there, and the broker's grant rules let `broker.members.manage` give `broker.provider`. The token is
+  stored in the control plane (`BrokerCredential`, `brokerCredentials`, never rendered, unencrypted
+  like the gateway key); a 401 forgets it and the next round makes a new one. With
+  `pacod.broker.open-mode` no token is needed.
+- **The AI card** (`/mgmt/platform`): `AiCatalog.ModelOption.brokerResourceId` comes from the
+  gateway's `/gw/v1/models` (pacod-gw's `broker_resource_id`, `res_` + hex or dropped); a model's
+  details show its reputation, price now and state on the broker (`BrokerFacts`, the studio's consumer
+  token `pacod.broker.token`, cached 60 s, a failure 10 s). Below the card, **"Found on pacod-broker"**
+  lists chat models that answer a JSON schema which the gateway does not offer yet: shown, never
+  selectable -- a feature calls only what the gateway offers, and its admin adds them.
+- **Everything from the broker is other providers' words**: `th:text` only, never a link.
+- `BrokerClient` is hand-written (pacod-broker ships no Java client): `RestClient` over HTTP/1.1, a
+  request built from a `URI` so a lease id is encoded once, problem titles cut to 300 characters.
+- Tests: `BrokerAnnouncerTest` (a stand-in broker: the announcement, the update under the same
+  lease, heartbeats, the goodbye, no token), `TokenExchangeTest.mintsABrokerProvider` /
+  `brokerProviderRefused`, `AiCatalogTest.brokerResource`, `PortalWebsitesTest.brokerOffer`.
+
 ### Studio languages
 
 The studio's UI is **English, Bulgarian, German or Russian**, switched in the topbar and under the

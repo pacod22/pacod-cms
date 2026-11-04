@@ -173,4 +173,20 @@ public class AiCatalogTest {
         assertThat(failed.details()).isNull();
         assertThat(failed.error()).contains("404");
     }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("a model keeps the pacod-broker resource the gateway links it to, and nothing that is not one")
+    void brokerResource() {
+        tools.jackson.databind.ObjectMapper json = new tools.jackson.databind.ObjectMapper();
+        AiCatalog.Catalog c = AiCatalog.parse(json.readTree("""
+                {"models": [
+                  {"id": "openai/linked", "kind": "chat", "state": "active", "broker_resource_id": "res_0a1b2c3d"},
+                  {"id": "openai/bad", "kind": "chat", "state": "active", "broker_resource_id": "../admin"},
+                  {"id": "openai/none", "kind": "chat", "state": "active"}
+                ], "templates": []}
+                """));
+        assertThat(c.model("openai/linked").orElseThrow().brokerResourceId()).isEqualTo("res_0a1b2c3d");
+        assertThat(c.model("openai/bad").orElseThrow().brokerResourceId()).isNull();
+        assertThat(c.model("openai/none").orElseThrow().brokerResourceId()).isNull();
+    }
 }

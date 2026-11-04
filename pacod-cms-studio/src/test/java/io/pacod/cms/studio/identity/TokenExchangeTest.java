@@ -97,4 +97,57 @@ class TokenExchangeTest {
                         .body("{\"error\":{\"type\":\"conflict\",\"message\":\"exists\",\"details\":{\"code\":\"binding_exists\"}}}"));
         assertThat(new Provisioner("pidt_abc_def", exchange, admin).makeOrgAdmin("usr_1", "org_x")).isEqualTo(-1);
     }
+
+    @Test
+    @DisplayName("an organisation's broker provider: the account found or made there, broker.provider bound first, then one token, the older ones revoked")
+    void mintsABrokerProvider() {
+        server.expect(requestTo("http://pacod-id:8071/oidc/token"))
+                .andRespond(withSuccess("{\"access_token\":\"eyJ.svc\"}", MediaType.APPLICATION_JSON));
+        adminServer.expect(requestTo("http://pacod-id:8071/admin/v1/service-accounts?organisation=org_x"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"service_accounts\":[{\"id\":\"svc_other\",\"name\":\"someone-else\"}]}",
+                        MediaType.APPLICATION_JSON));
+        adminServer.expect(requestTo("http://pacod-id:8071/admin/v1/service-accounts"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("{\"name\":\"cms-broker\",\"organisation_id\":\"org_x\"}"))
+                .andRespond(withStatus(org.springframework.http.HttpStatus.CREATED)
+                        .contentType(MediaType.APPLICATION_JSON).body("{\"id\":\"svc_b\",\"name\":\"cms-broker\"}"));
+        adminServer.expect(requestTo("http://pacod-id:8071/admin/v1/bindings"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("{\"principal\":\"svc_b\",\"role\":\"broker.provider\",\"scope\":\"organisation:org_x\"}"))
+                .andRespond(withStatus(org.springframework.http.HttpStatus.CREATED)
+                        .contentType(MediaType.APPLICATION_JSON).body("{\"id\":\"rb_2\",\"seq\":9}"));
+        adminServer.expect(requestTo("http://pacod-id:8071/admin/v1/service-accounts/svc_b/tokens"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(org.springframework.http.HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"id\":\"stk_new\",\"token\":\"pidt_new_secret\"}"));
+        adminServer.expect(requestTo("http://pacod-id:8071/admin/v1/service-accounts/svc_b/tokens"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"tokens\":[{\"id\":\"stk_new\",\"status\":\"active\"},"
+                        + "{\"id\":\"stk_old\",\"status\":\"active\"},{\"id\":\"stk_gone\",\"status\":\"revoked\"}]}",
+                        MediaType.APPLICATION_JSON));
+        adminServer.expect(requestTo("http://pacod-id:8071/admin/v1/service-tokens/stk_old"))
+                .andExpect(method(HttpMethod.DELETE))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        Provisioner.Minted minted = new Provisioner("pidt_abc_def", exchange, admin).mintBrokerProvider("org_x");
+        assertThat(minted).isEqualTo(new Provisioner.Minted("svc_b", "pidt_new_secret"));
+        adminServer.verify();
+    }
+
+    @Test
+    @DisplayName("without broker.provisioner pacod-id refuses, and nothing is minted")
+    void brokerProviderRefused() {
+        server.expect(requestTo("http://pacod-id:8071/oidc/token"))
+                .andRespond(withSuccess("{\"access_token\":\"eyJ.svc\"}", MediaType.APPLICATION_JSON));
+        adminServer.expect(requestTo("http://pacod-id:8071/admin/v1/service-accounts?organisation=org_x"))
+                .andRespond(withSuccess("{\"service_accounts\":[{\"id\":\"svc_b\",\"name\":\"cms-broker\",\"status\":\"active\"}]}",
+                        MediaType.APPLICATION_JSON));
+        adminServer.expect(requestTo("http://pacod-id:8071/admin/v1/bindings"))
+                .andRespond(withStatus(org.springframework.http.HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":{\"type\":\"forbidden\",\"message\":\"no\",\"details\":{\"code\":\"not_allowed\"}}}"));
+        assertThatThrownBy(() -> new Provisioner("pidt_abc_def", exchange, admin).mintBrokerProvider("org_x"))
+                .isInstanceOf(IdClient.IdException.class);
+        adminServer.verify();
+    }
 }

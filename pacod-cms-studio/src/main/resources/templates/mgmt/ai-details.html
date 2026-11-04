@@ -25,6 +25,12 @@
                 <code th:unless="${m.efforts().isEmpty()}" th:text="${#strings.listJoin(m.efforts(), ', ')}">low, medium, high</code></dd>
             <dt th:text="#{portal.platform.ai.details.images}">Images</dt>
             <dd th:text="${m.vision()} ? #{portal.platform.ai.details.yes} : #{portal.platform.ai.details.no}">yes</dd>
+            <th:block th:if="${d.broker() != null}" th:with="b=${d.broker()}">
+                <dt th:text="#{portal.platform.broker.title}">pacod-broker</dt>
+                <dd><span th:text="${b.reputation() == null} ? '—' : #{portal.platform.broker.details(${b.reputation()}, ${b.reputationLabel()})}">reputation 0.82 (good)</span>
+                    <span class="note" th:unless="${b.price().isEmpty()}" th:text="${b.price()}">EUR input 0.6</span>
+                    <span class="hint" th:unless="${b.status().isEmpty()}" th:text="${b.status()}">active</span></dd>
+            </th:block>
         </dl>
         <th:block th:if="${d.template()}">
             <p class="muted" th:if="${d.spec() == null and d.specError() != null}"

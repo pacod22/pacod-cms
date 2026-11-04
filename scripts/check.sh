@@ -50,7 +50,7 @@ written=$(lastval ENV .env .env-local)
 # The Makefile's unexport list: values compose alone reads.
 SECRET_KEYS="MONGO_ROOT_PASSWORD MONGO_PASSWORD PID_PG_SUPERUSER_PASSWORD PID_DB_PASSWORD PID_KEK PID_TOKEN_PEPPER
 CMS_ID_STUDIO_SECRET CMS_ID_SERVICE_SECRET ID_ADMIN_PASSWORD PACOD_PREVIEW_SECRET METRICS_VISITOR_SALT PACOD_GW_API_KEY
-PACOD_ID_PROVISIONER_TOKEN PID_SMTP_USERNAME PID_SMTP_PASSWORD"
+PACOD_ID_PROVISIONER_TOKEN PACOD_BROKER_TOKEN PID_SMTP_USERNAME PID_SMTP_PASSWORD"
 SECRET_KEYS=$(printf '%s' "$SECRET_KEYS" | tr '\n' ' ')
 known=" $(cat docker-compose.yml docker-compose.standalone.yml docker-compose.external.yml Makefile env/*.env .env.example 2>/dev/null | grep -oE '[A-Z][A-Z0-9_]{2,}' | sort -u | tr '\n' ' ') "
 unused=()

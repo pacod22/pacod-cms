@@ -265,6 +265,38 @@
                 </form>
             </div>
 
+            <!--/* pacod-broker: chat models the broker lists that the gateway does not offer yet. Shown, never
+                   selectable: a feature can only call what the gateway offers, and its admin adds them
+                   (pacod-gw's discovery proposes them from the broker). Other providers' words: th:text only. */-->
+            <div class="card" id="broker-models" th:if="${brokerConfigured and brokerFound != null}">
+                <div class="card-head"><h2 th:text="#{portal.platform.broker.found.title}">Found on pacod-broker</h2></div>
+                <div class="card-body">
+                    <p class="hint" th:text="#{portal.platform.broker.found.hint}">Chat models the broker lists that answer a JSON schema and that the gateway does not offer yet.</p>
+                    <p class="muted" th:if="${brokerError != null}" th:text="#{portal.platform.broker.unreachable(${brokerError})}">The broker could not be read.</p>
+                    <p class="muted" th:if="${brokerError == null and brokerFound.isEmpty()}" th:text="#{portal.platform.broker.found.none}">Nothing new.</p>
+                    <div class="table-wrap" th:unless="${brokerFound.isEmpty()}">
+                        <table class="table">
+                            <thead><tr>
+                                <th th:text="#{portal.platform.broker.model}">Model</th>
+                                <th th:text="#{portal.platform.broker.provider}">Provider</th>
+                                <th th:text="#{portal.platform.broker.price}">Price now</th>
+                                <th th:text="#{portal.platform.broker.reputation}">Reputation</th>
+                                <th th:text="#{portal.platform.ai.details.images}">Images</th>
+                            </tr></thead>
+                            <tbody>
+                            <tr th:each="f : ${brokerFound}">
+                                <td th:text="${f.name()}">llama</td>
+                                <td th:text="${f.provider().isEmpty()} ? '—' : ${f.provider()}">provider</td>
+                                <td th:text="${f.price().isEmpty()} ? '—' : ${f.price()}">EUR input 0.6</td>
+                                <td th:text="${f.reputation() == null} ? '—' : ${f.reputation()} + ' ' + ${f.reputationLabel()}">0.5 new</td>
+                                <td th:text="${f.vision()} ? #{portal.platform.ai.details.yes} : #{portal.platform.ai.details.no}">no</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <div class="card">
                 <h2><svg class="i"><use href="#i-building"></use></svg> <span th:text="#{portal.platform.organisations}">Organisations</span></h2>
                 <div class="table-wrap" th:if="${!organisations.isEmpty()}">

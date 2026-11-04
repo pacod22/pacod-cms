@@ -1,5 +1,8 @@
 package io.pacod.cms.studio.controller;
 
+import io.pacod.cms.studio.broker.BrokerAnnouncer;
+import io.pacod.cms.studio.broker.BrokerFacts;
+import org.springframework.beans.factory.ObjectProvider;
 import io.pacod.cms.core.control.data.Website;
 import io.pacod.cms.core.control.data.WebsiteStatus;
 import io.pacod.cms.core.tenant.TenantContext;
@@ -39,11 +42,17 @@ public class MgmtSiteSettingsController {
     private final PortalWebsites websites;
     private final StudioAccess access;
     private final MgmtText text;
+    /** pacod-broker, when the installation has one: the offer field shows only then. */
+    private final ObjectProvider<BrokerFacts> broker;
+    private final ObjectProvider<BrokerAnnouncer> announcer;
 
-    public MgmtSiteSettingsController(PortalWebsites websites, StudioAccess access, MgmtText text) {
+    public MgmtSiteSettingsController(PortalWebsites websites, StudioAccess access, MgmtText text,
+                                      ObjectProvider<BrokerFacts> broker, ObjectProvider<BrokerAnnouncer> announcer) {
         this.websites = websites;
         this.access = access;
         this.text = text;
+        this.broker = broker;
+        this.announcer = announcer;
     }
 
     @GetMapping
@@ -54,13 +63,18 @@ public class MgmtSiteSettingsController {
         model.addAttribute("domains", websites.domainsOf(website.getId()));
         model.addAttribute("statuses", List.of(WebsiteStatus.ACTIVE, WebsiteStatus.SUSPENDED));
         model.addAttribute("canDelete", access.allowed("org.manage"));
+        model.addAttribute("brokerConfigured", broker.getIfAvailable() != null);
+        BrokerAnnouncer a = announcer.getIfAvailable();
+        model.addAttribute("brokerResource", a == null ? null : a.announced().get(website.getId()));
+        model.addAttribute("brokerError", a == null ? null : a.errors().get(website.getOrganisationId()));
         return "mgmt/site-settings";
     }
 
     @PostMapping
     public String save(@ModelAttribute("form") SiteSettingsForm form, RedirectAttributes redirect) {
         try {
-            websites.update(siteId(), form.getName(), form.getLanguage(), form.getTimezone(), form.getStatus(), form.isAi());
+            websites.update(siteId(), form.getName(), form.getLanguage(), form.getTimezone(), form.getStatus(), form.isAi(),
+                    form.getBrokerOffer(), form.getBrokerSummary());
             redirect.addFlashAttribute("message", text.msg("portal.flash.saved"));
         } catch (MgmtOperationException e) {
             redirect.addFlashAttribute("error", text.of(e));

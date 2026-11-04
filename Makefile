@@ -75,7 +75,8 @@ MVN := JAVA_HOME=$(JAVA_HOME) PATH=$(JAVA_HOME)/bin:$$PATH ./mvnw
 export
 unexport ENV MONGO_ROOT_PASSWORD MONGO_PASSWORD PID_PG_SUPERUSER_PASSWORD PID_DB_PASSWORD PID_KEK \
 	PID_TOKEN_PEPPER CMS_ID_STUDIO_SECRET CMS_ID_SERVICE_SECRET ID_ADMIN_PASSWORD PACOD_PREVIEW_SECRET \
-	METRICS_VISITOR_SALT PACOD_GW_API_KEY PACOD_ID_PROVISIONER_TOKEN PID_SMTP_USERNAME PID_SMTP_PASSWORD
+	METRICS_VISITOR_SALT PACOD_GW_API_KEY PACOD_ID_PROVISIONER_TOKEN PACOD_BROKER_TOKEN PID_SMTP_USERNAME \
+	PID_SMTP_PASSWORD
 # The helpers below are make functions: exported, they would be expanded -- and fire -- on every recipe.
 unexport confirm need STUDIO_CLI MONGO_ROOT MVN comma RESTART_STUDIO NODE
 PACOD_ENV := $(ENV)
@@ -114,6 +115,7 @@ need = $(if $($(1)),,$(error $(1) is not set$(if $(2),: $(2))))
 STUDIO_CLI = $(COMPOSE) run --rm --no-deps -T $(if $(SEED_DIR),-v "$(abspath $(SEED_DIR)):/seed:ro") cms-studio \
 	--spring.main.web-application-type=none \
 	--pacod.bootstrap.enabled=false --pacod.id.enabled=false --pacod.jobs.runner.enabled=false \
+	--pacod.broker.announce=false \
 	--logging.level.root=WARN --logging.level.io.pacod.cms.studio.site=INFO --app.log.dir=/tmp/logs
 # $(call MONGO_ROOT,exec-flags,tool): mongosh or mongorestore inside the cms-mongo container, as
 # the root account compose gave it -- the passwords never pass through make.

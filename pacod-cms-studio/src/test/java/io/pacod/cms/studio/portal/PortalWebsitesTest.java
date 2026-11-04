@@ -258,4 +258,29 @@ class PortalWebsitesTest {
         assertThatThrownBy(() -> portal.addDomain("acme", "taken.example.com")).isInstanceOf(MgmtOperationException.class);
         verify(domains, never()).save(any());
     }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("the broker offer is one of three, blank for none, null to leave it; the line is at most 300 characters")
+    void brokerOffer() {
+        io.pacod.cms.core.control.data.Website w = new io.pacod.cms.core.control.data.Website("journal", "org_a", "Journal");
+        w.setStatus(io.pacod.cms.core.control.data.WebsiteStatus.ACTIVE);
+        org.mockito.Mockito.when(websites.findById("journal")).thenReturn(java.util.Optional.of(w));
+        org.mockito.Mockito.when(websites.save(org.mockito.ArgumentMatchers.any())).thenAnswer(i -> i.getArgument(0));
+        var active = io.pacod.cms.core.control.data.WebsiteStatus.ACTIVE;
+
+        portal.update("journal", "Journal", "en", "UTC", active, null, "platform", "  Contracts,\n explained ");
+        org.assertj.core.api.Assertions.assertThat(w.getBrokerOffer()).isEqualTo("platform");
+        org.assertj.core.api.Assertions.assertThat(w.getBrokerSummary()).isEqualTo("Contracts, explained");
+        portal.update("journal", "Journal", "en", "UTC", active, null, null, null);
+        org.assertj.core.api.Assertions.assertThat(w.getBrokerOffer()).isEqualTo("platform");
+        portal.update("journal", "Journal", "en", "UTC", active, null, "", "");
+        org.assertj.core.api.Assertions.assertThat(w.getBrokerOffer()).isNull();
+        org.assertj.core.api.Assertions.assertThat(w.getBrokerSummary()).isNull();
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> portal.update("journal", "Journal", "en", "UTC", active, null, "everyone", null))
+                .isInstanceOf(io.pacod.cms.studio.MgmtOperationException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> portal.update("journal", "Journal", "en", "UTC", active, null, null, "x".repeat(301)))
+                .isInstanceOf(io.pacod.cms.studio.MgmtOperationException.class);
+    }
 }

@@ -356,6 +356,14 @@ created. `make reseed-pages SITE=<id>` rebuilds them from a changed seed. It bac
 first, only reports until `APPLY=1`, and outside dev also needs `CONFIRM=<env>`. Undo it with
 `make reseed-pages-restore`.
 
+## pacod-broker
+
+Optional. Set `PACOD_BROKER_URL` (and `PACOD_BROKER_TOKEN`, a pacod-id service token with
+`broker.consumer`) in `.env`, give the provisioner account `broker.provisioner` at the platform in
+pacod-id (its admin pages), and recreate the studio. A website is then offered from its settings
+screen; the screen shows the broker resource it became, or why it was not announced. Against a broker
+in open mode set `PACOD_BROKER_OPEN_MODE=true` instead of the token and the role.
+
 ## Verifying
 
 | Command | What it shows | dev | stage | prod |

@@ -121,6 +121,15 @@ preview is counted or tracked, and drafts are read past every cache.
   language, browser, system and device, and -- while `READER_LOG` is on -- written one row each to
   a reader log that keeps the reader's address and User-Agent for 31 days.
 
+## pacod-broker
+
+When `PACOD_BROKER_URL` is set the studio announces each organisation's offered websites on the
+platform's catalogue, pacod-broker, as datasets (home page, `llms.txt`, `llms-full.txt`, the feed,
+the sitemap), under that organisation's own provider account, which the provisioner makes in
+pacod-id the first time it is needed. The installation screen's AI card shows the broker's
+reputation and price for the gateway's models that are broker resources, and lists models the broker
+has that the gateway does not offer yet. `studio.broker`; CLAUDE.md, *pacod-broker*.
+
 ## Front door
 
 Caddy (`pacod-caddy`) routes by host: the studio's host to `cms-studio`, pacod-id's to `pacod-id`,

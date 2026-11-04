@@ -1,5 +1,6 @@
 package io.pacod.cms.studio.portal;
 
+import io.pacod.cms.studio.broker.BrokerAnnouncer;
 import io.pacod.cms.core.control.data.Domain;
 import io.pacod.cms.core.control.data.Organisation;
 import io.pacod.cms.core.control.data.Website;
@@ -279,6 +280,15 @@ public class PortalWebsites {
     /** The same, and the website's AI switch; {@code ai} null leaves it as it is. */
     public Website update(String siteId, String name, String language, String timezone, WebsiteStatus status,
                           Boolean ai) {
+        return update(siteId, name, language, timezone, status, ai, null, null);
+    }
+
+    /**
+     * The same, and the website's offer on pacod-broker ({@code BrokerAnnouncer.OFFERS}, blank for
+     * none, null to leave it) with its one line for consumers (null leaves it, blank removes it).
+     */
+    public Website update(String siteId, String name, String language, String timezone, WebsiteStatus status,
+                          Boolean ai, String brokerOffer, String brokerSummary) {
         Website website = require(siteId);
         if (website.getStatus() == WebsiteStatus.DELETING) {
             throw new MgmtOperationException("portal.site.error.deleting");
@@ -291,6 +301,20 @@ public class PortalWebsites {
         }
         if (ai != null) {
             website.setAiDisabled(!ai);
+        }
+        if (brokerOffer != null) {
+            String offer = brokerOffer.strip();
+            if (!offer.isEmpty() && !BrokerAnnouncer.OFFERS.contains(offer)) {
+                throw new MgmtOperationException("portal.site.error.brokerOffer");
+            }
+            website.setBrokerOffer(offer.isEmpty() ? null : offer);
+        }
+        if (brokerSummary != null) {
+            String line = brokerSummary.strip().replaceAll("\\s+", " ");
+            if (line.length() > 300) {
+                throw new MgmtOperationException("portal.site.error.brokerSummary");
+            }
+            website.setBrokerSummary(line.isEmpty() ? null : line);
         }
         website = websites.save(website);
         changed();

@@ -171,6 +171,19 @@ confirms the host belongs to an active website. Nobody can make the installation
 for names it does not serve. The question is asked on the internal network; the front door
 answers `/_internal/` with a 404.
 
+## pacod-broker
+
+- **Each organisation announces under its own provider account** (`cms-broker`, `broker.provider`
+  at that organisation), so one organisation's members can never raise another's reputation, and a
+  token that leaks speaks for one organisation only. The studio makes these accounts with its
+  provisioner, which needs `broker.provisioner` at the platform beside `cms.provisioner`.
+- **Their tokens are stored unencrypted** in the control plane (`brokerCredentials`), like the
+  gateway key; they are never rendered or answered. A token the broker refuses is forgotten and
+  replaced.
+- **What the broker returns is other providers' words**: rendered as text, never as a link or markup.
+- **Only what is already public is announced**: addresses the website serves to anyone, and only
+  the files its own settings leave on.
+
 ## Reporting a vulnerability
 
 Please report security issues privately to the maintainers rather than in a public issue.

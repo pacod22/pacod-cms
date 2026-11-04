@@ -68,11 +68,13 @@ public class AiCatalog {
      * @param reasoning       its reasoning style ({@code none}, {@code effort}, {@code budget},
      *                        {@code adaptive}, {@code always_on}); null when not said
      * @param efforts         the reasoning levels it takes, for a style of {@code effort}
+     * @param brokerResourceId the pacod-broker resource the gateway links it to ({@code res_…}); null
+     *                         for none, or a gateway that says nothing of the broker
      */
     public record ModelOption(String id, String displayName, String provider, boolean vision,
                               boolean structuredOutput, boolean deprecated, String state, Integer contextWindow,
                               Integer maxOutputTokens, String temperature, String topP, String reasoning,
-                              List<String> efforts, String sunsetAt, String successor) {
+                              List<String> efforts, String sunsetAt, String successor, String brokerResourceId) {
 
         /** Whether the gateway would drop (or, under {@code reject}, refuse) a temperature sent to it. */
         public boolean refusesTemperature() {
@@ -306,6 +308,14 @@ public class AiCatalog {
         templates.clear();
     }
 
+    static final Pattern BROKER_RESOURCE = Pattern.compile("res_[0-9a-f]{8,64}");
+
+    /** A pacod-broker resource id, checked: it is only ever passed back to the broker. */
+    static String brokerResource(JsonNode v) {
+        String id = v.isString() ? v.asString() : "";
+        return BROKER_RESOURCE.matcher(id).matches() ? id : null;
+    }
+
     public static Catalog parse(JsonNode answer) {
         List<ModelOption> models = new ArrayList<>();
         for (JsonNode m : answer.path("models")) {
@@ -339,7 +349,8 @@ public class AiCatalog {
                     tokens(m.path("context_window")), tokens(m.path("max_output_tokens")),
                     oneOf(caps.path("temperature"), SUPPORT), oneOf(caps.path("top_p"), SUPPORT),
                     oneOf(caps.path("reasoning"), REASONING), List.copyOf(efforts),
-                    instant(sunset), ID.matcher(successor).matches() ? successor : null));
+                    instant(sunset), ID.matcher(successor).matches() ? successor : null,
+                    brokerResource(m.path("broker_resource_id"))));
         }
         List<TemplateOption> templates = new ArrayList<>();
         for (JsonNode t : answer.path("templates")) {

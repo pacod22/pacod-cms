@@ -92,6 +92,11 @@ class PortalScreensTest {
     private io.pacod.cms.core.archive.SiteArchives archives;
     @MockitoBean
     private io.pacod.cms.studio.archive.PortalRestore restore;
+    /** As if {@code pacod.broker.url} were set: every screen renders with the broker's parts. */
+    @MockitoBean
+    private io.pacod.cms.studio.broker.BrokerFacts brokerFacts;
+    @MockitoBean
+    private io.pacod.cms.studio.broker.BrokerAnnouncer brokerAnnouncer;
 
     private MockMvc mockMvc;
 
@@ -625,6 +630,48 @@ class PortalScreensTest {
         mockMvc.perform(postCsrf("/mgmt/platform/ai-params").with(oidcLogin()).param("maxTokens_translate", "100"))
                 .andExpect(status().isForbidden());
         verify(aiModels, org.mockito.Mockito.times(1)).setParams(any(), any());
+    }
+
+    @Test
+    @DisplayName("with a broker: the website's offer, its announcement, a model's reputation and what the gateway lacks")
+    void brokerParts() throws Exception {
+        TestSubjects.use(TestSubjects.platformAdmin());
+        Website offered = new Website("alpha", "org_alpha", "Alpha News");
+        offered.setStatus(WebsiteStatus.ACTIVE);
+        offered.setBrokerOffer("platform");
+        offered.setBrokerSummary("Contracts, explained");
+        when(websites.require("alpha")).thenReturn(offered);
+        when(brokerAnnouncer.announced()).thenReturn(java.util.Map.of("alpha", "res_0a0b0c0d"));
+        String settingsPage = renderEnglish("/sites/alpha/mgmt/settings");
+        assertThat(settingsPage).contains("name=\"brokerOffer\"", "<option value=\"platform\" selected=\"selected\"",
+                "Contracts, explained", "Announced on pacod-broker as res_0a0b0c0d.");
+        assertThat(render(get("/sites/alpha/mgmt/settings"))).contains("name=\"brokerOffer\"");
+        when(brokerAnnouncer.errors()).thenReturn(java.util.Map.of("org_alpha", "no provider token"));
+        assertThat(renderEnglish("/sites/alpha/mgmt/settings")).contains("Not announced: no provider token");
+
+        when(gatewayConfig.effective()).thenReturn(gatewayOf("http://pacod-gw:8080", SECRET_KEY,
+                io.pacod.cms.studio.ai.AiGatewayConfig.Source.ENVIRONMENT));
+        io.pacod.cms.studio.ai.AiCatalog.Lookup list = new io.pacod.cms.studio.ai.AiCatalog.Lookup(
+                io.pacod.cms.studio.ai.AiCatalog.parse(new tools.jackson.databind.ObjectMapper().readTree("""
+                        {"models": [{"id": "openai/linked", "kind": "chat", "state": "active",
+                          "capabilities": {"structured_output": true}, "broker_resource_id": "res_0a1b2c3d"}],
+                         "templates": []}
+                        """)), null);
+        when(aiCatalog.refresh()).thenReturn(list);
+        when(aiCatalog.lookup()).thenReturn(list);
+        when(brokerFacts.of("res_0a1b2c3d")).thenReturn(Optional.of(new io.pacod.cms.studio.broker.BrokerFacts.Facts(
+                "res_0a1b2c3d", "Linked", "Acme AI", "EUR input 0.25, output 0.5", 0.82, "good", "active", false, true)));
+        when(brokerFacts.notInGateway(any(), org.mockito.ArgumentMatchers.anyBoolean())).thenReturn(List.of(
+                new io.pacod.cms.studio.broker.BrokerFacts.Facts("res_99aa88bb", "<b>Elsewhere</b>", "Other Labs", "",
+                        null, "", "", true, true)));
+        String platformPage = renderEnglish("/mgmt/platform");
+        assertThat(platformPage).contains("Found on pacod-broker", "&lt;b&gt;Elsewhere&lt;/b&gt;", "Other Labs")
+                .doesNotContain("<b>Elsewhere</b>");
+        verify(brokerFacts).notInGateway(eq(java.util.Set.of("res_0a1b2c3d")), eq(false));
+        String details = render(get("/mgmt/platform/ai-models/details").param("id", "openai/linked")
+                .param("feature", "translate").cookie(new Cookie("mgmt-lang", "en")));
+        assertThat(details).contains("pacod-broker", "reputation 0.82 (good)", "EUR input 0.25, output 0.5");
+        assertThat(render(get("/mgmt/platform"))).contains("Other Labs");
     }
 
     @Test

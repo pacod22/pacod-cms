@@ -19,6 +19,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import io.pacod.cms.studio.ai.AiGateway;
 import io.pacod.cms.studio.ai.AiCatalog;
+import io.pacod.cms.studio.broker.BrokerFacts;
+import org.springframework.beans.factory.ObjectProvider;
 import io.pacod.cms.studio.ai.AiFeature;
 import io.pacod.cms.studio.ai.AiGatewayConfig;
 import io.pacod.cms.studio.ai.AiModels;
@@ -66,10 +68,12 @@ public class MgmtPlatformController {
     private final AiGatewayConfig gatewayConfig;
     private final AiModels models;
     private final AiCatalog catalog;
+    /** pacod-broker, when the installation has one ({@code PACOD_BROKER_URL}); else none. */
+    private final ObjectProvider<BrokerFacts> broker;
 
     public MgmtPlatformController(PortalSettings settings, PortalOrganisations organisations, PortalIdentity identity,
                                   StudioSites sites, MgmtText text, AiGateway gateway, AiGatewayConfig gatewayConfig,
-                                  AiModels models, AiCatalog catalog) {
+                                  AiModels models, AiCatalog catalog, ObjectProvider<BrokerFacts> broker) {
         this.settings = settings;
         this.organisations = organisations;
         this.identity = identity;
@@ -79,6 +83,7 @@ public class MgmtPlatformController {
         this.gatewayConfig = gatewayConfig;
         this.models = models;
         this.catalog = catalog;
+        this.broker = broker;
     }
 
     @GetMapping
@@ -193,7 +198,8 @@ public class MgmtPlatformController {
      * @param notes   where the feature's own parameters meet the gateway's: capped, ignored, fitted
      */
     public record Details(String id, boolean offered, boolean template, AiCatalog.ModelOption model,
-                          AiTemplateDetails spec, String specError, List<AiCatalog.ModelOption> pool, List<String> notes) {
+                          AiTemplateDetails spec, String specError, List<AiCatalog.ModelOption> pool, List<String> notes,
+                          BrokerFacts.Facts broker) {
     }
 
     private void addModels(Model model, boolean gatewaySetUp) {
@@ -228,6 +234,20 @@ public class MgmtPlatformController {
         model.addAttribute("aiModelsUpdated", stored.updatedOn() == null ? null
                 : UPDATED.format(stored.updatedOn().atZone(ZoneId.systemDefault())));
         model.addAttribute("aiModelsUpdatedBy", stored.updatedBy());
+        BrokerFacts facts = broker.getIfAvailable();
+        model.addAttribute("brokerConfigured", facts != null);
+        if (facts != null && c != null) {
+            // What the broker lists that the gateway does not offer yet: shown, never selectable --
+            // the gateway's admin adds a model before any feature can call it.
+            Set<String> known = new java.util.HashSet<>();
+            c.models().forEach(m -> {
+                if (m.brokerResourceId() != null) {
+                    known.add(m.brokerResourceId());
+                }
+            });
+            model.addAttribute("brokerFound", facts.notInGateway(known, false));
+            model.addAttribute("brokerError", facts.error());
+        }
     }
 
     private static boolean offers(List<AiCatalog.Choice> choices, String id) {
@@ -277,15 +297,22 @@ public class MgmtPlatformController {
                             Function<String, AiCatalog.TemplateLookup> spec) {
         boolean template = id != null && id.startsWith("@");
         if (c == null || id == null || !c.has(id)) {
-            return new Details(id, false, template, null, null, null, List.of(), List.of());
+            return new Details(id, false, template, null, null, null, List.of(), List.of(), null);
         }
         Optional<AiCatalog.ModelOption> m = c.model(id);
         if (m.isPresent()) {
-            return new Details(id, true, false, m.get(), null, null, List.of(), notes(params, null, List.of(m.get())));
+            return new Details(id, true, false, m.get(), null, null, List.of(), notes(params, null, List.of(m.get())),
+                    brokerFacts(m.get()));
         }
         AiCatalog.TemplateLookup t = spec.apply(id);
         List<AiCatalog.ModelOption> pool = c.poolOf(id);
-        return new Details(id, true, true, null, t.details(), t.error(), pool, notes(params, t.details(), pool));
+        return new Details(id, true, true, null, t.details(), t.error(), pool, notes(params, t.details(), pool), null);
+    }
+
+    /** What pacod-broker says of a model the gateway links to one of its resources; null otherwise. */
+    private BrokerFacts.Facts brokerFacts(AiCatalog.ModelOption m) {
+        BrokerFacts facts = broker.getIfAvailable();
+        return facts == null || m.brokerResourceId() == null ? null : facts.of(m.brokerResourceId()).orElse(null);
     }
 
     /** Where what the feature sends meets what the gateway applies; nothing when it sends nothing. */

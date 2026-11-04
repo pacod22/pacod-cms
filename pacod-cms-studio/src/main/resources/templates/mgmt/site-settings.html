@@ -51,6 +51,26 @@
                             <label for="ai" th:text="#{portal.site.field.ai}">Use AI on this website</label>
                         </div>
                         <span class="hint" th:text="#{portal.site.field.ai.hint}">Also needs AI switched on for the organisation.</span>
+                        <!--/* pacod-broker: shown only where the installation has a broker, so a form without
+                               it posts no brokerOffer and the stored offer stays. */-->
+                        <th:block th:if="${brokerConfigured}">
+                            <div class="field">
+                                <label for="brokerOffer" th:text="#{portal.site.field.broker}">Offer on pacod-broker</label>
+                                <select id="brokerOffer" th:field="*{brokerOffer}">
+                                    <option value="" th:text="#{portal.site.field.broker.none}">Not offered</option>
+                                    <option value="organisation" th:text="#{portal.site.field.broker.organisation}">To the organisation's members</option>
+                                    <option value="platform" th:text="#{portal.site.field.broker.platform}">To everyone signed in to the platform</option>
+                                    <option value="public" th:text="#{portal.site.field.broker.public}">To everyone the broker serves</option>
+                                </select>
+                                <span class="hint" th:text="#{portal.site.field.broker.hint}">Announced as a dataset: the home page, llms.txt, the feed and the sitemap, as the website's own settings leave them on.</span>
+                            </div>
+                            <div class="field">
+                                <label for="brokerSummary" th:text="#{portal.site.field.brokerSummary}">One line for consumers</label>
+                                <input type="text" id="brokerSummary" maxlength="300" th:field="*{brokerSummary}">
+                            </div>
+                            <p class="hint" th:if="${brokerResource != null}" th:text="#{portal.site.broker.announced(${brokerResource})}">Announced as res_….</p>
+                            <p class="muted" th:if="${brokerError != null}" th:text="#{portal.site.broker.error(${brokerError})}">Not announced: …</p>
+                        </th:block>
                         <dl class="kv">
                             <dt th:text="#{portal.org.id}">Id</dt>
                             <dd><code th:text="${website.id}">demo</code></dd>

@@ -59,6 +59,17 @@ public class Website {
      */
     private boolean aiDisabled;
 
+    /**
+     * pacod-broker: to whom the website is offered as a dataset -- {@code organisation} (its own
+     * organisation's members), {@code platform} (everyone signed in to the platform's pacod-id) or
+     * {@code public} -- or null, not offered. Set on the website's settings screen; the studio's
+     * {@code BrokerAnnouncer} announces what it says.
+     */
+    private String brokerOffer;
+
+    /** One line for the broker's consumers; the website's description when blank. */
+    private String brokerSummary;
+
     private Instant createdOn;
 
     /** The pacod-id account ({@code usr_…}) that created it; null for one made by the platform. */
