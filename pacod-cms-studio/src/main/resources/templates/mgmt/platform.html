@@ -265,6 +265,90 @@
                 </form>
             </div>
 
+            <!--/* pacod-broker's announcements (BrokerAnnouncer): each organisation's lease, the rounds, and
+                   how often they run. "Refresh now" runs a round on the request: what changed is sent,
+                   every unchanged lease heartbeated, the broker's model list read afresh. The interval
+                   saved here wins over PACOD_BROKER_REFRESH until reset. Shown while a broker is set. */-->
+            <div class="card" id="broker" th:if="${brokerInterval != null}">
+                <h2><svg class="i"><use href="#i-share"></use></svg> <span th:text="#{portal.platform.broker.announce.title}">Announcements on pacod-broker</span></h2>
+                <div class="card-body">
+                    <p class="muted" th:unless="${brokerAnnouncing}" th:text="#{portal.platform.broker.announce.off}">Announcements are off on this studio.</p>
+                    <th:block th:if="${brokerAnnouncing}">
+                        <dl class="kv">
+                            <dt th:text="#{portal.platform.broker.round.last}">Last round</dt>
+                            <dd th:text="${brokerLastRound == null} ? #{portal.platform.broker.round.never} : ${brokerLastRound}">2026-11-05 14:03:12</dd>
+                            <dt th:text="#{portal.platform.broker.round.next}">Next round</dt>
+                            <dd th:text="${brokerNextRound == null} ? #{portal.platform.broker.round.soon} : ${brokerNextRound}">2026-11-05 14:04:12</dd>
+                        </dl>
+                        <p class="muted" th:if="${brokerLeases.isEmpty()}" th:text="#{portal.platform.broker.leases.none}">No organisation offers a website.</p>
+                        <div class="table-wrap" th:unless="${brokerLeases.isEmpty()}">
+                            <table>
+                                <thead>
+                                <tr>
+                                    <th th:text="#{portal.orgs.col.name}">Organisation</th>
+                                    <th th:text="#{portal.platform.broker.leases.websites}">Websites announced</th>
+                                    <th class="shrink" th:text="#{portal.platform.broker.leases.state}">State</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="l : ${brokerLeases}">
+                                    <td class="title-cell">
+                                        <a th:href="${studioRoot} + '/mgmt/organisations/' + ${l.organisationId()}" th:text="${l.organisationName()}">Acme</a>
+                                        <span class="cell-sub" th:text="${l.provider()}">cms-org_…</span>
+                                    </td>
+                                    <td>
+                                        <span class="muted" th:if="${l.resources().isEmpty()}">—</span>
+                                        <div th:each="r : ${l.resources()}"><span th:text="${r.key}">journal</span> <code th:text="${r.value}">res_…</code></div>
+                                    </td>
+                                    <td class="shrink">
+                                        <span class="badge" th:classappend="${l.error() == null} ? 'published' : 'off'"
+                                              th:text="${l.error() == null} ? #{portal.platform.broker.leases.ok} : #{portal.platform.broker.leases.failed}">announced</span>
+                                        <span class="cell-sub" th:if="${l.error() != null}" th:text="${l.error()}">no provider token</span>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </th:block>
+                </div>
+                <form method="post" th:if="${brokerAnnouncing}" th:action="${studioRoot} + '/mgmt/platform/broker/refresh'">
+                    <div class="card-foot">
+                        <span class="hint" th:text="#{portal.platform.broker.refresh.hint}">Sends what changed and confirms every lease now, instead of at the next round.</span>
+                        <button class="btn" type="submit">
+                            <svg class="i"><use href="#i-share"></use></svg> <span th:text="#{portal.platform.broker.refresh}">Refresh now</span>
+                        </button>
+                    </div>
+                </form>
+                <form method="post" th:action="${studioRoot} + '/mgmt/platform/broker/interval'">
+                    <div class="card-body">
+                        <div class="field">
+                            <label for="brokerRefresh" th:text="#{portal.platform.broker.interval}">A round every (seconds)</label>
+                            <input type="number" id="brokerRefresh" name="seconds" step="1" required
+                                   th:min="${brokerIntervalMin}" th:max="${brokerIntervalMax}" th:value="${brokerInterval.seconds()}">
+                            <span class="hint" th:text="#{portal.platform.broker.interval.hint(${brokerIntervalMin}, ${brokerIntervalMax})}">From 10 to 86400 seconds.</span>
+                        </div>
+                        <dl class="kv">
+                            <dt th:text="#{portal.platform.broker.interval.source}">Comes from</dt>
+                            <dd th:text="${brokerInterval.source().name() == 'STORED'} ? #{portal.platform.broker.interval.source.stored} : #{portal.platform.broker.interval.source.environment(${brokerIntervalEnvironment})}">the environment</dd>
+                        </dl>
+                        <p class="hint" th:if="${brokerIntervalUpdated != null}"
+                           th:text="#{portal.platform.broker.interval.updated(${brokerIntervalUpdated}, ${brokerInterval.updatedBy() == null ? '—' : brokerInterval.updatedBy()})}">Set on 2026-11-05 14:00 by usr_…</p>
+                    </div>
+                    <div class="card-foot">
+                        <button class="btn btn-primary" type="submit">
+                            <svg class="i"><use href="#i-save"></use></svg> <span th:text="#{portal.action.save}">Save</span>
+                        </button>
+                    </div>
+                </form>
+                <form method="post" th:if="${brokerInterval.source().name() == 'STORED'}" th:action="${studioRoot} + '/mgmt/platform/broker/interval/reset'"
+                      th:data-confirm="#{portal.platform.broker.interval.reset.confirm(${brokerIntervalEnvironment})}">
+                    <div class="card-foot">
+                        <span class="hint" th:text="#{portal.platform.broker.interval.reset.hint(${brokerIntervalEnvironment})}">The environment's interval applies again.</span>
+                        <button class="btn" type="submit" th:text="#{portal.platform.broker.interval.reset}">Use the environment's</button>
+                    </div>
+                </form>
+            </div>
+
             <!--/* pacod-broker: chat models the broker lists that the gateway does not offer yet. Shown, never
                    selectable: a feature can only call what the gateway offers, and its admin adds them
                    (pacod-gw's discovery proposes them from the broker). Other providers' words: th:text only. */-->

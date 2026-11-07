@@ -97,6 +97,8 @@ class PortalScreensTest {
     private io.pacod.cms.studio.broker.BrokerFacts brokerFacts;
     @MockitoBean
     private io.pacod.cms.studio.broker.BrokerAnnouncer brokerAnnouncer;
+    @MockitoBean
+    private io.pacod.cms.studio.broker.BrokerRefresh brokerRefresh;
 
     private MockMvc mockMvc;
 
@@ -110,8 +112,15 @@ class PortalScreensTest {
         return new io.pacod.cms.studio.ai.AiGatewayConfig.Effective(url, key, source, null, null);
     }
 
+    private static io.pacod.cms.studio.broker.BrokerRefresh.Effective every(long seconds,
+            io.pacod.cms.studio.broker.BrokerRefresh.Source source, java.time.Instant on, String by) {
+        return new io.pacod.cms.studio.broker.BrokerRefresh.Effective(java.time.Duration.ofSeconds(seconds), source, on, by);
+    }
+
     @BeforeEach
     void setUp() {
+        when(brokerRefresh.effective()).thenReturn(every(60, io.pacod.cms.studio.broker.BrokerRefresh.Source.ENVIRONMENT, null, null));
+        when(brokerRefresh.environment()).thenReturn(java.time.Duration.ofSeconds(60));
         when(gatewayConfig.effective()).thenReturn(gatewayOf("", "", io.pacod.cms.studio.ai.AiGatewayConfig.Source.NONE));
         when(aiModels.stored()).thenReturn(new io.pacod.cms.studio.ai.AiModels.Stored(null, java.util.Map.of(), java.util.Map.of(), null, null));
         when(aiModels.defaultModel()).thenReturn("@fast");
@@ -672,6 +681,67 @@ class PortalScreensTest {
                 .param("feature", "translate").cookie(new Cookie("mgmt-lang", "en")));
         assertThat(details).contains("pacod-broker", "reputation 0.82 (good)", "EUR input 0.25, output 0.5");
         assertThat(render(get("/mgmt/platform"))).contains("Other Labs");
+    }
+
+    @Test
+    @DisplayName("with a broker: the announcements card, a round now, the interval saved, refused and reset -- not for an organisation's admin")
+    void brokerAnnouncements() throws Exception {
+        TestSubjects.use(TestSubjects.platformAdmin());
+        when(brokerAnnouncer.state()).thenReturn(List.of(
+                new io.pacod.cms.studio.broker.BrokerAnnouncer.OrganisationState("org_alpha", "cms-org_alpha",
+                        java.util.Map.of("alpha", "res_0a0b0c0d"), null),
+                new io.pacod.cms.studio.broker.BrokerAnnouncer.OrganisationState("org_beta", "cms-org_beta",
+                        java.util.Map.of(), "no provider token")));
+        when(brokerAnnouncer.lastRefresh()).thenReturn(java.time.Instant.parse("2026-11-05T10:00:00Z"));
+        when(brokerAnnouncer.nextRefresh()).thenReturn(java.time.Instant.parse("2026-11-05T10:01:00Z"));
+        String english = renderEnglish("/mgmt/platform");
+        assertThat(english).contains("Announcements on pacod-broker", "Alpha Media", "cms-org_alpha", "res_0a0b0c0d",
+                        "Beta Press", "no provider token", "last round failed", "/mgmt/platform/broker/refresh",
+                        "Refresh now", "name=\"seconds\"", "value=\"60\"", "PACOD_BROKER_REFRESH, 60 seconds")
+                .doesNotContain("/mgmt/platform/broker/interval/reset");
+        assertThat(render(get("/mgmt/platform"))).contains("res_0a0b0c0d", "/mgmt/platform/broker/interval");
+
+        // Saved here: who set it, and the way back to the environment's.
+        when(brokerRefresh.effective()).thenReturn(every(300, io.pacod.cms.studio.broker.BrokerRefresh.Source.STORED,
+                java.time.Instant.parse("2026-11-04T09:00:00Z"), "usr_admin"));
+        assertThat(renderEnglish("/mgmt/platform")).contains("value=\"300\"", "set here", "usr_admin",
+                "/mgmt/platform/broker/interval/reset");
+
+        Cookie english_ = new Cookie("mgmt-lang", "en");
+        when(brokerAnnouncer.refreshNow()).thenReturn(new io.pacod.cms.studio.broker.BrokerAnnouncer.Round(1, 1));
+        mockMvc.perform(postCsrf("/mgmt/platform/broker/refresh").with(oidcLogin()).cookie(english_))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(flash().attribute("message", org.hamcrest.Matchers.containsString("Organisations announced: 1. Failed: 1.")));
+        verify(brokerAnnouncer).refreshNow();
+        // The broker's model list is read afresh too.
+        verify(brokerFacts).forget();
+
+        when(brokerRefresh.set(eq(120), any())).thenReturn(every(120, io.pacod.cms.studio.broker.BrokerRefresh.Source.STORED, null, null));
+        mockMvc.perform(postCsrf("/mgmt/platform/broker/interval").param("seconds", "120").with(oidcLogin()).cookie(english_))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(flash().attribute("message", org.hamcrest.Matchers.containsString("120 seconds")));
+        // Not a number reaches the holder as nothing, which it refuses in words.
+        when(brokerRefresh.set(org.mockito.ArgumentMatchers.isNull(), any())).thenThrow(new io.pacod.cms.studio.MgmtOperationException(
+                "portal.platform.broker.interval.error", io.pacod.cms.studio.broker.BrokerRefresh.MIN,
+                io.pacod.cms.studio.broker.BrokerRefresh.MAX));
+        mockMvc.perform(postCsrf("/mgmt/platform/broker/interval").param("seconds", "soon").with(oidcLogin()).cookie(english_))
+                .andExpect(flash().attribute("error", org.hamcrest.Matchers.containsString("from 10 to 86400")));
+
+        when(brokerRefresh.clear()).thenReturn(every(60, io.pacod.cms.studio.broker.BrokerRefresh.Source.ENVIRONMENT, null, null));
+        mockMvc.perform(postCsrf("/mgmt/platform/broker/interval/reset").with(oidcLogin()).cookie(english_))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(flash().attribute("message", org.hamcrest.Matchers.containsString("60 seconds")));
+        verify(brokerRefresh).clear();
+
+        // Not for an organisation's admin.
+        TestSubjects.use(orgAdminOfAlpha());
+        mockMvc.perform(postCsrf("/mgmt/platform/broker/refresh").with(oidcLogin())).andExpect(status().isForbidden());
+        mockMvc.perform(postCsrf("/mgmt/platform/broker/interval").param("seconds", "10").with(oidcLogin()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(postCsrf("/mgmt/platform/broker/interval/reset").with(oidcLogin())).andExpect(status().isForbidden());
+        verify(brokerAnnouncer, org.mockito.Mockito.times(1)).refreshNow();
+        verify(brokerRefresh, never()).set(eq(10), any());
+        verify(brokerRefresh, org.mockito.Mockito.times(1)).clear();
     }
 
     @Test

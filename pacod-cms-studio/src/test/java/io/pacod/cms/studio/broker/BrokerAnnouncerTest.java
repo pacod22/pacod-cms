@@ -38,7 +38,8 @@ import static org.mockito.Mockito.when;
 /**
  * The announcer against a stand-in broker: what an offered website becomes, an update under the same
  * lease when it changed, nothing sent when it did not, heartbeats when due, and a goodbye when the
- * organisation offers nothing more. The organisation's token comes from {@link BrokerProviders}.
+ * organisation offers nothing more; the platform screen's round now, and its interval applying on
+ * the next tick. The organisation's token comes from {@link BrokerProviders}.
  */
 class BrokerAnnouncerTest {
 
@@ -49,6 +50,9 @@ class BrokerAnnouncerTest {
     private final List<Seen> seen = new CopyOnWriteArrayList<>();
     private HttpServer server;
     private String base;
+    /** What the stand-in answers a heartbeat; 404 is a lease it forgot. */
+    private volatile int heartbeatStatus = 204;
+    private volatile Duration interval = Duration.ofSeconds(60);
 
     private final WebsiteRepository websites = mock(WebsiteRepository.class);
     private final OrganisationRepository organisations = mock(OrganisationRepository.class);
@@ -65,6 +69,13 @@ class BrokerAnnouncerTest {
             seen.add(new Seen(exchange.getRequestMethod(), exchange.getRequestURI().toString(),
                     exchange.getRequestHeaders().getFirst("Authorization"),
                     new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+            if (exchange.getRequestURI().getPath().endsWith("/heartbeat") && heartbeatStatus != 204) {
+                byte[] problem = "{\"title\":\"Not Found\",\"detail\":\"no such lease\"}".getBytes(StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(heartbeatStatus, problem.length);
+                exchange.getResponseBody().write(problem);
+                exchange.close();
+                return;
+            }
             String body = exchange.getRequestURI().getPath().equals("/v1/announce")
                     ? "{\"lease_id\":\"lse_1\",\"provider_id\":\"prv_1\",\"ttl_s\":60,\"heartbeat_every_s\":20,"
                     + "\"resources\":{\"journal\":\"res_0a0b0c0d\"}}"
@@ -105,7 +116,7 @@ class BrokerAnnouncerTest {
 
     private BrokerAnnouncer announcer() {
         return new BrokerAnnouncer(websites, organisations, settings, files, sites, new BrokerClient(base, json),
-                providers, Duration.ofSeconds(60), 60);
+                providers, () -> interval, 60);
     }
 
     @Test
@@ -159,6 +170,106 @@ class BrokerAnnouncerTest {
         assertThat(seen.getLast().method()).isEqualTo("DELETE");
         assertThat(seen.getLast().path()).isEqualTo("/v1/leases/lse_1");
         assertThat(a.announced()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a round now sends nothing new, but heartbeats every unchanged lease at once and says what holds")
+    void refreshNowConfirmsTheLeases() {
+        BrokerAnnouncer a = announcer();
+        a.tick(Instant.now());
+        assertThat(seen).hasSize(1);
+        Instant first = a.lastRefresh();
+
+        BrokerAnnouncer.Round round = a.refreshNow();
+        assertThat(round).isEqualTo(new BrokerAnnouncer.Round(1, 0));
+        assertThat(seen).hasSize(2);
+        assertThat(seen.getLast().method()).isEqualTo("POST");
+        assertThat(seen.getLast().path()).isEqualTo("/v1/leases/lse_1/heartbeat");
+        assertThat(a.lastRefresh()).isAfterOrEqualTo(first);
+        assertThat(a.state()).singleElement().satisfies(st -> {
+            assertThat(st.provider()).isEqualTo("cms-org_a");
+            assertThat(st.resources()).containsEntry("journal", "res_0a0b0c0d");
+            assertThat(st.error()).isNull();
+        });
+    }
+
+    @Test
+    @DisplayName("a round now announces afresh, in the same round, a lease the broker forgot")
+    void refreshNowReannouncesAForgottenLease() {
+        BrokerAnnouncer a = announcer();
+        a.refreshAll(Instant.now());
+        heartbeatStatus = 404;
+
+        BrokerAnnouncer.Round round = a.refreshNow();
+        assertThat(round.announced()).isEqualTo(1);
+        List<Seen> puts = seen.stream().filter(x -> x.method().equals("PUT")).toList();
+        assertThat(puts).hasSize(2);
+        assertThat(json.readTree(puts.getLast().body()).has("lease_id")).isFalse();
+        assertThat(a.announced()).containsEntry("journal", "res_0a0b0c0d");
+    }
+
+    @Test
+    @DisplayName("a heartbeat the broker refuses otherwise, in a round now, is that organisation's failure")
+    void refreshNowReportsAFailedHeartbeat() {
+        BrokerAnnouncer a = announcer();
+        a.refreshAll(Instant.now());
+        heartbeatStatus = 503;
+
+        BrokerAnnouncer.Round round = a.refreshNow();
+        // The lease lives on, but this round could not confirm it: one organisation, counted once.
+        assertThat(round).isEqualTo(new BrokerAnnouncer.Round(0, 1));
+        assertThat(a.announced()).containsEntry("journal", "res_0a0b0c0d");
+        assertThat(a.errors()).containsKey("org_a");
+        assertThat(a.state()).singleElement().satisfies(st -> assertThat(st.error()).isNotNull());
+    }
+
+    @Test
+    @DisplayName("the interval is read on every tick: a longer one waits, a shorter one applies at once")
+    void theIntervalAppliesOnTheNextTick() {
+        BrokerAnnouncer a = announcer();
+        Instant t0 = Instant.parse("2026-11-01T10:00:00Z");
+        a.tick(t0);
+        assertThat(a.lastRefresh()).isEqualTo(t0);
+        assertThat(a.nextRefresh()).isEqualTo(t0.plusSeconds(60));
+
+        interval = Duration.ofHours(1);
+        a.tick(t0.plusSeconds(65));
+        assertThat(a.lastRefresh()).isEqualTo(t0);
+        assertThat(a.nextRefresh()).isEqualTo(t0.plusSeconds(3600));
+
+        interval = Duration.ofSeconds(30);
+        a.tick(t0.plusSeconds(70));
+        assertThat(a.lastRefresh()).isEqualTo(t0.plusSeconds(70));
+    }
+
+    @Test
+    @DisplayName("a lease the broker forgot on a tick's heartbeat makes the next tick a round, whatever the interval")
+    void aForgottenLeaseIsAnnouncedAtTheNextTick() {
+        BrokerAnnouncer a = announcer();
+        Instant t0 = Instant.parse("2026-11-01T10:00:00Z");
+        a.tick(t0);
+        heartbeatStatus = 404;
+        a.tick(t0.plusSeconds(21));
+        assertThat(a.announced()).isEmpty();
+        // The screen says the next tick, not the last round plus the interval.
+        assertThat(a.nextRefresh()).isNull();
+        heartbeatStatus = 204;
+        a.tick(t0.plusSeconds(26));
+        assertThat(a.lastRefresh()).isEqualTo(t0.plusSeconds(26));
+        assertThat(a.announced()).containsEntry("journal", "res_0a0b0c0d");
+    }
+
+    @Test
+    @DisplayName("an organisation that stops offering leaves no failure behind")
+    void aWithdrawnOrganisationForgetsItsFailure() {
+        when(providers.token(any())).thenReturn(Optional.empty());
+        BrokerAnnouncer a = announcer();
+        a.refreshAll(Instant.now());
+        assertThat(a.errors()).containsKey("org_a");
+        site.setBrokerOffer(null);
+        a.refreshAll(Instant.now());
+        assertThat(a.errors()).isEmpty();
+        assertThat(a.state()).isEmpty();
     }
 
     @Test

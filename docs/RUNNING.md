@@ -364,6 +364,12 @@ pacod-id (its admin pages), and recreate the studio. A website is then offered f
 screen; the screen shows the broker resource it became, or why it was not announced. Against a broker
 in open mode set `PACOD_BROKER_OPEN_MODE=true` instead of the token and the role.
 
+The studio rebuilds the announcements every 60 seconds; heartbeats keep the leases alive in between,
+so only a change on a website waits for the next round. `PACOD_BROKER_REFRESH` sets another interval
+(seconds, 10 to 86400). The installation screen's *Announcements on pacod-broker* card shows each
+organisation's lease and has **Refresh now**, which runs a round at once and confirms every lease, and
+an interval of its own that replaces the environment's until you choose "Use the environment's".
+
 ## Verifying
 
 | Command | What it shows | dev | stage | prod |

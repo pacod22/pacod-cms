@@ -103,6 +103,15 @@ public class BrokerFacts {
                 .toList();
     }
 
+    /** Forgets what was read and the last failure: the next screen asks the broker afresh. */
+    public void forget() {
+        resources.invalidateAll();
+        found = null;
+        foundAt = 0;
+        error = null;
+        errorAt = 0;
+    }
+
     /** The last failure, while it is recent; null otherwise. */
     public String error() {
         return recentlyFailed() ? error : null;

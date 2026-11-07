@@ -1,6 +1,7 @@
 package io.pacod.cms.studio.broker;
 
 import io.pacod.cms.core.control.repository.BrokerCredentialRepository;
+import io.pacod.cms.core.control.repository.BrokerSettingsRepository;
 import io.pacod.cms.core.control.repository.OrganisationRepository;
 import io.pacod.cms.core.control.repository.WebsiteRepository;
 import io.pacod.cms.core.repository.SiteFilesRepository;
@@ -14,8 +15,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import tools.jackson.databind.ObjectMapper;
 
-import java.time.Duration;
-
 /**
  * pacod-broker, on while {@code pacod.broker.url} ({@code PACOD_BROKER_URL}) is set:
  *
@@ -26,6 +25,8 @@ import java.time.Duration;
  *       under each organisation's own provider, made by the provisioner; switched off by
  *       {@code pacod.broker.announce=false} (the test profile and the {@code --create-site} run).
  *       {@code pacod.broker.open-mode} says the broker needs no tokens.</li>
+ *   <li>{@link BrokerRefresh}, how often the announcer rebuilds: the platform screen's interval,
+ *       else {@code pacod.broker.refresh} ({@code PACOD_BROKER_REFRESH}, 60 s).</li>
  * </ul>
  */
 @Configuration
@@ -43,6 +44,11 @@ public class BrokerConfig {
     }
 
     @Bean
+    BrokerRefresh brokerRefresh(@Value("${pacod.broker.refresh:}") String refresh, BrokerSettingsRepository settings) {
+        return new BrokerRefresh(refresh, settings);
+    }
+
+    @Bean
     @ConditionalOnExpression("${pacod.broker.announce:true}")
     BrokerProviders brokerProviders(BrokerCredentialRepository credentials, ObjectProvider<Provisioner> provisioner,
                                     @Value("${pacod.broker.open-mode:false}") boolean openMode) {
@@ -53,9 +59,9 @@ public class BrokerConfig {
     @ConditionalOnExpression("${pacod.broker.announce:true}")
     BrokerAnnouncer brokerAnnouncer(WebsiteRepository websites, OrganisationRepository organisations,
                                     SiteSettingsRepository settings, SiteFilesRepository files, StudioSites sites,
-                                    BrokerClient client, BrokerProviders providers,
-                                    @Value("${pacod.broker.refresh:60s}") Duration refresh,
+                                    BrokerClient client, BrokerProviders providers, BrokerRefresh refresh,
                                     @Value("${pacod.broker.ttl:60}") int ttl) {
-        return new BrokerAnnouncer(websites, organisations, settings, files, sites, client, providers, refresh, ttl);
+        return new BrokerAnnouncer(websites, organisations, settings, files, sites, client, providers,
+                refresh::interval, ttl);
     }
 }

@@ -218,6 +218,9 @@ services:
       PACOD_BROKER_URL: ${PACOD_BROKER_URL:-}
       PACOD_BROKER_TOKEN: ${PACOD_BROKER_TOKEN:-}
       PACOD_BROKER_OPEN_MODE: ${PACOD_BROKER_OPEN_MODE:-false}
+      # Seconds between two rebuilds of the announcements (blank: 60); the installation screen's
+      # interval replaces it. Passed unvalued: unset stays unset.
+      PACOD_BROKER_REFRESH:
       # The draft-preview key, the site's too (make init writes it into .env). Empty: no
       # previews. No default: a published one would be a published key.
       PACOD_PREVIEW_SECRET: ${PACOD_PREVIEW_SECRET:-}

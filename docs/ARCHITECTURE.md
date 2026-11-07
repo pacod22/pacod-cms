@@ -126,7 +126,8 @@ preview is counted or tracked, and drafts are read past every cache.
 When `PACOD_BROKER_URL` is set the studio announces each organisation's offered websites on the
 platform's catalogue, pacod-broker, as datasets (home page, `llms.txt`, `llms-full.txt`, the feed,
 the sitemap), under that organisation's own provider account, which the provisioner makes in
-pacod-id the first time it is needed. The installation screen's AI card shows the broker's
+pacod-id the first time it is needed, and rebuilt every minute or as often as the installation
+screen says (which also rebuilds them on request). The installation screen's AI card shows the broker's
 reputation and price for the gateway's models that are broker resources, and lists models the broker
 has that the gateway does not offer yet. `studio.broker`; CLAUDE.md, *pacod-broker*.
 

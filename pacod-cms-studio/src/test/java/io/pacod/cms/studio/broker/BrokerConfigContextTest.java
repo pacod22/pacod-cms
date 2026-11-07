@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The studio starts with a broker set, as pacod-demo starts it: {@code PACOD_BROKER_URL} named, no
- * token yet (the demo's bootstrap makes it later) and the announcer on. Every other test runs
+ * token yet (the demo's bootstrap makes it later), the announcer on and its interval unset. Every other test runs
  * without a broker, where {@link BrokerConfig} creates nothing, so a missing dependency of its beans
  * would only show when a stack set the URL -- as a studio that does not start.
  *
@@ -32,6 +32,9 @@ class BrokerConfigContextTest {
         assertThat(context.getBeansOfType(BrokerFacts.class)).hasSize(1);
         assertThat(context.getBeansOfType(BrokerProviders.class)).hasSize(1);
         assertThat(context.getBeansOfType(BrokerAnnouncer.class)).hasSize(1);
+        assertThat(context.getBeansOfType(BrokerRefresh.class)).hasSize(1);
+        // Nothing stored and nothing set: the 60 seconds the announcer has always used.
+        assertThat(context.getBean(BrokerRefresh.class).environment()).hasSeconds(60);
         // Without the consumer token the facts read as nothing, never as a failure of the screen.
         assertThat(context.getBean(BrokerFacts.class).of("not-a-resource")).isEmpty();
     }

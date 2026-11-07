@@ -2506,15 +2506,34 @@ studio meets it in `studio.broker`, all off while `pacod.broker.url` (`PACOD_BRO
   or null -- and `brokerSummary` (at most 300 characters); the field shows only where a broker is
   configured, so a form without it posts null and **null leaves the stored offer** (blank clears it).
   `BrokerAnnouncer` (a virtual thread from `ApplicationReadyEvent`, like `IdentityLifecycle`) every
-  `pacod.broker.refresh` (60 s) builds one announcement per organisation from its offered `ACTIVE`
+  `BrokerRefresh` interval (60 s, *The round's interval* below) builds one announcement per organisation from its offered `ACTIVE`
   websites: kind `dataset`, key the website id, interfaces `other:website`, `other:llms-txt`,
   `other:llms-full-txt`, `other:atom`, `other:sitemap` at the website's origin (`baseUrl`, else
   `StudioSites.publicUrl`) -- each file only while `SiteFiles` leaves it on -- and the robots AI
   switches as tags. It sends only what changed, under the same lease, heartbeats every
   `heartbeat_every_s`, and says goodbye when nothing is offered or the studio stops. Each
-  organisation fails on its own (`errors()`, shown on the settings screen). **Off in the one-off
-  command runs** (`--pacod.broker.announce=false` in the Makefile's `STUDIO_CLI`), which would
-  otherwise announce for a moment.
+  organisation fails on its own (`errors()`, shown on the settings screen; an organisation that stops
+  offering loses its failure too). **Off in the one-off command runs** (`--pacod.broker.announce=false`
+  in the Makefile's `STUDIO_CLI`), which would otherwise announce for a moment.
+- **The round's interval and "Refresh now"** (the installation screen's *Announcements on
+  pacod-broker* card, `platform.manage`: each organisation's lease, its websites' resources and its
+  failure, the last and next round). The interval is **`BrokerRefresh`**: the stored `BrokerSettings`
+  (control plane, `brokerSettings`, id `broker`, `refreshSeconds`; apart from `PlatformSettings`,
+  saved whole by its own form) while set, else `pacod.broker.refresh` (`PACOD_BROKER_REFRESH`,
+  passed unvalued by compose, blank = 60). **A bare number is seconds**, parsed by `DurationStyle`
+  with `SECONDS` -- Boot's own `Duration` conversion reads a bare `60` as 60 ms -- `2m`/`PT2M` work
+  too; whole seconds from `MIN` (10, twice the tick) to `MAX` (a day), else the start fails, and a
+  posted value outside them is refused (`portal.platform.broker.interval.error`). Read behind a 5 s
+  memo that `set`/`clear` forget, **on every tick**: the next round is due at the last round plus the
+  interval in effect *now*, so a shorter one applies at once. `POST /mgmt/platform/broker/refresh`
+  is `BrokerAnnouncer.refreshNow()`: the round on the request's thread, what changed sent and **every
+  unchanged lease heartbeated** (a 404 re-announced in the same round), so the flash's counts are what
+  the broker holds; it also `forget()`s `BrokerFacts`, so "Found on pacod-broker" is read anew. With
+  the broker down it waits one connect and read timeout (15 s) per organisation, as the hint says.
+  **`tick`, `refreshNow` and `stop`'s goodbyes are `synchronized`** (no pinning on JDK 25): two
+  first announcements without a `lease_id` would be two leases. `stop` interrupts the worker before
+  it takes the lock, so a round in progress fails its calls instead of holding up the shutdown. `…/interval` and `…/interval/reset` set and
+  clear the stored value. No announcer (`announce=false`) shows the card without the button.
 - **Each organisation announces as itself** (`BrokerProviders`): its own pacod-id service account
   `cms-broker`, holding `broker.provider` at the organisation, made the first time it offers a
   website by **`Provisioner.mintBrokerProvider`** -- the provisioner's second fixed method, so its
@@ -2535,7 +2554,11 @@ studio meets it in `studio.broker`, all off while `pacod.broker.url` (`PACOD_BRO
 - `BrokerClient` is hand-written (pacod-broker ships no Java client): `RestClient` over HTTP/1.1, a
   request built from a `URI` so a lease id is encoded once, problem titles cut to 300 characters.
 - Tests: `BrokerAnnouncerTest` (a stand-in broker: the announcement, the update under the same
-  lease, heartbeats, the goodbye, no token), `TokenExchangeTest.mintsABrokerProvider` /
+  lease, heartbeats, the goodbye, no token, a round now confirming, re-announcing and failing, the
+  interval read on every tick), `BrokerRefreshTest` (seconds not milliseconds, the bounds, stored
+  over environment, the memo, reset, an unreadable control plane),
+  `PortalScreensTest.brokerAnnouncements`, `MgmtSecurityTest.brokerCardRequiresAuthentication`,
+  `BrokerConfigContextTest`, `TokenExchangeTest.mintsABrokerProvider` /
   `brokerProviderRefused`, `AiCatalogTest.brokerResource`, `PortalWebsitesTest.brokerOffer`.
 
 ### Studio languages
@@ -2642,7 +2665,7 @@ application's account without one.
   `CRAWLER_VERIFY`, `READER_LOG` (*The reader log*), `STUDIO_ORIGIN` (who may frame it, see *Advertising*). `cms-site` and `cms-studio`:
   `PACOD_PREVIEW_SECRET` (the same value; blank = no previews, see *The draft preview*). `cms-studio`:
   `MGMT_SESSION_TIMEOUT`, `IMAGE_*` (compose defaults equal the code's), `PACOD_PDF_GOTENBERG_URL`,
-  `PACOD_JOBS_WORKERS`/`PACOD_JOBS_PER_ORGANISATION`, `PACOD_GW_URL`/`PACOD_GW_API_KEY`/`PACOD_AI_MODEL` (*AI*;
+  `PACOD_JOBS_WORKERS`/`PACOD_JOBS_PER_ORGANISATION`, `PACOD_BROKER_URL`/`PACOD_BROKER_TOKEN`/`PACOD_BROKER_OPEN_MODE`/`PACOD_BROKER_REFRESH` (*pacod-broker*; the last passed unvalued, and the installation screen's interval replaces it), `PACOD_GW_URL`/`PACOD_GW_API_KEY`/`PACOD_AI_MODEL` (*AI*;
   the URL defaults to `http://pacod-gw:8080`, the key has none, `make init` writes the dev gateway's;
   a pair stored from the installation screen or the internal API replaces both; `PACOD_AI_MODEL`
   and `pacod.ai.models.*` likewise give way to the models chosen there), `SITE_PUBLIC_SCHEME`/`SITE_PUBLIC_PORT`, `PACOD_BOOTSTRAP_DEMO_HOSTS` (from

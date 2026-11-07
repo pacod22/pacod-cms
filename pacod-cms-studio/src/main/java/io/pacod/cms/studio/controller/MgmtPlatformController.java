@@ -19,7 +19,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import io.pacod.cms.studio.ai.AiGateway;
 import io.pacod.cms.studio.ai.AiCatalog;
+import io.pacod.cms.studio.broker.BrokerAnnouncer;
 import io.pacod.cms.studio.broker.BrokerFacts;
+import io.pacod.cms.studio.broker.BrokerRefresh;
 import org.springframework.beans.factory.ObjectProvider;
 import io.pacod.cms.studio.ai.AiFeature;
 import io.pacod.cms.studio.ai.AiGatewayConfig;
@@ -51,7 +53,8 @@ import java.util.function.Function;
 
 /**
  * The installation: who may create organisations, the self-service limits, AI for new
- * organisations, and every organisation with its websites and its AI switch. Platform admins only.
+ * organisations, pacod-broker's announcements and how often they are rebuilt, and every
+ * organisation with its websites and its AI switch. Platform admins only.
  */
 @PlatformScreen
 @PlatformPermission(read = "platform.manage")
@@ -70,10 +73,14 @@ public class MgmtPlatformController {
     private final AiCatalog catalog;
     /** pacod-broker, when the installation has one ({@code PACOD_BROKER_URL}); else none. */
     private final ObjectProvider<BrokerFacts> broker;
+    /** The announcements: none without a broker, or with {@code pacod.broker.announce=false}. */
+    private final ObjectProvider<BrokerAnnouncer> announcer;
+    private final ObjectProvider<BrokerRefresh> brokerRefresh;
 
     public MgmtPlatformController(PortalSettings settings, PortalOrganisations organisations, PortalIdentity identity,
                                   StudioSites sites, MgmtText text, AiGateway gateway, AiGatewayConfig gatewayConfig,
-                                  AiModels models, AiCatalog catalog, ObjectProvider<BrokerFacts> broker) {
+                                  AiModels models, AiCatalog catalog, ObjectProvider<BrokerFacts> broker,
+                                  ObjectProvider<BrokerAnnouncer> announcer, ObjectProvider<BrokerRefresh> brokerRefresh) {
         this.settings = settings;
         this.organisations = organisations;
         this.identity = identity;
@@ -84,6 +91,8 @@ public class MgmtPlatformController {
         this.models = models;
         this.catalog = catalog;
         this.broker = broker;
+        this.announcer = announcer;
+        this.brokerRefresh = brokerRefresh;
     }
 
     @GetMapping
@@ -91,7 +100,8 @@ public class MgmtPlatformController {
         model.addAttribute("form", PlatformSettingsForm.of(settings.current()));
         model.addAttribute("orgCreationFixed", settings.orgCreationFixed());
         model.addAttribute("orgCreations", Arrays.asList(OrgCreation.values()));
-        model.addAttribute("organisations", organisations.all());
+        List<PortalOrganisations.OrgView> orgs = organisations.all();
+        model.addAttribute("organisations", orgs);
         model.addAttribute("siteCount", sites.all().size());
         model.addAttribute("identityEnabled", identity.enabled());
         model.addAttribute("canProvision", identity.canProvision());
@@ -103,7 +113,112 @@ public class MgmtPlatformController {
         model.addAttribute("aiModel", models.defaultModel());
         addModels(model, ai.configured());
         model.addAttribute("aiNotSetUp", AiRefusal.NOT_SET_UP);
+        addAnnouncements(model, orgs);
         return "mgmt/platform";
+    }
+
+    /** One organisation on the pacod-broker card: its lease's websites, or why it is not announced. */
+    public record BrokerLeaseRow(String organisationId, String organisationName, String provider,
+                                 Map<String, String> resources, String error) {
+    }
+
+    /** The pacod-broker card: each organisation's lease, the rounds, and the interval in effect. */
+    private void addAnnouncements(Model model, List<PortalOrganisations.OrgView> orgs) {
+        BrokerRefresh refresh = brokerRefresh.getIfAvailable();
+        BrokerAnnouncer a = announcer.getIfAvailable();
+        model.addAttribute("brokerAnnouncing", a != null);
+        if (refresh != null) {
+            BrokerRefresh.Effective every = refresh.effective();
+            model.addAttribute("brokerInterval", every);
+            model.addAttribute("brokerIntervalEnvironment", refresh.environment().toSeconds());
+            model.addAttribute("brokerIntervalUpdated", every.updatedOn() == null ? null
+                    : UPDATED.format(every.updatedOn().atZone(ZoneId.systemDefault())));
+            model.addAttribute("brokerIntervalMin", BrokerRefresh.MIN);
+            model.addAttribute("brokerIntervalMax", BrokerRefresh.MAX);
+        }
+        if (a == null) {
+            return;
+        }
+        Map<String, String> names = new java.util.HashMap<>();
+        orgs.forEach(o -> names.put(o.id(), o.name()));
+        List<BrokerLeaseRow> rows = new ArrayList<>();
+        for (BrokerAnnouncer.OrganisationState st : a.state()) {
+            rows.add(new BrokerLeaseRow(st.organisationId(), names.getOrDefault(st.organisationId(), st.organisationId()),
+                    st.provider(), st.resources(), st.error()));
+        }
+        model.addAttribute("brokerLeases", rows);
+        model.addAttribute("brokerLastRound", round(a.lastRefresh()));
+        model.addAttribute("brokerNextRound", round(a.nextRefresh()));
+    }
+
+    private static String round(java.time.Instant at) {
+        return at == null ? null : ROUND.format(at.atZone(ZoneId.systemDefault()));
+    }
+
+    /**
+     * Rebuilds the pacod-broker announcements now instead of at the next round: what changed is
+     * sent, every unchanged lease is heartbeated, and the broker's model list is read afresh.
+     */
+    @PostMapping("/broker/refresh")
+    public RedirectView refreshBroker(HttpServletRequest request, RedirectAttributes redirect) {
+        BrokerFacts facts = broker.getIfAvailable();
+        BrokerAnnouncer a = announcer.getIfAvailable();
+        if (facts == null) {
+            redirect.addFlashAttribute("error", text.msg("portal.platform.broker.notSetUp"));
+        } else if (a == null) {
+            facts.forget();
+            redirect.addFlashAttribute("error", text.msg("portal.platform.broker.refresh.off"));
+        } else {
+            facts.forget();
+            try {
+                BrokerAnnouncer.Round round = a.refreshNow();
+                redirect.addFlashAttribute("message",
+                        text.msg("portal.platform.broker.refresh.done", round.announced(), round.failed()));
+            } catch (RuntimeException e) {
+                redirect.addFlashAttribute("error", text.msg("portal.platform.broker.refresh.failed", e.getMessage()));
+            }
+        }
+        return PortalModels.toPlatform(request, StudioPaths.PLATFORM_SCREEN + "#broker");
+    }
+
+    /** How often the announcements are rebuilt, in seconds, over {@code PACOD_BROKER_REFRESH}. */
+    @PostMapping("/broker/interval")
+    public RedirectView setBrokerInterval(@RequestParam(defaultValue = "") String seconds, HttpServletRequest request,
+                                          RedirectAttributes redirect) {
+        BrokerRefresh refresh = brokerRefresh.getIfAvailable();
+        if (refresh == null) {
+            redirect.addFlashAttribute("error", text.msg("portal.platform.broker.notSetUp"));
+        } else {
+            try {
+                BrokerRefresh.Effective every = refresh.set(seconds(seconds), StudioPrincipals.currentSubject());
+                redirect.addFlashAttribute("message", text.msg("portal.platform.broker.interval.saved", every.seconds()));
+            } catch (MgmtOperationException e) {
+                redirect.addFlashAttribute("error", text.of(e));
+            }
+        }
+        return PortalModels.toPlatform(request, StudioPaths.PLATFORM_SCREEN + "#broker");
+    }
+
+    /** Forgets the stored interval: {@code PACOD_BROKER_REFRESH} applies again. */
+    @PostMapping("/broker/interval/reset")
+    public RedirectView resetBrokerInterval(HttpServletRequest request, RedirectAttributes redirect) {
+        BrokerRefresh refresh = brokerRefresh.getIfAvailable();
+        if (refresh == null) {
+            redirect.addFlashAttribute("error", text.msg("portal.platform.broker.notSetUp"));
+        } else {
+            BrokerRefresh.Effective every = refresh.clear();
+            redirect.addFlashAttribute("message", text.msg("portal.platform.broker.interval.resetDone", every.seconds()));
+        }
+        return PortalModels.toPlatform(request, StudioPaths.PLATFORM_SCREEN + "#broker");
+    }
+
+    /** A posted number of seconds; null when it is none, which {@link BrokerRefresh#set} refuses. */
+    private static Integer seconds(String s) {
+        try {
+            return s == null || s.isBlank() ? null : Integer.valueOf(s.strip());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     @PostMapping
@@ -461,6 +576,7 @@ public class MgmtPlatformController {
     }
 
     private static final DateTimeFormatter UPDATED = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter ROUND = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @PostMapping("/organisations/{orgId}/ai")
     public RedirectView setAi(@PathVariable String orgId, @RequestParam(defaultValue = "false") boolean enabled,

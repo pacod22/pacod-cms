@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * Announces each organisation's offered websites on pacod-broker as {@code dataset} resources,
@@ -41,15 +42,33 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>A virtual thread started at {@code ApplicationReadyEvent}, like {@code IdentityLifecycle}:
  * it never blocks startup, and a broker that is down costs the announcements, never the studio.
- * Every {@link #TICK} it heartbeats what is due; every {@code pacod.broker.refresh} it rebuilds the
- * announcements and sends one only when it changed, under the same lease. An organisation with
- * nothing left to offer says goodbye. Each organisation fails on its own.
+ * Every {@link #TICK} it heartbeats what is due; every {@link BrokerRefresh} interval (the platform
+ * screen's, else {@code pacod.broker.refresh}, read on every tick so a change applies at once) it
+ * rebuilds the announcements and sends one only when it changed, under the same lease. An
+ * organisation with nothing left to offer says goodbye. Each organisation fails on its own.
+ *
+ * <p>{@link #refreshNow} is the platform screen's button: the same round at once, on the request's
+ * thread, with every unchanged lease heartbeated too, so a click confirms that each lease still
+ * exists (one the broker forgot is announced again in the same round). Rounds, ticks and the
+ * goodbyes share one lock: two first announcements without a {@code lease_id} would be two leases.
  */
 @Slf4j
 public class BrokerAnnouncer {
 
     static final Duration TICK = Duration.ofSeconds(5);
     public static final Set<String> OFFERS = Set.of("organisation", "platform", "public");
+
+    /** What a round left: organisations announced without a failure, and organisations whose attempt failed. */
+    public record Round(int announced, int failed) {
+    }
+
+    /**
+     * One organisation as the platform screen shows it: its provider, the broker resource of each
+     * announced website (by website id; empty without a lease), and its last failure, if any.
+     */
+    public record OrganisationState(String organisationId, String provider, Map<String, String> resources,
+                                    String error) {
+    }
 
     /** One organisation's lease, as the broker answered its last announcement. */
     record Lease(String leaseId, String providerName, Map<String, Object> announcement, Duration every,
@@ -63,16 +82,20 @@ public class BrokerAnnouncer {
     private final StudioSites sites;
     private final BrokerClient broker;
     private final BrokerProviders providers;
-    private final Duration refresh;
+    private final Supplier<Duration> refresh;
     private final int ttlSeconds;
     private final Map<String, Lease> leases = new ConcurrentHashMap<>();
     private final Map<String, String> errors = new ConcurrentHashMap<>();
-    private volatile Instant nextRefresh = Instant.EPOCH;
+    /** When the last round started; null before the first. */
+    private volatile Instant lastRefresh;
+    /** A round is due at the next tick, whatever the interval: the first, or a lease the broker forgot. */
+    private volatile boolean refreshDue = true;
     private volatile Thread worker;
 
     public BrokerAnnouncer(WebsiteRepository websites, OrganisationRepository organisations,
                            SiteSettingsRepository settings, SiteFilesRepository files, StudioSites sites,
-                           BrokerClient broker, BrokerProviders providers, Duration refresh, int ttlSeconds) {
+                           BrokerClient broker, BrokerProviders providers, Supplier<Duration> refresh,
+                           int ttlSeconds) {
         this.websites = websites;
         this.organisations = organisations;
         this.settings = settings;
@@ -106,19 +129,25 @@ public class BrokerAnnouncer {
     public void stop() {
         Thread t = worker;
         if (t != null) {
+            // Before the lock: a round in progress then fails its calls at once instead of being waited for.
             t.interrupt();
         }
-        // Goodbye, so consumers stop finding what no longer answers for this studio.
-        for (String org : List.copyOf(leases.keySet())) {
-            goodbye(org);
+        synchronized (this) {
+            // Goodbye, so consumers stop finding what no longer answers for this studio.
+            for (String org : List.copyOf(leases.keySet())) {
+                goodbye(org);
+            }
         }
     }
 
-    /** One pass at {@code now}: a rebuild when due, else the heartbeats that are due. */
-    void tick(Instant now) {
-        if (!now.isBefore(nextRefresh)) {
-            nextRefresh = now.plus(refresh);
-            refreshAll(now);
+    /**
+     * One pass at {@code now}: a rebuild when due -- the last round plus the interval in effect
+     * now, so a shorter one applies at once -- else the heartbeats that are due.
+     */
+    synchronized void tick(Instant now) {
+        Instant last = lastRefresh;
+        if (refreshDue || last == null || !now.isBefore(last.plus(refresh.get()))) {
+            round(now, false);
             return;
         }
         for (Map.Entry<String, Lease> e : leases.entrySet()) {
@@ -128,8 +157,31 @@ public class BrokerAnnouncer {
         }
     }
 
+    /**
+     * A round now, for the platform screen's button: what changed is sent, and every unchanged
+     * lease is heartbeated at once, so the answer says what the broker holds now. Blocks while the
+     * broker answers -- with it down, one connect and read timeout per organisation.
+     */
+    public synchronized Round refreshNow() {
+        round(Instant.now(), true);
+        // A lease still alive whose confirmation failed counts as failed, once.
+        int announced = (int) leases.keySet().stream().filter(org -> !errors.containsKey(org)).count();
+        return new Round(announced, errors.size());
+    }
+
+    private void round(Instant now, boolean confirm) {
+        refreshDue = false;
+        lastRefresh = now;
+        refreshAll(now, confirm);
+    }
+
     /** Rebuilds every organisation's announcement and sends what changed. */
     void refreshAll(Instant now) {
+        refreshAll(now, false);
+    }
+
+    /** The same; with {@code confirm}, unchanged leases are heartbeated now rather than when due. */
+    void refreshAll(Instant now, boolean confirm) {
         Map<String, List<Website>> offered = new TreeMap<>();
         for (Website w : websites.findByStatus(WebsiteStatus.ACTIVE)) {
             if (w.getBrokerOffer() != null && OFFERS.contains(w.getBrokerOffer()) && w.getOrganisationId() != null) {
@@ -138,13 +190,15 @@ public class BrokerAnnouncer {
         }
         Set<String> orgs = new java.util.TreeSet<>(offered.keySet());
         orgs.addAll(leases.keySet());
+        // An organisation that offers nothing any more has nothing left to fail.
+        errors.keySet().retainAll(orgs);
         for (String org : orgs) {
             try {
                 Map<String, Object> announcement = offered.containsKey(org) ? announcement(org, offered.get(org)) : null;
                 if (announcement == null) {
                     goodbye(org);
                 } else {
-                    announce(org, announcement, now);
+                    announce(org, announcement, now, confirm);
                 }
                 errors.remove(org);
             } catch (RuntimeException e) {
@@ -230,13 +284,20 @@ public class BrokerAnnouncer {
         });
     }
 
-    private void announce(String org, Map<String, Object> announcement, Instant now) {
+    private void announce(String org, Map<String, Object> announcement, Instant now, boolean confirm) {
         Lease lease = leases.get(org);
         if (lease != null && lease.announcement().equals(announcement)) {
-            if (!now.isBefore(lease.nextBeat())) {
-                beat(org, lease, now);
+            if (!confirm) {
+                if (!now.isBefore(lease.nextBeat())) {
+                    beat(org, lease, now);
+                }
+                return;
             }
-            return;
+            if (heartbeat(org, lease, now)) {
+                return;
+            }
+            // The broker forgot the lease: announce afresh, now.
+            lease = null;
         }
         String token = providers.token(org).orElseThrow(() -> new IllegalStateException("no provider token"));
         Map<String, Object> body = new LinkedHashMap<>(announcement);
@@ -271,26 +332,36 @@ public class BrokerAnnouncer {
                 Duration.ofSeconds(every), now.plusSeconds(every), resources));
     }
 
+    /** The tick's heartbeat: a failure is logged, a lease the broker forgot makes the next tick a round. */
     private void beat(String org, Lease lease, Instant now) {
         try {
-            String token = providers.token(org).orElseThrow(() -> new IllegalStateException("no provider token"));
-            broker.heartbeat(token, lease.leaseId(), lease.providerName());
-            leases.put(org, new Lease(lease.leaseId(), lease.providerName(), lease.announcement(), lease.every(),
-                    now.plus(lease.every()), lease.resources()));
-        } catch (BrokerClient.BrokerException e) {
-            if (e.notFound()) {
+            if (!heartbeat(org, lease, now)) {
                 // Expired at the broker: the next round announces afresh.
-                leases.remove(org);
-                nextRefresh = Instant.EPOCH;
-            } else {
-                if (e.status() == 401) {
-                    providers.forget(org);
-                }
-                log.warn("pacod-broker: heartbeat of organisation {} failed: {}", org, e.getMessage());
+                refreshDue = true;
             }
         } catch (RuntimeException e) {
             log.warn("pacod-broker: heartbeat of organisation {} failed: {}", org, e.getMessage());
         }
+    }
+
+    /** Heartbeats {@code lease}; false, and the lease forgotten, when the broker no longer knows it. */
+    private boolean heartbeat(String org, Lease lease, Instant now) {
+        String token = providers.token(org).orElseThrow(() -> new IllegalStateException("no provider token"));
+        try {
+            broker.heartbeat(token, lease.leaseId(), lease.providerName());
+        } catch (BrokerClient.BrokerException e) {
+            if (e.notFound()) {
+                leases.remove(org);
+                return false;
+            }
+            if (e.status() == 401) {
+                providers.forget(org);
+            }
+            throw e;
+        }
+        leases.put(org, new Lease(lease.leaseId(), lease.providerName(), lease.announcement(), lease.every(),
+                now.plus(lease.every()), lease.resources()));
+        return true;
     }
 
     private void goodbye(String org) {
@@ -316,6 +387,30 @@ public class BrokerAnnouncer {
     /** The last failure per organisation, for the screens. */
     public Map<String, String> errors() {
         return Map.copyOf(errors);
+    }
+
+    /** Every organisation holding a lease or with a failure, by id, for the platform screen. */
+    public List<OrganisationState> state() {
+        Set<String> orgs = new java.util.TreeSet<>(leases.keySet());
+        orgs.addAll(errors.keySet());
+        List<OrganisationState> out = new ArrayList<>();
+        for (String org : orgs) {
+            Lease lease = leases.get(org);
+            out.add(new OrganisationState(org, providerName(org),
+                    lease == null ? Map.of() : new TreeMap<>(lease.resources()), errors.get(org)));
+        }
+        return out;
+    }
+
+    /** When the last round started; null before the first. */
+    public Instant lastRefresh() {
+        return lastRefresh;
+    }
+
+    /** When the next round is due at the interval in effect now; null when it is the next tick's. */
+    public Instant nextRefresh() {
+        Instant last = lastRefresh;
+        return last == null || refreshDue ? null : last.plus(refresh.get());
     }
 
     static String providerName(String org) {

@@ -380,6 +380,19 @@ class MgmtSecurityTest {
     }
 
     @Test
+    @DisplayName("the pacod-broker card's round now, interval and reset need sign-in and CSRF")
+    @WithAnonymousUser
+    void brokerCardRequiresAuthentication() throws Exception {
+        for (String path : java.util.List.of("/mgmt/platform/broker/refresh", "/mgmt/platform/broker/interval",
+                "/mgmt/platform/broker/interval/reset")) {
+            mockMvc.perform(post(path).param("seconds", "10")).andExpect(status().isForbidden());
+            mockMvc.perform(post(path).with(csrf()).param("seconds", "10"))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/mgmt/login"));
+        }
+    }
+
+    @Test
     @DisplayName("queueing, cancelling, promoting and deleting a job all require CSRF")
     @WithMockUser(roles = "MGMT")
     void jobPostsRequireCsrf() throws Exception {
