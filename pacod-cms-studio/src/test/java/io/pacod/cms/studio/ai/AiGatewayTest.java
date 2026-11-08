@@ -2,6 +2,7 @@ package io.pacod.cms.studio.ai;
 
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
+import org.springframework.http.HttpHeaders;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -80,7 +81,7 @@ class AiGatewayTest {
         assertThat(sent).containsEntry("authorization", "Bearer pgw_cms_test")
                 .containsEntry("x-gw-end-user", "demo").containsEntry("x-gw-task", "translate")
                 .containsEntry("x-gw-trace", "0123456789abcdef01234567").containsEntry("x-gw-user-id", "usr_1")
-                .doesNotContainKey("x-gw-tags");
+                .doesNotContainKey("x-gw-tags").doesNotContainKey("x-gw-agent-id");
         assertThat(sent.get("body")).contains("\"model\":\"@fast\"", "\"json_schema\"", "\"strict\":true", "\"max_tokens\":600",
                 "\"role\":\"system\"", "Добро утро");
     }
@@ -266,5 +267,62 @@ class AiGatewayTest {
         assertThatThrownBy(() -> gateway.templateSpec("@../admin")).hasMessageContaining("Not a template");
         assertThatThrownBy(() -> gateway.templateSpec("@a/b")).hasMessageContaining("Not a template");
         assertThat(requests).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("headers(): the key, the agent where one is set, and the attribution; a blank or odd agent names none")
+    void headersNameTheAgent() {
+        HttpHeaders named = new HttpHeaders();
+        new AiGateway("http://gw.test", "pgw_cms_test", Duration.ofSeconds(1), false, " pacod-cms ")
+                .headers(named, "pgw_cms_test", translation());
+        assertThat(named.getFirst("Authorization")).isEqualTo("Bearer pgw_cms_test");
+        assertThat(named.getFirst("x-gw-agent-id")).isEqualTo("pacod-cms");
+        assertThat(named.getFirst("x-gw-task")).isEqualTo("translate");
+        assertThat(named.getFirst("x-gw-end-user")).isEqualTo("demo");
+
+        for (String none : new String[] {"", "   ", null, "pacod cms", "pacod/cms"}) {
+            HttpHeaders unnamed = new HttpHeaders();
+            new AiGateway("http://gw.test", "pgw_cms_test", Duration.ofSeconds(1), false, none)
+                    .headers(unnamed, "pgw_cms_test", translation());
+            assertThat(unnamed.containsHeader("x-gw-agent-id")).as("agent %s", none).isFalse();
+            assertThat(unnamed.getFirst("x-gw-task")).isEqualTo("translate");
+        }
+    }
+
+    @Test
+    @DisplayName("the agent goes on every call to the gateway: a completion, the model list and a template's settings")
+    void agentOnEveryCall() throws IOException {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            Map<String, String> seen = new java.util.HashMap<>();
+            exchange.getRequestHeaders().forEach((k, v) -> seen.put(k.toLowerCase(), v.getFirst()));
+            seen.put("path", exchange.getRequestURI().getRawPath());
+            requests.add(seen);
+            String reply = exchange.getRequestURI().getRawPath().equals("/v1/chat/completions")
+                    ? "{\"choices\":[{\"message\":{\"content\":\"{\\\"reply\\\":\\\"pong\\\"}\",\"refusal\":null},\"finish_reason\":\"stop\"}]}"
+                    : "{\"id\":\"@fast\",\"models\":[],\"templates\":[]}";
+            byte[] body = reply.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.start();
+        String address = "http://127.0.0.1:" + server.getAddress().getPort();
+        AiGateway gateway = new AiGateway(address, "pgw_cms_test", Duration.ofSeconds(5), false, "pacod-cms");
+        gateway.ping("@fast");
+        gateway.listModels();
+        gateway.templateSpec("@fast");
+        assertThat(requests).extracting(r -> r.get("path"))
+                .containsExactly("/v1/chat/completions", "/gw/v1/models", "/gw/v1/models/@fast");
+        assertThat(requests).allSatisfy(r -> assertThat(r)
+                .containsEntry("x-gw-agent-id", "pacod-cms").containsEntry("authorization", "Bearer pgw_cms_test"));
+
+        requests.clear();
+        AiGateway unnamed = new AiGateway(address, "pgw_cms_test", Duration.ofSeconds(5), false);
+        unnamed.ping("@fast");
+        unnamed.listModels();
+        unnamed.templateSpec("@fast");
+        assertThat(requests).hasSize(3).allSatisfy(r -> assertThat(r).doesNotContainKey("x-gw-agent-id"));
     }
 }

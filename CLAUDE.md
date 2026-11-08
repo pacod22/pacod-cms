@@ -2231,6 +2231,13 @@ Every AI feature calls **pacod-gw** (OpenAI's chat API, `/v1/chat/completions`) 
   - **Attribution uses opaque ids only**: `x-gw-end-user` (the website), `x-gw-task` (the
     feature), `x-gw-trace` (the job), `x-gw-user-id` (a `usr_` id).
   - `x-gw-tags` is sent only with `pacod.ai.tags`, because a workspace counts tag keys it declares.
+  - **`x-gw-agent-id` goes on every call** (`identify()`: the completion, `GET /gw/v1/models` and
+    `GET /gw/v1/models/@name`) when `pacod.ai.agent-id` (`PACOD_GW_AGENT_ID`) is set; blank, the
+    default, sends none. It must be the agent the key in effect is bound to, or blank: the gateway
+    refuses a key's call that names another agent (403), and a key bound to one agent needs none.
+    It comes from the environment alone, so it applies to a pair stored at runtime too: a stored
+    key bound to another agent needs the label changed (and a restart) or blanked. A value that is
+    not an opaque id (`[A-Za-z0-9_.:-]{1,200}`) is not sent, with one warning at start.
   - **A 429 is retried once**, after its `Retry-After` (at most 30 s). A 402 (budget spent) or a
     504 (the model may still be generating, and billing) is never retried. The gateway already
     fails over between models, and a second retry layer would multiply calls.
@@ -2668,7 +2675,8 @@ application's account without one.
   `PACOD_JOBS_WORKERS`/`PACOD_JOBS_PER_ORGANISATION`, `PACOD_BROKER_URL`/`PACOD_BROKER_TOKEN`/`PACOD_BROKER_OPEN_MODE`/`PACOD_BROKER_REFRESH` (*pacod-broker*; the last passed unvalued, and the installation screen's interval replaces it), `PACOD_GW_URL`/`PACOD_GW_API_KEY`/`PACOD_AI_MODEL` (*AI*;
   the URL defaults to `http://pacod-gw:8080`, the key has none, `make init` writes the dev gateway's;
   a pair stored from the installation screen or the internal API replaces both; `PACOD_AI_MODEL`
-  and `pacod.ai.models.*` likewise give way to the models chosen there), `SITE_PUBLIC_SCHEME`/`SITE_PUBLIC_PORT`, `PACOD_BOOTSTRAP_DEMO_HOSTS` (from
+  and `pacod.ai.models.*` likewise give way to the models chosen there), `PACOD_GW_AGENT_ID` (*AI*,
+  `pacod.ai.agent-id`; blank default, and nothing stored replaces it), `SITE_PUBLIC_SCHEME`/`SITE_PUBLIC_PORT`, `PACOD_BOOTSTRAP_DEMO_HOSTS` (from
   `DEMO_HOSTS`) and `PACOD_BOOTSTRAP_DEMO_MINIMAL_HOSTS` (from `DEMO_MINIMAL_HOSTS`), `PACOD_ID_ISSUER` (from `ID_ISSUER`), `PACOD_ID_INTERNAL_URL` (default `http://pacod-id-internal:8071`),
   `PACOD_ID_{STUDIO,SERVICE}_SECRET` (from `CMS_ID_*_SECRET`), `STUDIO_ORIGIN`,
   `PACOD_ID_PROVISIONER_TOKEN` (empty default: no provisioner, platform admins create

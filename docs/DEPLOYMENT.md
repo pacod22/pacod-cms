@@ -533,6 +533,7 @@ Set per service, not globally:
 | `PACOD_PDF_GOTENBERG_URL` | `cms-studio` | Gotenberg, for PDF export (compose: `http://cms-gotenberg:3000`); blank switches it off |
 | `PACOD_JOBS_WORKERS`, `PACOD_JOBS_PER_ORGANISATION` | `cms-studio` | jobs run at once (2), and of one organisation (1) |
 | `PACOD_GW_URL`, `PACOD_GW_API_KEY` | `cms-studio` | the AI gateway (pacod-gw, default `http://pacod-gw:8080`) and the studio's key for it; without a key AI is not set up. Starting values only: a pair set on the installation screen or through `PUT /internal/v1/ai-gateway` replaces them until it is reset |
+| `PACOD_GW_AGENT_ID` | `cms-studio` | the agent the studio's calls are made as (`x-gw-agent-id`, on every call, the model list included); blank by default, which sends none. Set, it must be the agent the key in effect is bound to at the gateway, which refuses (403) a call naming another; a key bound to one agent needs none. It is not replaced by a pair stored at runtime, so a stored key bound to another agent needs it changed or blanked |
 | `PACOD_AI_MODEL` | `cms-studio` | the model or pool each AI feature asks for (default `@fast`); a starting value, replaced by the models chosen on the installation screen or through `/internal/v1/ai-models` |
 | `COMPOSE_PROFILES` | compose (the presets) | `dev-gateway,mailpit` on dev and stage: the development gateway and the mail catcher; empty in production |
 | `METRICS_VISITOR_SALT` | `cms-site` | salts the opaque reader key; blank means a new random salt per restart |

@@ -178,9 +178,11 @@ services:
       PACOD_JOBS_PER_ORGANISATION:
       # The AI gateway (pacod-gw): its address, the studio's key and the model it asks for. The
       # development gateway is pacod-gw in docker-compose.standalone.yml; a deployment names its
-      # own. Without a key, AI is not set up. @fast is a pool of the development gateway.
+      # own. Without a key, AI is not set up. @fast is a pool of the development gateway. The agent
+      # is blank, or the one the key is bound to at the gateway.
       PACOD_GW_URL: ${PACOD_GW_URL:-http://pacod-gw:8080}
       PACOD_GW_API_KEY: ${PACOD_GW_API_KEY:-}
+      PACOD_GW_AGENT_ID: ${PACOD_GW_AGENT_ID:-}
       PACOD_AI_MODEL: ${PACOD_AI_MODEL:-@fast}
       # See cms-site for why this carries no value.
       CORS_ALLOWED_ORIGINS:

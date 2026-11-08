@@ -111,7 +111,9 @@ preview is counted or tracked, and drafts are read past every cache.
   and key come from the environment until a platform admin (installation screen) or a script
   (`/internal/v1/ai-gateway`, with a pacod-id service token) stores a pair in the control plane.
   That pair wins from the next call on. Which model or template each feature calls is chosen the
-  same two ways, from the list the gateway reports for that key.
+  same two ways, from the list the gateway reports for that key. The agent the calls are made as
+  (`PACOD_GW_AGENT_ID`, `x-gw-agent-id`) is blank by default; set, it must be the agent the key is
+  bound to at the gateway.
 - **Export and restore**: a website, or an organisation's websites, downloads as one ZIP (its
   collections as raw BSON and its files, without analytics, members or hosts) and restores from one,
   always as a new website created the way the portal creates one.

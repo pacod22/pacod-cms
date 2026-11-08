@@ -33,6 +33,10 @@ import java.util.Map;
  *       at the gateway), {@code x-gw-task} the feature, {@code x-gw-trace} the job,
  *       {@code x-gw-user-id} the person's {@code usr_} id; {@code x-gw-tags} only when
  *       {@code pacod.ai.tags} is on, since the gateway counts tag keys a workspace declares.</li>
+ *   <li><b>The agent</b>, {@code pacod.ai.agent-id} ({@code PACOD_GW_AGENT_ID}, blank by default),
+ *       goes in {@code x-gw-agent-id} on every call, the model list and a template's settings
+ *       included. It must be the agent the key in effect is bound to, or blank: the gateway refuses
+ *       a key's call that names another agent (403), and a key bound to one agent needs none.</li>
  *   <li><b>One retry, for a 429</b>, after its {@code Retry-After} (at most 30 s); never for a 402
  *       (the budget is spent) or a 504 (the model may still be generating, and billing). The
  *       gateway already fails over between models; a second retry layer here would multiply.</li>
@@ -49,9 +53,13 @@ import java.util.Map;
 public class AiGateway {
 
     private static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(30);
+    /** What may go into an attribution header: an opaque id. */
+    private static final String OPAQUE_ID = "[A-Za-z0-9_.:-]{1,200}";
 
     private final AiGatewayConfig config;
     private final boolean tags;
+    /** {@code x-gw-agent-id} on every call; null sends none. */
+    private final String agentId;
     private final RestClient client;
     /** For the model list, which a page render may wait on: seconds, not minutes. */
     private final RestClient listing;
@@ -59,9 +67,14 @@ public class AiGateway {
 
     @Autowired
     public AiGateway(AiGatewayConfig config, @Value("${pacod.ai.timeout:180s}") Duration timeout,
-                     @Value("${pacod.ai.tags:false}") boolean tags) {
+                     @Value("${pacod.ai.tags:false}") boolean tags, @Value("${pacod.ai.agent-id:}") String agentId) {
         this.config = config;
         this.tags = tags;
+        this.agentId = agentId == null || agentId.isBlank() ? null : agentId.strip();
+        if (this.agentId != null && !this.agentId.matches(OPAQUE_ID)) {
+            // Not sent, as a bad attribution value is not: the gateway could not read it as meant.
+            log.warn("pacod.ai.agent-id is not an agent id ([A-Za-z0-9_.:-], 1-200): none is sent");
+        }
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(5)).build());
         factory.setReadTimeout(timeout);
@@ -72,9 +85,19 @@ public class AiGateway {
         this.listing = RestClient.builder().requestFactory(quick).build();
     }
 
+    /** A gateway that names no agent: for tests. */
+    public AiGateway(AiGatewayConfig config, Duration timeout, boolean tags) {
+        this(config, timeout, tags, "");
+    }
+
     /** A gateway with a fixed address and key, nothing stored: for tests. */
     public AiGateway(String url, String key, Duration timeout, boolean tags) {
-        this(AiGatewayConfig.fixed(url, key), timeout, tags);
+        this(url, key, timeout, tags, "");
+    }
+
+    /** A gateway with a fixed address and key, nothing stored, speaking for {@code agentId}: for tests. */
+    public AiGateway(String url, String key, Duration timeout, boolean tags, String agentId) {
+        this(AiGatewayConfig.fixed(url, key), timeout, tags, agentId);
     }
 
     /** Whether there is a gateway to call: an address and a key, stored or from the environment. */
@@ -128,8 +151,9 @@ public class AiGateway {
     /**
      * The gateway's list of what this key may call, {@code GET <address>/gw/v1/models} (the native
      * interface: models with their kind, state and capabilities, and templates with their pools),
-     * parsed by {@link AiCatalog}. Nobody is attributed. The address and key in effect, the answer
-     * as the gateway wrote it.
+     * parsed by {@link AiCatalog}. Nobody is attributed; the agent, where one is set, is named,
+     * since the gateway narrows a key to what its agent may call. The address and key in effect, the
+     * answer as the gateway wrote it.
      *
      * @throws AiException not set up, unreachable, refused, or not JSON
      */
@@ -160,7 +184,7 @@ public class AiGateway {
         }
         try {
             String body = listing.get().uri(target.url() + path)
-                    .headers(h -> h.setBearerAuth(target.key()))
+                    .headers(h -> identify(h, target.key()))
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve().body(String.class);
             JsonNode parsed = json.readTree(body == null ? "{}" : body);
@@ -272,8 +296,15 @@ public class AiGateway {
                 response.getHeaders().getFirst("x-gw-request-id"));
     }
 
-    private void headers(HttpHeaders headers, String key, Call call) {
+    /** The key, and the agent it speaks for where one is set: on every call to the gateway. */
+    private void identify(HttpHeaders headers, String key) {
         headers.setBearerAuth(key);
+        put(headers, "x-gw-agent-id", agentId);
+    }
+
+    /** Every header of a completion: the key, the agent, the attribution. Package-private for its test. */
+    void headers(HttpHeaders headers, String key, Call call) {
+        identify(headers, key);
         put(headers, "x-gw-end-user", call.siteId());
         put(headers, "x-gw-task", call.feature());
         put(headers, "x-gw-trace", call.trace());
@@ -289,7 +320,7 @@ public class AiGateway {
     }
 
     private static void put(HttpHeaders headers, String name, String value) {
-        if (value != null && !value.isBlank() && value.matches("[A-Za-z0-9_.:-]{1,200}")) {
+        if (value != null && !value.isBlank() && value.matches(OPAQUE_ID)) {
             headers.set(name, value);
         }
     }
