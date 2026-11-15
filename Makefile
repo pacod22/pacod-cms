@@ -162,7 +162,7 @@ status: ## The environment, its containers and its addresses
 	@$(MAKE) --no-print-directory urls
 
 ##@ Content
-.PHONY: site-create seed seed-check reseed-pages reseed-pages-restore restore mongo
+.PHONY: site-create seed seed-articles seed-check reseed-pages reseed-pages-restore restore mongo
 # $(seed-dir-check): refuses a SEED_DIR without a seed.json before a container is started for it.
 seed-dir-check = $(if $(SEED_DIR),@test -f "$(SEED_DIR)/seed.json" || { echo 'SEED_DIR=$(SEED_DIR) holds no seed.json'; exit 2; })
 
@@ -176,6 +176,13 @@ seed: ## Give a website the demo content (SITE=<id>; dev/stage: demo) [DEMO=spac
 	$(call need,SITE,make seed SITE=<website id>)
 	$(seed-dir-check)
 	$(STUDIO_CLI) --seed-demo --site-id="$(SITE)" $(if $(DEMO),--demo="$(DEMO)") $(if $(SEED_DIR),--seed-dir=/seed)
+
+seed-articles: ## Add a seed's new articles to a live website, nothing else: SITE=<id> SEED_DIR=<folder> ARTICLES=14,15,16 [APPLY=1]; a dry run without APPLY
+	$(call need,SITE,make seed-articles SITE=<website id> SEED_DIR=<folder> ARTICLES=<numbers>)
+	$(call need,SEED_DIR,make seed-articles SITE=<website id> SEED_DIR=<folder> ARTICLES=<numbers>)
+	$(call need,ARTICLES,make seed-articles SITE=<website id> SEED_DIR=<folder> ARTICLES=<numbers>)
+	$(seed-dir-check)
+	$(STUDIO_CLI) --seed-articles --site-id="$(SITE)" --seed-dir=/seed --articles="$(ARTICLES)" $(if $(APPLY),--apply)
 
 seed-check: ## Check a seed folder without writing anything: SEED_DIR=<folder> [LANGUAGE=en]
 	$(call need,SEED_DIR,make seed-check SEED_DIR=<folder holding seed.json>)

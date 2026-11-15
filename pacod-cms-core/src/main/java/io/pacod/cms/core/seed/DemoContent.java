@@ -167,7 +167,12 @@ public class DemoContent {
         /** The website already has articles: demo content goes only into an empty one. */
         HAS_ARTICLES,
         /** A seed from outside the jar breaks one of {@link SeedRules}: the message lists them. */
-        INVALID
+        INVALID,
+        /**
+         * {@link #addArticles}: an article named is not in the seed, its number is taken by another
+         * article, or it needs a section, an author or a linked article the website does not have.
+         */
+        CONFLICT
     }
 
     /** Thrown before anything is written. */
@@ -433,6 +438,155 @@ public class DemoContent {
         Result result = new Result(written.size(), newImages, newCategories, newAuthors, newTags, menuGroup, socialPage);
         log.info("Demo content ({}) in website {}: {}", source.id(), website.id(), result);
         return result;
+    }
+
+    /**
+     * What {@link #addArticles} wrote, or would write when it was not told to apply.
+     *
+     * @param applied      whether anything was written
+     * @param added        the articles written (or to be written)
+     * @param present      the articles named that the website already has, under the same title: left alone
+     * @param picturesKept the pictures the new articles use that the website already has, by file name
+     * @param picturesNew  the pictures stored for them (or to be stored)
+     * @param tagsNew      the tags created for them (or to be created)
+     */
+    public record Addition(boolean applied, List<Integer> added, List<Integer> present, List<String> picturesKept,
+                           List<String> picturesNew, List<String> tagsNew) {
+    }
+
+    /** An article linked from a body: {@code href="/article/14"}, the number. */
+    private static final java.util.regex.Pattern ARTICLE_LINK = java.util.regex.Pattern.compile("href=\"/article/(\\d+)\"");
+
+    /**
+     * Adds the seed's articles {@code ids} to a website that already has content, and writes nothing
+     * else: no menu, page, site text, theme, layout, language, issue, section or author is created
+     * or changed, and no existing article, picture or tag is touched. For a blog kept as a seed
+     * ({@code --seed-dir}) whose new posts must reach a website that is already live, where
+     * {@link #install} refuses ({@link Refusal#HAS_ARTICLES}).
+     *
+     * <p>Each article keeps the seed's number, so the seed's links between articles stay right. It is
+     * refused whole ({@link Refusal#CONFLICT}), every problem named, when an article named is not in
+     * the seed; its number is taken by an article with another title; it names a section or an author
+     * the website lacks; or a body links an article the website will not have. An article already
+     * there under the same title is left alone, so running it again writes nothing. Its pictures are
+     * reused by file name and stored only when absent, and so are its tags.
+     *
+     * <p>Without {@code apply} it only works out the {@link Addition}.
+     */
+    public Addition addArticles(SeedSource source, SiteSeedStep.Website website, java.util.Collection<Integer> ids,
+                                boolean apply) {
+        String bound = TenantContext.current().siteId();
+        if (!bound.equals(website.id())) {
+            throw new IllegalStateException("Articles for " + website.id() + " while " + bound + " is bound");
+        }
+        Seed seed = seed(source);
+        String lang = website.defaultLanguage() == null || website.defaultLanguage().isBlank()
+                ? LanguageChain.original() : LanguageChain.normalise(website.defaultLanguage());
+        if (!completeLanguages(seed).contains(lang)) {
+            throw new Refused(Refusal.LANGUAGE, "The seed is written in " + completeLanguages(seed) + ", not in " + lang);
+        }
+        if (source.external()) {
+            List<String> problems = check(source, lang);
+            if (!problems.isEmpty()) {
+                throw new Refused(Refusal.INVALID, "The seed of " + source.id() + " has " + problems.size()
+                        + " problem(s): " + String.join("; ", problems));
+            }
+        }
+        if (ids == null || ids.isEmpty()) {
+            throw new Refused(Refusal.CONFLICT, "No article named: give the numbers of the ones to add");
+        }
+
+        Map<Integer, ArticleSeed> inSeed = new LinkedHashMap<>();
+        seed.getArticles().forEach(article -> inSeed.put(article.getId(), article));
+        List<String> problems = new ArrayList<>();
+        List<ArticleSeed> toAdd = new ArrayList<>();
+        List<Integer> present = new ArrayList<>();
+        for (Integer id : new TreeSet<>(ids)) {
+            ArticleSeed seedArticle = inSeed.get(id);
+            if (seedArticle == null) {
+                problems.add("the seed has no article " + id);
+                continue;
+            }
+            Article existing = articles.findById(id).orElse(null);
+            if (existing == null) {
+                toAdd.add(seedArticle);
+            } else if (java.util.Objects.equals(existing.getTitle(), seedArticle.getTitles().get(lang))) {
+                present.add(id);
+            } else {
+                problems.add("article " + id + " is taken by \"" + existing.getTitle() + "\", not \""
+                        + seedArticle.getTitles().get(lang) + "\"");
+            }
+        }
+        Set<Integer> adding = toAdd.stream().map(ArticleSeed::getId).collect(Collectors.toSet());
+        for (ArticleSeed seedArticle : toAdd) {
+            String which = "article " + seedArticle.getId();
+            seedArticle.getCategories().stream().filter(id -> !categories.existsById(id))
+                    .forEach(id -> problems.add(which + ": the website has no section " + id));
+            seedArticle.getAuthors().stream().filter(id -> !authors.existsById(id))
+                    .forEach(id -> problems.add(which + ": the website has no author " + id));
+            Set<Integer> linked = new TreeSet<>();
+            for (String body : seedArticle.getBodies().values()) {
+                java.util.regex.Matcher link = ARTICLE_LINK.matcher(body == null ? "" : body);
+                while (link.find()) {
+                    linked.add(Integer.valueOf(link.group(1)));
+                }
+            }
+            linked.stream().filter(id -> !adding.contains(id) && !articles.existsById(id))
+                    .forEach(id -> problems.add(which + " links /article/" + id + ", which the website does not have"));
+        }
+        if (!problems.isEmpty()) {
+            throw new Refused(Refusal.CONFLICT, "Website " + website.id() + ": " + String.join("; ", problems));
+        }
+
+        Map<String, ImageSeed> imageSeeds = new LinkedHashMap<>();
+        seed.getImages().forEach(image -> imageSeeds.put(image.getKey(), image));
+        Map<String, ImageMedia> pictures = new LinkedHashMap<>();
+        List<String> picturesKept = new ArrayList<>();
+        List<String> picturesNew = new ArrayList<>();
+        for (String key : toAdd.stream().flatMap(a -> a.getImages().stream())
+                .collect(Collectors.toCollection(LinkedHashSet::new))) {
+            String filename = seed.getImagePrefix() + key + ".jpg";
+            ImageMedia existing = images.findImageMediaByFilename(filename).orElse(null);
+            if (existing != null) {
+                picturesKept.add(filename);
+                pictures.put(key, existing);
+            } else {
+                picturesNew.add(filename);
+                if (apply) {
+                    pictures.put(key, storePicture(source, imageSeeds.get(key), filename, lang));
+                }
+            }
+        }
+        List<String> tagsNew = new ArrayList<>();
+        for (String name : toAdd.stream().flatMap(a -> a.getTags().stream())
+                .collect(Collectors.toCollection(LinkedHashSet::new))) {
+            if (!tags.existsById(name)) {
+                tagsNew.add(name);
+                if (apply) {
+                    tags.save(new Tag(name, new ArrayList<>(translations(seed.getTags().getOrDefault(name, Map.of()), lang))));
+                }
+            }
+        }
+        List<Integer> added = toAdd.stream().map(ArticleSeed::getId).toList();
+        if (!apply || toAdd.isEmpty()) {
+            Addition addition = new Addition(false, added, present, picturesKept, picturesNew, tagsNew);
+            log.info("Articles for website {} ({}): {}", website.id(), apply ? "nothing to write" : "dry run", addition);
+            return addition;
+        }
+
+        Map<Integer, Category> categoryById = byId(categories.findAllById(toAdd.stream()
+                .flatMap(a -> a.getCategories().stream()).collect(Collectors.toSet())), Category::getId);
+        Map<Integer, Author> authorById = byId(authors.findAllById(toAdd.stream()
+                .flatMap(a -> a.getAuthors().stream()).collect(Collectors.toSet())), Author::getId);
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
+        List<Article> written = new ArrayList<>();
+        for (ArticleSeed seedArticle : toAdd) {
+            written.add(toArticle(seedArticle, lang, now, categoryById, authorById, pictures));
+        }
+        articles.saveAll(written);
+        Addition addition = new Addition(true, added, present, picturesKept, picturesNew, tagsNew);
+        log.info("Articles for website {} ({}): {}", website.id(), source.id(), addition);
+        return addition;
     }
 
     private ImageMedia storePicture(SeedSource source, ImageSeed image, String filename, String lang) {

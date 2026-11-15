@@ -351,6 +351,20 @@ refused before anything is written, and its layouts choose the template set unle
 another. Like the demos, it is written once, into a website without articles; afterwards the
 website is edited in the studio.
 
+**New articles from the same seed** reach a website that is already live with `make seed-articles`.
+It writes those articles, their tags and any picture of theirs the website lacks (reused by file
+name otherwise), and nothing else: no page, menu, section, author, site text, theme or existing
+article is touched. Each article keeps the seed's number, so links between articles stay right.
+It refuses the lot, naming every problem, when a number is taken by an article with another title,
+or an article needs a section, an author or a linked article the website does not have. An article
+already there under its title is skipped, so a second run writes nothing. It only reports until
+`APPLY=1`:
+
+```bash
+make seed-articles SITE=pacod SEED_DIR=../pacod-web/build/seed ARTICLES=14,15,16           # what it would write
+make seed-articles SITE=pacod SEED_DIR=../pacod-web/build/seed ARTICLES=14,15,16 APPLY=1   # write them
+```
+
 **A website's standing pages** (About, Contact, Terms…) come from a seed when the website is
 created. `make reseed-pages SITE=<id>` rebuilds them from a changed seed. It backs the pages up
 first, only reports until `APPLY=1`, and outside dev also needs `CONFIRM=<env>`. Undo it with

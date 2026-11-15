@@ -626,6 +626,7 @@ cache or an invalidation endpoint the writers call.
 | `make mongo` | `mongosh` on the control plane; `make mongo SITE=<id>` on that website's database |
 | `make site-create SLUG= NAME= HOSTS= [LANGUAGE=] [ORG=] [TEMPLATE=] [DEMO=1]` | create a website, in a new organisation or `ORG` (see above) |
 | `make seed SITE=<id>` | the demo content into a website that has no articles (dev and stage default to `demo`); English websites only |
+| `make seed-articles SITE=<id> SEED_DIR=… ARTICLES=14,15 [APPLY=1]` | a folder seed's articles into a website that already has content, and nothing else; refused whole if a number is taken by another article or a section, author or linked article is missing; reports until `APPLY=1` (docs/RUNNING.md) |
 | `make restore DUMP=dir [FROM_DB= TO_DB=] [EXCLUDE=…]` | `mongorestore` a dump from `MONGO_BACKUP_DIR`; reports unless `APPLY=1` (and `CONFIRM=<env>` outside dev). A `FROM_DB` dump is renamed into `TO_DB`, the control plane by default; only the collections the dump carries are dropped and replaced |
 | `make reseed-pages SITE=<id>` | rebuild a website's standing pages from `seed/pages.json`: backs its collection up, drops it, rebuilds the studio image and recreates the container, which re-seeds; reports unless `APPLY=1` (and `CONFIRM=<env>` outside dev). `make reseed-pages-restore` puts the backup back |
 | `make smoke`, `make smoke-tls` | the main routes through Caddy by host, each code and redirect checked (HTTPS on stage and prod; `SITE=<id>` names a website in production); each host's certificate |

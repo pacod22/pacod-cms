@@ -141,6 +141,16 @@ public class StudioDemo {
         return install(DemoContent.Demo.JOURNAL, website);
     }
 
+    /**
+     * {@link DemoContent#addArticles}, in the website's own tenant: the seed's articles {@code ids}
+     * into a website that already has content, and nothing else -- no promotions, no brand files.
+     */
+    public DemoContent.Addition addArticles(SeedSource source, Website website, java.util.Collection<Integer> ids,
+                                            boolean apply) {
+        return TenantContext.callAs(TenantDirectory.tenantOf(website), () -> content.addArticles(source,
+                new SiteSeedStep.Website(website.getId(), website.getName(), website.getDefaultLanguage()), ids, apply));
+    }
+
     /** {@link #install(Website)}, of the seed named: a demo, or a folder's ({@code --seed-dir}). */
     public Outcome install(SeedSource demo, Website website) {
         return TenantContext.callAs(TenantDirectory.tenantOf(website), () -> {

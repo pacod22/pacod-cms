@@ -601,6 +601,101 @@ class DemoContentTest {
         assertThat(DemoContent.Demo.SPACE.files("demo/space/photos")).contains("lantern-reef.jpg", "VENDORED.md");
     }
 
+    // --- addArticles: new posts into a website that is already live ------------------------------
+
+    /** The folder seed's website after an earlier load: its sections, its author, article 1 and its picture. */
+    private void liveWebsite() {
+        when(imageService.getMaxImageBytes()).thenReturn(400L * 1024);
+        storedCategories.put(1, new Category(1, "Gateway", new ArrayList<>(), "en"));
+        storedCategories.put(2, new Category(2, "Platform", new ArrayList<>(), "en"));
+        storedAuthors.put(1, new Author(1));
+        ImageMedia mark = new ImageMedia(41);
+        mark.setFilename("pacod-mark.jpg");
+        storedImages.put(mark.getFilename(), mark);
+        Article first = new Article(1);
+        first.setTitle("Introducing PACOD");
+        when(articles.findById(any())).thenAnswer(c -> Optional.ofNullable(Integer.valueOf(1).equals(c.getArgument(0)) ? first : null));
+        when(articles.existsById(any())).thenAnswer(c -> Integer.valueOf(1).equals(c.getArgument(0)));
+        when(tags.existsById("release")).thenReturn(true);
+    }
+
+    @Test
+    @DisplayName("adding articles to a live website writes those articles, a missing picture, and nothing else")
+    void addArticlesWritesOnlyTheArticles(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        liveWebsite();
+        DirectorySeed source = FolderSeed.write(dir);
+
+        DemoContent.Addition addition = demo.addArticles(source, TEST, List.of(1, 2), true);
+
+        assertThat(addition.applied()).isTrue();
+        assertThat(addition.added()).containsExactly(2);
+        assertThat(addition.present()).containsExactly(1);
+        assertThat(addition.picturesKept()).containsExactly("pacod-mark.jpg");
+        assertThat(addition.picturesNew()).containsExactly("pacod-screen.jpg");
+        assertThat(addition.tagsNew()).isEmpty();
+        List<Article> written = savedArticles();
+        assertThat(written).extracting(Article::getId).containsExactly(2);
+        Article gateway = written.getFirst();
+        assertThat(gateway.getDate()).isEqualTo(LocalDateTime.of(2025, 2, 3, 10, 30));
+        assertThat(gateway.getImages()).extracting(ImageMedia::getFilename).containsExactly("pacod-mark.jpg", "pacod-screen.jpg");
+        assertThat(gateway.getImages().getFirst().getId()).isEqualTo(41);
+        assertThat(gateway.getCategories()).extracting(Category::getId).containsExactly(1);
+        // Nothing but the article and its one missing picture: no section, author, tag, menu or link page.
+        verify(categories, never()).save(any());
+        verify(authors, never()).save(any());
+        verify(tags, never()).save(any());
+        org.mockito.Mockito.verifyNoInteractions(menus, socialPages);
+    }
+
+    @Test
+    @DisplayName("without apply, adding articles only says what it would write")
+    void addArticlesDryRun(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        liveWebsite();
+
+        DemoContent.Addition addition = demo.addArticles(FolderSeed.write(dir), TEST, List.of(2), false);
+
+        assertThat(addition.applied()).isFalse();
+        assertThat(addition.added()).containsExactly(2);
+        assertThat(addition.picturesNew()).containsExactly("pacod-screen.jpg");
+        nothingWritten();
+        verify(imageService, never()).save(anyString(), anyString(), any(byte[].class), any());
+    }
+
+    @Test
+    @DisplayName("an article already there under its title is left alone: a second run writes nothing")
+    void addArticlesTwice(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        liveWebsite();
+
+        DemoContent.Addition addition = demo.addArticles(FolderSeed.write(dir), TEST, List.of(1), true);
+
+        assertThat(addition.applied()).isFalse();
+        assertThat(addition.present()).containsExactly(1);
+        assertThat(addition.added()).isEmpty();
+        nothingWritten();
+    }
+
+    @Test
+    @DisplayName("a number taken by another article, a missing section or author, or a dead link refuses the lot")
+    void addArticlesRefused(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        liveWebsite();
+        Article other = new Article(2);
+        other.setTitle("Something else");
+        when(articles.findById(any())).thenAnswer(c -> Optional.ofNullable(Integer.valueOf(2).equals(c.getArgument(0)) ? other : null));
+        when(articles.existsById(any())).thenReturn(false);
+        DirectorySeed source = FolderSeed.write(dir, FolderSeed.JSON
+                .replace("<p>Six projects", "<p><a href=\\\"/article/9\\\">Before</a>. Six projects"));
+        storedAuthors.remove(1);
+
+        assertThatThrownBy(() -> demo.addArticles(source, TEST, List.of(1, 2, 3), true))
+                .isInstanceOf(DemoContent.Refused.class)
+                .satisfies(e -> assertThat(((DemoContent.Refused) e).reason()).isEqualTo(DemoContent.Refusal.CONFLICT))
+                .hasMessageContaining("the seed has no article 3")
+                .hasMessageContaining("article 2 is taken by \"Something else\"")
+                .hasMessageContaining("article 1: the website has no author 1")
+                .hasMessageContaining("article 1 links /article/9");
+        nothingWritten();
+    }
+
     private void nothingWritten() {
         verify(articles, never()).saveAll(anyIterable());
         verify(categories, never()).save(any());

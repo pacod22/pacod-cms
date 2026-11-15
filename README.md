@@ -76,6 +76,7 @@ make site-create SLUG=acme NAME="Acme News" HOSTS=acme.localhost DEMO=1   # with
 make site-create SLUG=notes NAME="Notes" HOSTS=notes.localhost TEMPLATE=minimal
 make seed SITE=acme                # the demo content into a website that has no articles yet
 make seed SITE=acme SEED_DIR=…     # or a seed of your own, from a folder (docs/RUNNING.md)
+make seed-articles SITE=acme SEED_DIR=… ARTICLES=14,15 [APPLY=1]   # that seed's new articles into a live website, nothing else
 ```
 
 The demo content is written in English, so it is offered only to a website whose content language
