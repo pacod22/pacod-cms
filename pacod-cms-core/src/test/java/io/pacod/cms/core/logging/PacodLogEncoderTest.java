@@ -27,7 +27,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The event of pacod-demo/docs/LOGGING.md, section 4, as both applications write it: the five keys
+ * The event of pacod-stack/docs/LOGGING.md, section 4, as both applications write it: the five keys
  * first and in order, the timestamp's exact shape, the levels, the fields flat and typed, the
  * renaming of a reserved name, the error fields, and the text line.
  */

@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The pacod log event (pacod-demo/docs/LOGGING.md, section 4), as one JSON object or one text line.
+ * The pacod log event (pacod-stack/docs/LOGGING.md, section 4), as one JSON object or one text line.
  * Both apps' logback-spring.xml reach it through {@link PacodLogEncoder}.
  *
  * <p>JSON: {@code timestamp}, {@code level}, {@code service}, {@code logger}, {@code message}, in that

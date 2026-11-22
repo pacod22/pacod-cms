@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  The pacod logging convention, pacod-demo/docs/LOGGING.md: one event per line on stdout, JSON or
+  The pacod logging convention, pacod-stack/docs/LOGGING.md: one event per line on stdout, JSON or
   text (APP_LOG_FORMAT), and a JSON file per service under the log directory. The encoder and the
   level mapping are pacod-cms-core's (io.pacod.cms.core.logging), shared with the other application.
 

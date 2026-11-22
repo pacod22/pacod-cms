@@ -24,7 +24,7 @@ which holds every account, session and role in `pacod-postgres` (volume `pacod-p
 `pacod-db-init` creates its role and database at every start (`platform/postgres/id-db.sh`);
 `pacod-mailpit` catches every mail pacod-id sends; `pacod-gw` and `gw-mock` are the development AI
 gateway (profile `dev-gateway`); `pacod-caddy` is the front door for every host.
-Logging follows the pacod convention, [`pacod-demo/docs/LOGGING.md`](../../pacod-demo/docs/LOGGING.md).
+Logging follows the pacod convention, [`pacod-stack/docs/LOGGING.md`](../../pacod-stack/docs/LOGGING.md).
 Both applications write one event per line to stdout (`make logs`), JSON by default or text with
 `APP_LOG_FORMAT=text` (`env/dev.env` sets it), at the level `APP_LOG_LEVEL` (`debug`, `info`, `warn`,
 `error`; default `info`); `SERVICE_NAME` (`cms-site`, `cms-studio`) is the event's `service`. They
@@ -90,7 +90,7 @@ make up           # make check first; builds pacod-id's image if missing; starts
   and slow. A deployment that pulls a published pacod-id image sets `PACOD_ID_IMAGE` instead. On dev
   and stage it also builds the mock gateway from `PACOD_GW_SRC`.
 - **The Docker network is external and shared.** Both compose files attach every service to
-  `pacod-net`, declared `external: true`, which every pacod repo and the full stack (pacod-demo)
+  `pacod-net`, declared `external: true`, which every pacod repo and the full stack (pacod-stack)
   join; compose never creates it. `make network` does, idempotently, and `make up` runs it first. A
   bare `docker compose up` on a fresh machine aborts with "declared as external, but could not be
   found". The `pacod-*` names are shared too: one stack running them per machine (README, *Shared

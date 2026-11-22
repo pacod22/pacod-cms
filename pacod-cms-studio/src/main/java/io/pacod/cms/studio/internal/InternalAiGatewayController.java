@@ -19,7 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * The installation's pacod-gw address and key, for scripts (pacod-demo's bootstrap, say):
+ * The installation's pacod-gw address and key, for scripts (pacod-stack's bootstrap, say):
  * {@code GET}, {@code PUT} and {@code DELETE /internal/v1/ai-gateway}, as the platform screen sets
  * them -- the same {@link AiGatewayConfig}, the same pairing rule, applied from the next call on.
  * Reached with a pacod-id service token holding {@code platform.manage}

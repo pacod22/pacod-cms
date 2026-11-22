@@ -10,7 +10,7 @@ import org.springframework.test.context.ActiveProfiles;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The studio starts with a broker set, as pacod-demo starts it: {@code PACOD_BROKER_URL} named, no
+ * The studio starts with a broker set, as pacod-stack starts it: {@code PACOD_BROKER_URL} named, no
  * token yet (the demo's bootstrap makes it later), the announcer on and its interval unset. Every other test runs
  * without a broker, where {@link BrokerConfig} creates nothing, so a missing dependency of its beans
  * would only show when a stack set the URL -- as a studio that does not start.

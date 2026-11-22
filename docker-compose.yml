@@ -3,8 +3,8 @@
 # renderer (`cms-gotenberg`). The shared components they use (pacod-caddy, pacod-id and its
 # pacod-postgres, the development gateway pacod-gw, pacod-mailpit) come from
 # docker-compose.standalone.yml, which `make up` loads with this file, or from the full stack
-# (pacod-demo), which loads only this file and provides them once. The naming convention is
-# pacod-demo/docs/NETWORK.md. The studio also joins pacod-admin-net, the internal network on
+# (pacod-stack), which loads only this file and provides them once. The naming convention is
+# pacod-stack/docs/NETWORK.md. The studio also joins pacod-admin-net, the internal network on
 # which pacod-id's internal listener (pacod-id-internal:8071) listens, and nothing else does.
 #
 # One stack hosts every website. Caddy sends the studio's host (STUDIO_HOST, studio.localhost by
@@ -20,7 +20,7 @@
 # (env/<ENV>.env), this machine's .env and an optional .env-local as --env-file, in that order.
 # The defaults below are a developer machine's; docs/RUNNING.md describes dev, stage and prod.
 
-# Every service's container log rotates (pacod-demo/docs/LOGGING.md, section 2): 10 MB a file, five
+# Every service's container log rotates (pacod-stack/docs/LOGGING.md, section 2): 10 MB a file, five
 # files. YAML anchors do not cross files, so each compose file declares its own copy.
 x-logging: &logging
   driver: json-file
@@ -111,7 +111,7 @@ services:
       # The reader log (/mgmt/monitoring/readers): each counted page view with the reader's IP
       # address and User-Agent, kept 31 days. false writes none -- see .env.example.
       READER_LOG: ${READER_LOG:-true}
-      # Logging (pacod-demo/docs/LOGGING.md): the event's service name, the level (debug, info, warn,
+      # Logging (pacod-stack/docs/LOGGING.md): the event's service name, the level (debug, info, warn,
       # error) and stdout's format (json or text; the file under LOG_DIR is JSON either way).
       SERVICE_NAME: cms-site
       APP_LOG_LEVEL: ${APP_LOG_LEVEL:-info}
@@ -233,7 +233,7 @@ services:
       PACOD_SITE_DOMAIN: ${PACOD_SITE_DOMAIN-localhost}
       # true lets the websites share the studio's and pacod-id's registrable domain, which the studio
       # otherwise refuses (StudioDomainCheck): a website's script can then set cookies they receive.
-      # Only where every website is trusted, such as pacod-demo on one domain.
+      # Only where every website is trusted, such as pacod-stack on one domain.
       PACOD_SITE_DOMAIN_SHARED: ${PACOD_SITE_DOMAIN_SHARED:-false}
       PACOD_ORG_CREATION: ${PACOD_ORG_CREATION:-self-service}
       PACOD_MAX_ORGS_PER_USER:

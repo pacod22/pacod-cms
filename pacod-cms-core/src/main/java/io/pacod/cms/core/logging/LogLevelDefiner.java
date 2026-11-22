@@ -6,7 +6,7 @@ import java.util.Locale;
 
 /**
  * APP_LOG_LEVEL (app.log.level) as a logback level, by the pacod convention
- * (pacod-demo/docs/LOGGING.md, section 3): {@code debug}, {@code info}, {@code warn}, {@code error}
+ * (pacod-stack/docs/LOGGING.md, section 3): {@code debug}, {@code info}, {@code warn}, {@code error}
  * (and {@code trace}), any case; {@code warning} means warn; anything else means info.
  *
  * <p>Needed because logback reads an unknown level -- {@code warning} included -- as DEBUG.

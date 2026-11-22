@@ -1,5 +1,5 @@
 # pacod-cms standalone: its own copies of the shared components cms needs, under their shared
-# names (pacod-demo/docs/NETWORK.md) -- the front door (pacod-caddy), sign-in (pacod-id, its
+# names (pacod-stack/docs/NETWORK.md) -- the front door (pacod-caddy), sign-in (pacod-id, its
 # pacod-postgres and pacod-db-init), the development gateway (pacod-gw and gw-mock, profile
 # dev-gateway) and the mail catcher (pacod-mailpit, profile mailpit). Loaded together with
 # docker-compose.yml by `make up`; the full stack does not load this file, it runs one of each
@@ -8,7 +8,7 @@
 # Only one of each pacod-* component runs on a host at a time: stop another repo's standalone stack
 # (or the full stack) before `make up` here.
 
-# Every service's container log rotates (pacod-demo/docs/LOGGING.md, section 2): 10 MB a file, five
+# Every service's container log rotates (pacod-stack/docs/LOGGING.md, section 2): 10 MB a file, five
 # files. YAML anchors do not cross files, so each compose file declares its own copy.
 x-logging: &logging
   driver: json-file

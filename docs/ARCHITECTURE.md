@@ -140,7 +140,7 @@ every other host to `cms-site`. In production it serves every host over HTTPS, o
 website's certificate on demand once the site confirms the host is an active website's, or serving
 a certificate pair the deployment supplies for the names it covers; in development it serves plain
 HTTP, and HTTPS from its own local CA. Both run the same rules for cms's sites
-(`platform/caddy/cms.caddy`), which the full stack (pacod-demo) imports too: every container is on
+(`platform/caddy/cms.caddy`), which the full stack (pacod-stack) imports too: every container is on
 the shared network `pacod-net`. The studio and the websites must be on different registrable
 domains; the studio refuses to start otherwise
 ([`SECURITY.md`](SECURITY.md)), unless `PACOD_SITE_DOMAIN_SHARED=true` says the risk is accepted:

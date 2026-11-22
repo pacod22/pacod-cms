@@ -38,7 +38,7 @@
 # CMS_PUBLIC_SITE names the websites' hosts instead of catching every host.
 #   CMS_CADDY_LOG_FORMAT  the access log's format, `json` (the default) or `console` (Caddy's text);
 #                     every site importing cms-front logs each request to stdout in it, with
-#                     sign-in codes, tokens and keys removed (pacod-demo/docs/LOGGING.md, section 6).
+#                     sign-in codes, tokens and keys removed (pacod-stack/docs/LOGGING.md, section 6).
 # A variable set to the empty string is used as such, not replaced by the default: leave it unset.
 
 (cms-forward) {
@@ -47,7 +47,7 @@
 }
 
 (cms-front) {
-	# Each request, to stdout (pacod-demo/docs/LOGGING.md, section 6), in CMS_CADDY_LOG_FORMAT. The
+	# Each request, to stdout (pacod-stack/docs/LOGGING.md, section 6), in CMS_CADDY_LOG_FORMAT. The
 	# query parameters and headers that carry sign-in codes, tokens and keys are removed -- the
 	# studio's and pacod-id's sign-in round trips put `code` and `state` in the address, and a
 	# Referer repeats an address whole. Caddy itself leaves out Cookie, Set-Cookie and Authorization.
