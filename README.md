@@ -109,7 +109,7 @@ the data; `make destroy` also drops the volumes — the content and every pacod-
 
 pacod-cms runs on **`pacod-net`**, the external Docker network every pacod repo shares (`make
 network`, run by `make up`, creates it), and follows their naming convention,
-[`pacod-demo/docs/NETWORK.md`](../pacod-demo/docs/NETWORK.md): a container's name is its service's
+[`pacod-stack/docs/NETWORK.md`](../pacod-stack/docs/NETWORK.md): a container's name is its service's
 and its address on the network.
 
 Listeners that only servers reach are on a second shared network, **`pacod-admin-net`**, which is
@@ -123,7 +123,7 @@ address; `http://pacod-id:8071` no longer answers.
 - **`docker-compose.standalone.yml`**: cms's copies of the shared components it uses — `pacod-caddy`,
   `pacod-id` with `pacod-postgres` and `pacod-db-init` (which runs `platform/postgres/*-db.sh`),
   `pacod-gw` and `gw-mock` (profile `dev-gateway`) and `pacod-mailpit` (profile `mailpit`). `make`
-  loads both files; the full stack (`pacod-demo`) loads only the app file and runs one of each shared
+  loads both files; the full stack (`pacod-stack`) loads only the app file and runs one of each shared
   component for every product.
 - **`docker-compose.external.yml`** (`PROXY_MODE=external`): in place of the standalone file on a
   host whose Caddy and pacod-id already run — the site and the studio join that Caddy's network,
@@ -384,7 +384,7 @@ every setting a `.env` may hold. The secrets have no published default; `make ch
 | CORS | `CORS_ALLOWED_ORIGINS` |
 | TLS in the JVM | `SSL_ENABLED` `SSL_KEYSTORE` `SSL_KEYSTORE_PASSWORD` `SSL_KEY_ALIAS` |
 | Paths | `LOG_DIR` `STORAGE_ROOT` (container side) · `MONGO_DATA_DIR` `LOG_DIR_HOST` `STORAGE_HOST` (host side) |
-| Logging | `APP_LOG_LEVEL` (`debug`, `info`, `warn`, `error`; default `info`) `APP_LOG_FORMAT` (stdout `json` or `text`; default `json`, `text` on dev) · `CMS_CADDY_LOG_FORMAT` (Caddy's access log, `json` or `console`) · files `cms-site.log`, `cms-studio.log` (JSON) under `LOG_DIR_HOST`. The convention: [`pacod-demo/docs/LOGGING.md`](../pacod-demo/docs/LOGGING.md) |
+| Logging | `APP_LOG_LEVEL` (`debug`, `info`, `warn`, `error`; default `info`) `APP_LOG_FORMAT` (stdout `json` or `text`; default `json`, `text` on dev) · `CMS_CADDY_LOG_FORMAT` (Caddy's access log, `json` or `console`) · files `cms-site.log`, `cms-studio.log` (JSON) under `LOG_DIR_HOST`. The convention: [`pacod-stack/docs/LOGGING.md`](../pacod-stack/docs/LOGGING.md) |
 | Caddy | `HTTP_PORT` `HTTPS_PORT` · `CADDYFILE` (the preset's: `Caddyfile.dev` on dev, `Caddyfile` else) · `CMS_STUDIO_SITE` `CMS_PUBLIC_SITE` (its site addresses, derived from `STUDIO_HOST` and the preset) · `SSL_CERT_FILE` `SSL_KEY_FILE` (a certificate pair of your own, optional) · `CADDY_GLOBAL_OPTIONS` · `MAILPIT_PORT` (the mail catcher's page) |
 | Environment | `ENV` (`dev`, `stage`, `prod`) · `PUBLISH_IP` (where the applications' and MongoDB's own ports listen: every interface on dev, loopback else) · `DEMO_WEBSITES` (the demo websites on an empty platform: on for dev and stage) · `COMPOSE_PROFILES` (`dev-gateway`, `mailpit`) |
 

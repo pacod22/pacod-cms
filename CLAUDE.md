@@ -696,7 +696,7 @@ checks first only so its screens offer what would succeed.
 - **The provisioner** is a pacod-id service account holding `cms.provisioner` at the platform, made
   by `make id-provisioner` (`scripts/id-provisioner.mjs`, run by `make up`; with this machine's Node,
   else in a `NODE_IMAGE` container that reaches `ID_HOST` through host-gateway; refused while
-  `cms-studio` belongs to another compose project, as pacod-demo's, whose `make bootstrap` makes it): it signs in as the
+  `cms-studio` belongs to another compose project, as pacod-stack's, whose `make bootstrap` makes it): it signs in as the
   bootstrap admin through the hosted pages' API, uses `/ui-api/v1/admin` (writes need the issuer's
   `Origin`), and writes `PACOD_ID_PROVISIONER_TOKEN`/`_ACCOUNT` into whichever of `.env-local` and
   `.env` already names the token, else `.env` (a new token beside an old one in the later file
@@ -747,7 +747,7 @@ checks first only so its screens offer what would succeed.
   literal origin is skipped with a WARN. Stored `domain` rows that share one are only **reported at
   ERROR** after startup (with `pacod.bootstrap.enabled`): refusing to start over data would take
   every website's studio down. **`pacod.portal.site-domain-shared`** (`PACOD_SITE_DOMAIN_SHARED`,
-  off) accepts the risk for an installation whose websites are all trusted (pacod-demo on one
+  off) accepts the risk for an installation whose websites are all trusted (pacod-stack on one
   domain): the refusal becomes a WARN, the stored rows' report WARN, and `DomainRules` drops its
   `sameSite` rule — never the `reserved` one.
 - **A website's settings** (`/sites/<id>/mgmt/settings`, `website.manage`): name, content language,
@@ -2714,7 +2714,7 @@ application's account without one.
   it in production. Compose declares it without a value so unset stays unset.
 - **No keystore is committed** (`make keystore` makes one; see `docs/DEPLOYMENT.md`).
   Each base `application.properties` hardcodes `spring.profiles.active=prod`.
-- **Logging is the pacod convention** (`pacod-demo/docs/LOGGING.md`). Both `logback-spring.xml`
+- **Logging is the pacod convention** (`pacod-stack/docs/LOGGING.md`). Both `logback-spring.xml`
   use core's `core.logging.PacodLogEncoder`: one event per line on stdout, JSON (`timestamp`,
   `level`, `service`, `logger`, `message`, then the MDC and SLF4J's `addKeyValue` pairs flat, then
   `error`/`stack_trace`) or text by `app.log.format` (`APP_LOG_FORMAT`, default `json`; `env/dev.env`
@@ -2734,7 +2734,7 @@ application's account without one.
 The root `Dockerfile` builds both applications, chosen by the `MODULE` build arg; its `ENTRYPOINT`
 passes container arguments through (`"$@"`), which `make site-create` relies on.
 
-**Two compose files on one shared network** (pacod-demo's convention, `pacod-demo/docs/NETWORK.md`:
+**Two compose files on one shared network** (pacod-stack's convention, `pacod-stack/docs/NETWORK.md`:
 service key = `container_name` = DNS name; shared components `pacod-*`, cms's own `cms-*`, volume
 keys likewise). **`docker-compose.yml`, the app file**, holds cms's own services: `cms-mongo`,
 `cms-site` (8443 inside, `${WEB_PORT:-8080}`), `cms-studio` (7443, `${MGMT_PORT:-7070}`,
@@ -2757,7 +2757,7 @@ public listener 8070, internal 8071 bound to `pacod-id-internal` on `pacod-admin
 pacod-id's `id-db.sh`, a verbatim copy of pacod-id's: role and database `pacod_id`, password set
 each time) and `pacod-mailpit` (every mail pacod-id sends; published on loopback only,
 `${MAILPIT_PORT:-8125}`), and under the profile `dev-gateway` `pacod-gw`/`gw-mock` (the
-development AI gateway, *AI*). **The Makefile's `COMPOSE` loads both**; the full stack (pacod-demo)
+development AI gateway, *AI*). **The Makefile's `COMPOSE` loads both**; the full stack (pacod-stack)
 loads only the app file and provides the shared components once, which is why the app file names
 them only by address (`http://pacod-id-internal:8071`, `http://pacod-gw:8080`) and never in a `depends_on`
 (one would need `required: false`). The network `pacod-net` is **external** and shared by every
@@ -2844,7 +2844,7 @@ and `docs/RUNNING.md` (*Moving to pacod-net*) copies them.
   sign-in throttle covers all. **SMTP defaults to `pacod-mailpit`** (`PID_SMTP_HOST`, port 1025,
   `PID_SMTP_TLS: none`); production names a relay. `make destroy` drops `pacod-postgres-data`: every
   account and binding.
-- **Logs (`pacod-demo/docs/LOGGING.md`).** Each compose file declares its own `x-logging` anchor
+- **Logs (`pacod-stack/docs/LOGGING.md`).** Each compose file declares its own `x-logging` anchor
   (`json-file`, 10m, five files; anchors do not cross files) and **every service carries `logging:
   *logging`**, third-party ones and the profile-gated ones included — a new service gets it too.
   `cms-site` and `cms-studio` take `SERVICE_NAME`, `APP_LOG_LEVEL`, `APP_LOG_FORMAT` and `LOG_DIR:

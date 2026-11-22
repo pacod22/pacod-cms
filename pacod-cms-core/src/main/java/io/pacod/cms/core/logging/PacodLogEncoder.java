@@ -8,7 +8,7 @@ import java.util.Locale;
 
 /**
  * The logback encoder of both apps (logback-spring.xml): one pacod log event per line
- * (pacod-demo/docs/LOGGING.md), as JSON or as text.
+ * (pacod-stack/docs/LOGGING.md), as JSON or as text.
  *
  * <pre>{@code
  * <encoder class="io.pacod.cms.core.logging.PacodLogEncoder">

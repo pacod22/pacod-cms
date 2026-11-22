@@ -223,7 +223,7 @@ if [ -n "$(get SSL_CERT_FILE)$(get SSL_KEY_FILE)" ]; then
 fi
 
 # ---- names from before the shared network pacod-net ----------------------------------------------
-# The services and volumes were renamed (pacod-demo/docs/NETWORK.md); a value naming an old one
+# The services and volumes were renamed (pacod-stack/docs/NETWORK.md); a value naming an old one
 # reaches nothing, and a volume under its old name is data the stack would no longer see.
 for pair in "PID_SMTP_HOST:mailpit" "PACOD_GW_URL:http://gw:" "PACOD_PDF_GOTENBERG_URL:http://gotenberg:" "MONGO_DATA_DIR:mongo-data"; do
   key=${pair%%:*} old=${pair#*:}

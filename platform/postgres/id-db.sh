@@ -7,7 +7,7 @@
 # variables (PGHOST, PGUSER, PGPASSWORD). Safe to run again: it creates what is missing and sets
 # the role's password to PID_DB_PASSWORD. The password is read with psql's \getenv, so it is on no
 # command line, and nothing secret is printed. The same file serves pacod-id's development stack
-# (deploy/compose/docker-compose.standalone.yml) and the full stack (pacod-demo).
+# (deploy/compose/docker-compose.standalone.yml) and the full stack (pacod-stack).
 
 set -eu
 
